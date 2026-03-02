@@ -4903,8 +4903,13 @@ body.theme-dark {
 }
 
 /* ─── Export Modal ──────────────────────────────────────────── */
-.storyline-export-modal {
+.modal:has(.storyline-export-modal) {
     max-width: 420px;
+    width: 420px;
+}
+
+.storyline-export-modal {
+    max-width: 100%;
 }
 
 .storyline-export-project-name {

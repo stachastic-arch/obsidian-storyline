@@ -10,6 +10,7 @@ import { RelationshipMap } from '../components/RelationshipMap';
 import { StoryGraph } from '../components/StoryGraph';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
 import { isMobile, DESKTOP_ONLY_CHARACTER_MODES, applyMobileClass } from '../components/MobileAdapter';
+import { RenameConfirmModal } from '../components/RenameConfirmModal';
 
 import type SceneCardsPlugin from '../main';
 
@@ -42,6 +43,8 @@ export class CharacterView extends ItemView {
     private relationshipMap: RelationshipMap | null = null;
     /** Active StoryGraph instance (cleaned up on re-render) */
     private storyGraph: StoryGraph | null = null;
+    /** Original name when the detail view was opened — used for cascade rename detection */
+    private originalCharacterName: string | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -329,8 +332,10 @@ export class CharacterView extends ItemView {
         // Name
         card.createEl('h4', { text: char.name });
 
-        // Short description snippet
-        const snippet = char.personality || char.occupation || char.age || '';
+        // Short description snippet — per-character tagline field selector, with auto fallback
+        const taglineKey = char.tagline; // a field key like 'personality', 'occupation', etc.
+        const autoSnippet = char.personality || char.occupation || char.role || '';
+        const snippet = (taglineKey ? ((char as any)[taglineKey] || '') : '') || autoSnippet;
         if (snippet) {
             card.createEl('p', { cls: 'character-card-snippet', text: snippet });
         }
@@ -614,6 +619,8 @@ export class CharacterView extends ItemView {
         const draft: Character = { ...character, custom: { ...(character.custom || {}) } };
         // Snapshot for undo — taken once when the detail view opens
         this.undoSnapshot = { ...character, custom: { ...(character.custom || {}) } };
+        // Track original name for cascade rename detection
+        this.originalCharacterName = character.name;
 
         // Back button + character name header
         const header = container.createDiv('character-detail-header');
@@ -739,6 +746,28 @@ export class CharacterView extends ItemView {
             return;
         }
 
+        if (field.key === 'tagline') {
+            // Tagline is a dropdown that picks which other field to show on the card
+            const select = row.createEl('select', { cls: 'character-field-input dropdown' });
+            select.createEl('option', { text: 'Auto (personality → occupation → role)', value: '' });
+            const taglineOptions: { key: string; label: string }[] = [];
+            for (const cat of CHARACTER_CATEGORIES) {
+                for (const f of cat.fields) {
+                    if (['name', 'tagline', 'relations', 'locations', 'image'].includes(f.key)) continue;
+                    taglineOptions.push({ key: f.key, label: f.label });
+                }
+            }
+            for (const opt of taglineOptions) {
+                const el = select.createEl('option', { text: opt.label, value: opt.key });
+                if (value === opt.key) el.selected = true;
+            }
+            select.addEventListener('change', () => {
+                (draft as any)[field.key] = select.value;
+                this.scheduleSave(draft);
+            });
+            return;
+        }
+
         if (field.key === 'role') {
             // Role gets a dropdown
             const select = row.createEl('select', { cls: 'character-field-input dropdown' });
@@ -777,6 +806,13 @@ export class CharacterView extends ItemView {
                 (draft as any)[field.key] = input.value;
                 this.scheduleSave(draft);
             });
+
+            // ── Cascade rename: check when leaving the Name field ──
+            if (field.key === 'name') {
+                input.addEventListener('blur', () => {
+                    this.checkCharacterRename(draft, input);
+                });
+            }
         }
     }
 
@@ -1452,6 +1488,47 @@ export class CharacterView extends ItemView {
                 console.error('StoryLine: failed to save character', e);
             }
         }, 600);
+    }
+
+    /**
+     * Check if the character name changed and offer to cascade-update all references.
+     * Called on blur of the Name input field.
+     */
+    private checkCharacterRename(draft: Character, inputEl: HTMLInputElement): void {
+        const oldName = this.originalCharacterName;
+        const newName = draft.name?.trim();
+        if (!oldName || !newName || oldName === newName) return;
+
+        const service = this.plugin.cascadeRename;
+        const preview = service.previewCharacterRename(oldName, newName);
+        const total = preview.sceneCount + preview.relationCount;
+        if (total === 0) {
+            // No references to update — just silently update the tracked name
+            this.originalCharacterName = newName;
+            return;
+        }
+
+        const summary = service.buildSummary(preview);
+        const modal = new RenameConfirmModal(
+            this.app,
+            'character',
+            oldName,
+            newName,
+            preview,
+            summary,
+            async () => {
+                await service.cascadeCharacterRename(oldName, newName);
+                this.originalCharacterName = newName;
+                new Notice(`Updated ${total} reference${total !== 1 ? 's' : ''} from "${oldName}" to "${newName}"`);
+            },
+            () => {
+                // User cancelled — revert the name back
+                draft.name = oldName;
+                inputEl.value = oldName;
+                this.scheduleSave(draft);
+            },
+        );
+        modal.open();
     }
 
     /** Immediately flush any pending debounced save */

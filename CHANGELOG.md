@@ -2,12 +2,47 @@
 
 ---
 
+## Version 1.3.1
+
+Version 1.3.1 fixes:
+
+**Cascade Rename**
+Renaming a character or location now updates all references across the project, with a confirmation modal.
+
+**PlotGrid Editing**
+Inspector textarea edits no longer get wiped by grid re-renders. Headers are also protected while editing.
+
+**Family/Background Field**
+Moved from "Basic Information" to the "Relationships" section in character view.
+
+**Character Tagline Setting**
+New setting to choose which field appears as the tagline on character cards.
+
+**Scene Deselect on Save**
+Selected scene stays selected after saving/refreshing in Board and Timeline views.
+
+**Scene Rename in Inspector**
+Editing a scene title in the inspector no longer causes the inspector to re-render mid-typing.
+
+**Larger Textareas**
+Description and Conflict fields increased from 4/2 rows to 12 rows each.
+*Note that right clicking on a scene and choosing edit will open the scene and you can type as much as you like.*
+
+**Split Scene Fix**
+Split no longer deletes the first half. The split button was accidentally calling the delete handler instead of a refresh.
+
+**More options for Location types.**
+
+
+
+
+
 ## Version 1.3.0
 
 > **⚠️ Important — Back up your StoryLine folder before updating!**
->
+> 
 > This release includes a one-time automatic migration that moves per-project settings out of the shared `data.json` file and into individual `System/` files inside each project folder. This is a necessary change to make StoryLine work reliably across multiple devices (desktop, mobile, sync services).
->
+> 
 > The migration runs automatically on first launch and should be seamless, but as a precaution, **please make a copy of your entire `StoryLine/` folder** before installing version 1.3.0 — just in case something goes wrong.
 
 ### New Features

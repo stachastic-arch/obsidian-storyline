@@ -173,6 +173,7 @@ export class PlotgridView extends ItemView {
                 {
                     onEdit: (scene) => this.openScene(scene),
                     onDelete: (scene) => this.deleteScene(scene),
+                    onRefresh: () => this.renderGrid(),
                     onStatusChange: async (scene, status) => {
                         await sceneManager.updateScene(scene.filePath, { status });
                         this.renderGrid();
@@ -983,6 +984,8 @@ export class PlotgridView extends ItemView {
             if (this.saveDebounce) return;
             // If a cell is being edited, skip refresh to avoid destroying the textarea
             if (this.canvasEl?.querySelector('.plot-grid-cell.editing')) return;
+            // If any input/textarea in the grid or inspector is focused, skip refresh to avoid losing edits
+            if (this.wrapperEl?.querySelector('input:focus, textarea:focus')) return;
             await this.loadData();
             // If the view hasn't been opened yet, `wrapperEl` will be null — skip rendering
             if (!this.wrapperEl) return;
@@ -2161,6 +2164,13 @@ export class PlotgridView extends ItemView {
         const row = this.data.rows[rowIndex];
         const col = this.data.columns[colIndex];
 
+        // Stable key so we can always resolve the canonical cell in this.data
+        // even after refresh() replaces this.data with freshly-loaded data.
+        const cellKey = `${row?.id}-${col?.id}`;
+
+        // Helper: get the live cell object from the current this.data
+        const getCell = (): CellData => this.data.cells[cellKey] ?? cell;
+
         // ── Header ──
         const header = el.createDiv('inspector-header');
         header.createEl('h3', { text: 'Cell Details' });
@@ -2180,7 +2190,7 @@ export class PlotgridView extends ItemView {
         textSection.createSpan({ cls: 'inspector-label', text: 'Content:' });
         const textArea = textSection.createEl('textarea', { cls: 'inspector-cell-textarea' });
         textArea.value = cell.content || '';
-        textArea.rows = 4;
+        textArea.rows = 8;
         textArea.style.width = '100%';
         textArea.style.resize = 'vertical';
         textArea.style.marginTop = '4px';
@@ -2192,22 +2202,43 @@ export class PlotgridView extends ItemView {
         textArea.style.font = 'inherit';
         textArea.style.fontSize = '13px';
 
+        // ── Scan results container ── (created before event handlers so they can reference it)
+        const scanContainer = el.createDiv('inspector-scan-results');
+        this.updateCellInspectorScan(scanContainer, cell);
+
         let textSaveTimer: number | null = null;
         textArea.addEventListener('input', () => {
+            const liveCell = getCell();
+            liveCell.content = textArea.value;
+            liveCell.manualContent = true;
+            // Also keep the closure reference in sync (in case it diverged after a refresh)
             cell.content = textArea.value;
             cell.manualContent = true;
+            // Update the cell's visible content in the grid without a full re-render
+            if (this.selectedRow !== null && this.selectedCol !== null) {
+                const gridCellEl = this.getCellElement(this.selectedRow, this.selectedCol);
+                if (gridCellEl) {
+                    const contentDiv = gridCellEl.querySelector('div') as HTMLElement | null;
+                    if (contentDiv) contentDiv.textContent = liveCell.content || '';
+                }
+            }
             if (textSaveTimer) window.clearTimeout(textSaveTimer);
             textSaveTimer = window.setTimeout(() => {
                 this.scheduleSave();
-                this.renderGrid();
                 // Re-scan and update the inspector sections below
-                this.updateCellInspectorScan(el, cell);
+                this.updateCellInspectorScan(scanContainer, liveCell);
             }, 600);
         });
-
-        // ── Scan results container ──
-        const scanContainer = el.createDiv('inspector-scan-results');
-        this.updateCellInspectorScan(scanContainer, cell);
+        textArea.addEventListener('blur', () => {
+            if (textSaveTimer) { window.clearTimeout(textSaveTimer); textSaveTimer = null; }
+            const liveCell = getCell();
+            liveCell.content = textArea.value;
+            liveCell.manualContent = true;
+            cell.content = textArea.value;
+            cell.manualContent = true;
+            this.scheduleSave();
+            this.updateCellInspectorScan(scanContainer, liveCell);
+        });
 
         // ── Linked scene ──
         const scMgr = this.plugin?.sceneManager as SceneManager | undefined;

@@ -62,10 +62,19 @@ export type LocationType =
     | 'city'
     | 'town'
     | 'village'
+    | 'neighborhood'
     | 'building'
     | 'room'
     | 'wilderness'
-    | 'landmark'
+    | 'forest'
+    | 'mountain'
+    | 'river'
+    | 'lake'
+    | 'sea'
+    | 'island'
+    | 'harbour'
+    | 'road'
+    | 'vehicle'
     | 'region'
     | 'country'
     | 'other';
@@ -220,10 +229,19 @@ export const LOCATION_TYPES: string[] = [
     'City',
     'Town',
     'Village',
+    'Neighborhood',
     'Building',
     'Room',
     'Wilderness',
-    'Landmark',
+    'Forest',
+    'Mountain',
+    'River',
+    'Lake',
+    'Sea',
+    'Island',
+    'Harbour',
+    'Road',
+    'Vehicle',
     'Region',
     'Country',
     'Other',

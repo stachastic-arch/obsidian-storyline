@@ -14,6 +14,7 @@ import { pickImage as pickImageModal, resolveImagePath } from '../components/Ima
 
 import type SceneCardsPlugin from '../main';
 import { CharacterManager } from '../services/CharacterManager';
+import { RenameConfirmModal } from '../components/RenameConfirmModal';
 
 import { LOCATION_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
@@ -39,6 +40,10 @@ export class LocationView extends ItemView {
     private undoSnapshot: WorldOrLocation | null = null;
     private _lastSaveTime = 0;
     private static readonly SAVE_REFRESH_GRACE_MS = 2000;
+    /** Original name when the detail view was opened — used for cascade rename detection */
+    private originalItemName: string | null = null;
+    /** Original type (world vs location) when the detail view was opened */
+    private originalItemType: 'world' | 'location' | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -329,6 +334,9 @@ export class LocationView extends ItemView {
         const draft: WorldOrLocation = { ...item, custom: { ...(item.custom || {}) } };
         // Snapshot for undo — taken once when the detail view opens
         this.undoSnapshot = { ...item, custom: { ...(item.custom || {}) } };
+        // Track original name for cascade rename detection
+        this.originalItemName = item.name;
+        this.originalItemType = item.type;
 
         // Header
         const header = container.createDiv('location-detail-header');
@@ -505,6 +513,13 @@ export class LocationView extends ItemView {
                 (draft as any)[field.key] = input.value;
                 this.scheduleSave(draft);
             });
+
+            // ── Cascade rename: check when leaving the Name field ──
+            if (field.key === 'name') {
+                input.addEventListener('blur', () => {
+                    this.checkLocationRename(draft, input);
+                });
+            }
         }
     }
 
@@ -813,6 +828,54 @@ export class LocationView extends ItemView {
                 console.error('StoryLine: failed to save location/world', e);
             }
         }, 600);
+    }
+
+    /**
+     * Check if a world/location name changed and offer to cascade-update all references.
+     * Called on blur of the Name input field.
+     */
+    private checkLocationRename(draft: WorldOrLocation, inputEl: HTMLInputElement): void {
+        const oldName = this.originalItemName;
+        const newName = draft.name?.trim();
+        if (!oldName || !newName || oldName === newName) return;
+
+        const service = this.plugin.cascadeRename;
+        const isWorld = this.originalItemType === 'world';
+
+        const preview = isWorld
+            ? service.previewWorldRename(oldName, newName)
+            : service.previewLocationRename(oldName, newName);
+        const total = preview.sceneCount + preview.locationCount + preview.characterLocationCount;
+        if (total === 0) {
+            this.originalItemName = newName;
+            return;
+        }
+
+        const summary = service.buildSummary(preview);
+        const modal = new RenameConfirmModal(
+            this.app,
+            isWorld ? 'world' : 'location',
+            oldName,
+            newName,
+            preview,
+            summary,
+            async () => {
+                if (isWorld) {
+                    await service.cascadeWorldRename(oldName, newName);
+                } else {
+                    await service.cascadeLocationRename(oldName, newName);
+                }
+                this.originalItemName = newName;
+                new Notice(`Updated ${total} reference${total !== 1 ? 's' : ''} from "${oldName}" to "${newName}"`);
+            },
+            () => {
+                // User cancelled — revert the name back
+                draft.name = oldName;
+                inputEl.value = oldName;
+                this.scheduleSave(draft);
+            },
+        );
+        modal.open();
     }
 
     /** Immediately flush any pending debounced save */

@@ -11,6 +11,8 @@ export interface Character {
     // ── Basic Information ──────────────────────────────
     /** Character name */
     name: string;
+    /** Short tagline — key of another field to display on character cards */
+    tagline?: string;
     /** Vault-relative path to a portrait/avatar image */
     image?: string;
     /** Nicknames or aliases */
@@ -249,19 +251,20 @@ export const CHARACTER_CATEGORIES: CharacterFieldCategory[] = [
         icon: 'user',
         fields: [
             { key: 'name', label: 'Name', placeholder: 'Full name of the character' },
+            { key: 'tagline', label: 'Tagline', placeholder: 'Choose which field to show on the card' },
             { key: 'nickname', label: 'Nickname / Alias', placeholder: 'Alternative names and their origins' },
             { key: 'age', label: 'Age', placeholder: 'Date of birth, current life stage' },
             { key: 'role', label: 'Role in Story', placeholder: 'Protagonist, antagonist, mentor, sidekick…' },
             { key: 'occupation', label: 'Occupation', placeholder: 'Current job, income level, career history' },
             { key: 'residency', label: 'Residency', placeholder: 'Where they are from and where they currently live' },
             { key: 'locations', label: 'Locations', placeholder: 'Story locations they appear at (e.g. The Tavern, Castle Ruins)' },
-            { key: 'family', label: 'Family / Background', placeholder: 'Relationships with parents, siblings, spouse…', multiline: true },
         ],
     },
     {
         title: 'Relationships',
         icon: 'users',
         fields: [
+            { key: 'family', label: 'Family / Background', placeholder: 'Relationships with parents, siblings, spouse…', multiline: true },
             { key: 'relations', label: 'Relations', placeholder: 'Add relation rows by category and type' },
         ],
     },
@@ -321,7 +324,7 @@ export const CHARACTER_CATEGORIES: CharacterFieldCategory[] = [
  * Frontmatter keys that map to Character fields (excludes computed/meta keys)
  */
 export const CHARACTER_FIELD_KEYS: (keyof Character)[] = [
-    'name', 'image', 'nickname', 'age', 'role', 'occupation', 'residency', 'locations', 'family', 'relations',
+    'name', 'tagline', 'image', 'nickname', 'age', 'role', 'occupation', 'residency', 'locations', 'family', 'relations',
     'appearance', 'distinguishingFeatures', 'style', 'quirks',
     'personality', 'internalMotivation', 'externalMotivation', 'strengths', 'flaws', 'fears', 'belief', 'misbelief',
     'formativeMemories', 'accomplishments', 'secrets',

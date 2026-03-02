@@ -155,6 +155,7 @@ export class BoardView extends ItemView {
             {
                 onEdit: (scene) => this.openScene(scene),
                 onDelete: (scene) => this.deleteScene(scene),
+                onRefresh: () => this.refreshBoard(),
                 onStatusChange: async (scene, status) => {
                     await this.sceneManager.updateScene(scene.filePath, { status });
                     this.refreshBoard();
@@ -2323,7 +2324,17 @@ export class BoardView extends ItemView {
      */
     refresh(): void {
         if (this.rootContainer) {
+            const prevSelectedPath = this.selectedScene?.filePath ?? null;
             this.renderView(this.rootContainer);
+            // Restore scene selection & inspector after full re-render
+            if (prevSelectedPath) {
+                const updated = this.sceneManager.getScene(prevSelectedPath);
+                if (updated) {
+                    this.selectedScene = updated;
+                    this.selectedScenes.add(updated.filePath);
+                    this.inspectorComponent?.show(updated);
+                }
+            }
         }
     }
 

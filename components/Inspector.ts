@@ -21,6 +21,7 @@ export class InspectorComponent {
     private currentScene: Scene | null = null;
     private onEdit: (scene: Scene) => void;
     private onDelete: (scene: Scene) => void;
+    private onRefresh: () => void;
     private onStatusChange: (scene: Scene, newStatus: SceneStatus) => void;
 
     /**
@@ -39,6 +40,7 @@ export class InspectorComponent {
         callbacks: {
             onEdit: (scene: Scene) => void;
             onDelete: (scene: Scene) => void;
+            onRefresh: () => void;
             onStatusChange: (scene: Scene, newStatus: SceneStatus) => void;
         }
     ) {
@@ -47,6 +49,7 @@ export class InspectorComponent {
         this.sceneManager = sceneManager;
         this.onEdit = callbacks.onEdit;
         this.onDelete = callbacks.onDelete;
+        this.onRefresh = callbacks.onRefresh;
         this.onStatusChange = callbacks.onStatusChange;
     }
 
@@ -54,6 +57,14 @@ export class InspectorComponent {
      * Show inspector for a scene
      */
     show(scene: Scene): void {
+        // If the user is actively editing inside the inspector, skip the
+        // re-render to avoid destroying their in-progress input.  Just
+        // update the backing scene reference so the next blur/change
+        // handler writes to the correct object.
+        if (this.container.querySelector('input:focus, textarea:focus, select:focus')) {
+            this.currentScene = scene;
+            return;
+        }
         this.currentScene = scene;
         this.render();
         this.container.style.display = 'block';
@@ -522,7 +533,7 @@ export class InspectorComponent {
             descSection.createSpan({ cls: 'inspector-label', text: 'Description:' });
             const descInput = descSection.createEl('textarea', {
                 cls: 'inspector-description-input',
-                attr: { placeholder: 'Scene description / body text…', rows: '4' },
+                attr: { placeholder: 'Scene description / body text…', rows: '12' },
             });
             descInput.value = scene.body || '';
             styleInput(descInput);
@@ -543,7 +554,7 @@ export class InspectorComponent {
         conflictSection.createSpan({ cls: 'inspector-label', text: 'Conflict:' });
         const conflictInput = conflictSection.createEl('textarea', {
             cls: 'inspector-conflict-input',
-            attr: { placeholder: 'What is the main conflict?', rows: '2' },
+            attr: { placeholder: 'What is the main conflict?', rows: '12' },
         });
         conflictInput.value = scene.conflict || '';
         styleInput(conflictInput);
@@ -626,9 +637,9 @@ export class InspectorComponent {
         });
         splitBtn.addEventListener('click', () => {
             new SplitSceneModal(this.plugin, scene, () => {
-                // After split, hide inspector and notify parent to refresh
+                // After split, hide inspector and refresh the board
                 this.hide();
-                this.onDelete(scene); // triggers board refresh
+                this.onRefresh();
             }).open();
         });
 

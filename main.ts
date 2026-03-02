@@ -27,6 +27,7 @@ import { ExportModal } from './components/ExportModal';
 import { WritingTracker } from './services/WritingTracker';
 import { SnapshotManager } from './services/SnapshotManager';
 import { LinkScanner } from './services/LinkScanner';
+import { CascadeRenameService } from './services/CascadeRenameService';
 
 /**
  * StoryLine Plugin for Obsidian
@@ -43,6 +44,7 @@ export default class SceneCardsPlugin extends Plugin {
     writingTracker: WritingTracker = new WritingTracker();
     snapshotManager: SnapshotManager;
     linkScanner: LinkScanner;
+    cascadeRename: CascadeRenameService;
     /** The leaf currently hosting a StoryLine view */
     storyLeaf: WorkspaceLeaf | null = null;
     /** Removes native browser tooltips (`title`) inside StoryLine UI */
@@ -57,6 +59,7 @@ export default class SceneCardsPlugin extends Plugin {
         this.characterManager = new CharacterManager(this.app);
         this.snapshotManager = new SnapshotManager(this.app);
         this.linkScanner = new LinkScanner(this.characterManager, this.locationManager);
+        this.cascadeRename = new CascadeRenameService(this.app, this.sceneManager, this.characterManager, this.locationManager);
 
         // Wire up undo/redo to refresh views + re-index
         this.sceneManager.undoManager.onAfterUndoRedo = async () => {

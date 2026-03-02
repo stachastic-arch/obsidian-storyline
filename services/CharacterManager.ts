@@ -274,6 +274,7 @@ export class CharacterManager {
             filePath,
             type: 'character',
             name: fm.name || basename,
+            tagline: fm.tagline,
             image: fm.image,
             nickname: fm.nickname,
             age: fm.age != null ? String(fm.age) : undefined,

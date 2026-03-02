@@ -364,6 +364,9 @@ export interface SceneCardsSettings {
     // e.g. { "sven": "Sven Andersson" } — user-defined via "Link to…" in Characters view
     characterAliases: Record<string, string>;
 
+    // Which character field to show as the tagline on cards ('auto' = personality → occupation → age)
+    characterTaglineField: string;
+
     // Character names to hide from the "no profile yet" list (lowercased)
     ignoredCharacters: string[];
 
@@ -417,6 +420,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     tagTypeOverrides: {},
 
     characterAliases: {},
+
+    characterTaglineField: 'auto',
 
     ignoredCharacters: [],
 
