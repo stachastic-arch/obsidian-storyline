@@ -18,7 +18,7 @@
 
 - **Corkboard smoothness** — Improved drag performance with `requestAnimationFrame`, added inertia on release, and smoother zoom transitions.
 
-- **Character elaboration fields** — Expanded character profile sections with additional detail fields.
+- 
 
 ### Bug Fixes
 
