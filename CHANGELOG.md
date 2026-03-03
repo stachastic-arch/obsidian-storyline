@@ -22,7 +22,7 @@
 
 ### Bug Fixes
 
-- **Scene split placement** — Split scene now correctly preserves the sequence number for the first half instead of overwriting it.
+- **Scene split placement** — Split scene now correctly preserves the sequence number for the first half instead of overwriting it. It also places the second split half under the first instead of at the end.
 
 ---
 
@@ -56,10 +56,6 @@ Description and Conflict fields increased from 4/2 rows to 12 rows each.
 Split no longer deletes the first half. The split button was accidentally calling the delete handler instead of a refresh.
 
 **More options for Location types.**
-
-
-
-
 
 ## Version 1.3.0
 
