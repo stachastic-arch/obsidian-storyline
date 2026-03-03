@@ -550,6 +550,34 @@ body.theme-dark {
     display: none;
 }
 
+/* ── Kanban note cards ─ sticky-note look in column view ── */
+.scene-card.story-line-kanban-note {
+    border-left: 0 !important;
+    border: 1px solid var(--background-modifier-border) !important;
+    background: var(--sl-note-bg, color-mix(in srgb, var(--color-yellow) 32%, var(--background-primary))) !important;
+    border-radius: var(--sc-radius);
+}
+.scene-card.story-line-kanban-note:hover {
+    background: var(--sl-note-bg, color-mix(in srgb, var(--color-yellow) 32%, var(--background-primary))) !important;
+}
+.scene-card.story-line-kanban-note::after {
+    content: none;
+}
+.scene-card.story-line-kanban-note .scene-card-seq,
+.scene-card.story-line-kanban-note .scene-card-status-icon {
+    display: none;
+}
+.scene-card.story-line-kanban-note .scene-card-meta,
+.scene-card.story-line-kanban-note .scene-card-conflict,
+.scene-card.story-line-kanban-note .scene-card-characters,
+.scene-card.story-line-kanban-note .scene-card-footer {
+    display: none;
+}
+.scene-card.story-line-kanban-note .scene-card-title {
+    color: var(--sl-note-accent-strong, var(--text-normal));
+    font-style: italic;
+}
+
 .scene-card.story-line-corkboard-note-card {
     --sl-note-bg: color-mix(in srgb, var(--color-yellow) 32%, var(--background-primary));
     --sl-note-accent: rgba(122, 112, 84, 0.4);

@@ -47,6 +47,10 @@ export class BoardView extends ItemView {
     private corkboardInertiaRaf: number | null = null;
     /** Smooth zoom animation frame handle */
     private corkboardZoomRaf: number | null = null;
+    /** Accumulated target zoom for smooth chasing */
+    private corkboardZoomTarget: number | null = null;
+    /** Pivot point (viewport-local) for current zoom gesture */
+    private corkboardZoomPivot = { vx: 0, vy: 0 };
     private quickNoteLastCreatedAt = 0;
     private quickNoteChainIndex = 0;
     /** Active virtual scrollers — cleaned up on re-render */
@@ -764,39 +768,45 @@ export class BoardView extends ItemView {
      * Keeps the world point under the cursor stationary.
      */
     private zoomCorkboardAt(canvas: HTMLElement, viewport: HTMLElement, clientX: number, clientY: number, nextZoom: number): void {
-        const targetZoom = Math.max(0.35, Math.min(2.8, nextZoom));
+        this.corkboardZoomTarget = Math.max(0.35, Math.min(2.8, nextZoom));
         const rect = viewport.getBoundingClientRect();
-        const vx = clientX - rect.left;
-        const vy = clientY - rect.top;
+        this.corkboardZoomPivot.vx = clientX - rect.left;
+        this.corkboardZoomPivot.vy = clientY - rect.top;
 
-        // Cancel any running zoom animation
-        if (this.corkboardZoomRaf !== null) {
-            cancelAnimationFrame(this.corkboardZoomRaf);
-            this.corkboardZoomRaf = null;
-        }
+        // If an animation loop is already running it will pick up the
+        // updated target — no need to restart it.
+        if (this.corkboardZoomRaf !== null) return;
 
-        const startZoom = this.corkboardCamera.zoom;
-        const startX = this.corkboardCamera.x;
-        const startY = this.corkboardCamera.y;
-        const startTime = performance.now();
-        const duration = 80; // ms — subtle ease
+        const step = () => {
+            const target = this.corkboardZoomTarget!;
+            const cur = this.corkboardCamera.zoom;
+            // Exponential lerp — converges smoothly regardless of how
+            // many wheel ticks pile up.  0.25 gives a snappy yet fluid feel.
+            const lerpFactor = 0.25;
+            const newZoom = cur + (target - cur) * lerpFactor;
 
-        const worldX = (vx - startX) / startZoom;
-        const worldY = (vy - startY) / startZoom;
-
-        const step = (now: number) => {
-            const t = Math.min(1, (now - startTime) / duration);
-            // Ease-out quad
-            const ease = 1 - (1 - t) * (1 - t);
-            const z = startZoom + (targetZoom - startZoom) * ease;
-            this.corkboardCamera.zoom = z;
-            this.corkboardCamera.x = vx - worldX * z;
-            this.corkboardCamera.y = vy - worldY * z;
+            // Keep the world point under the cursor stationary
+            const { vx, vy } = this.corkboardZoomPivot;
+            const worldX = (vx - this.corkboardCamera.x) / cur;
+            const worldY = (vy - this.corkboardCamera.y) / cur;
+            this.corkboardCamera.zoom = newZoom;
+            this.corkboardCamera.x = vx - worldX * newZoom;
+            this.corkboardCamera.y = vy - worldY * newZoom;
             this.applyCorkboardCamera(canvas);
-            if (t < 1) {
+
+            // Stop when close enough to the target
+            if (Math.abs(newZoom - target) > 0.001) {
                 this.corkboardZoomRaf = requestAnimationFrame(step);
             } else {
+                // Snap to exact target on last frame
+                const worldX2 = (vx - this.corkboardCamera.x) / newZoom;
+                const worldY2 = (vy - this.corkboardCamera.y) / newZoom;
+                this.corkboardCamera.zoom = target;
+                this.corkboardCamera.x = vx - worldX2 * target;
+                this.corkboardCamera.y = vy - worldY2 * target;
+                this.applyCorkboardCamera(canvas);
                 this.corkboardZoomRaf = null;
+                this.corkboardZoomTarget = null;
             }
         };
         this.corkboardZoomRaf = requestAnimationFrame(step);

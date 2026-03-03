@@ -439,6 +439,20 @@ export default class SceneCardsPlugin extends Plugin {
                 toSave.stickyNoteSaturation = g.stickyNoteSaturation;
                 toSave.stickyNoteLightness = g.stickyNoteLightness;
                 toSave.stickyNoteOverrides = g.stickyNoteOverrides ?? {};
+            } else {
+                // Keep global colour snapshot in sync so toggling
+                // useProjectColors later doesn't revert to stale values.
+                this._globalColorDefaults = {
+                    colorScheme: this.settings.colorScheme,
+                    plotlineHue: this.settings.plotlineHue,
+                    plotlineSaturation: this.settings.plotlineSaturation,
+                    plotlineLightness: this.settings.plotlineLightness,
+                    stickyNoteTheme: this.settings.stickyNoteTheme,
+                    stickyNoteHue: this.settings.stickyNoteHue,
+                    stickyNoteSaturation: this.settings.stickyNoteSaturation,
+                    stickyNoteLightness: this.settings.stickyNoteLightness,
+                    stickyNoteOverrides: { ...(this.settings.stickyNoteOverrides || {}) },
+                };
             }
         }
         await this.saveData(toSave);

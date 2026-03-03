@@ -1,7 +1,7 @@
 import { Scene, STATUS_CONFIG, SceneStatus, ColorCodingMode, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode } from '../models/Scene';
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
-import { resolveTagColor, getPlotlineHSL } from '../settings';
+import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
 import type { LinkScanResult } from '../services/LinkScanner';
 
 /**
@@ -35,10 +35,16 @@ export class SceneCardComponent {
             }
         });
 
-        // Color stripe based on coding mode
-        const colorMode = options?.colorCoding || this.plugin.settings.colorCoding as ColorCodingMode;
-        const color = this.getCardColor(scene, colorMode);
-        card.style.borderLeftColor = color;
+        // Corkboard notes get sticky-note styling instead of the scene look
+        if (scene.corkboardNote) {
+            card.addClass('story-line-kanban-note');
+            this.applyNoteColor(card, scene);
+        } else {
+            // Color stripe based on coding mode
+            const colorMode = options?.colorCoding || this.plugin.settings.colorCoding as ColorCodingMode;
+            const color = this.getCardColor(scene, colorMode);
+            card.style.borderLeftColor = color;
+        }
 
         // Header
         const header = card.createDiv('scene-card-header');
@@ -309,6 +315,29 @@ export class SceneCardComponent {
     /**
      * Format sequence number for display
      */
+    /**
+     * Apply sticky-note background color to a kanban note card
+     */
+    private applyNoteColor(card: HTMLElement, scene: Scene): void {
+        const presets = resolveStickyNoteColors(this.plugin.settings);
+        const defaultColor = presets.length > 0 ? presets[0].color : '#F6EDB4';
+        const raw = scene.corkboardNoteColor?.trim();
+        const base = (raw && /^#[0-9a-fA-F]{6}$/.test(raw)) ? raw.toUpperCase() : defaultColor;
+        card.style.setProperty('--sl-note-bg', base);
+        card.style.setProperty('--sl-note-accent', this.darken(base, 0.24));
+        card.style.setProperty('--sl-note-accent-strong', this.darken(base, 0.34));
+    }
+
+    /** Darken a hex colour by a 0-1 factor */
+    private darken(hex: string, factor: number): string {
+        const r = Number.parseInt(hex.slice(1, 3), 16);
+        const g = Number.parseInt(hex.slice(3, 5), 16);
+        const b = Number.parseInt(hex.slice(5, 7), 16);
+        const s = Math.max(0, 1 - factor);
+        const toHex = (n: number) => Math.round(n * s).toString(16).padStart(2, '0');
+        return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+    }
+
     private formatSequence(scene: Scene): string {
         const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
         const seq = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
