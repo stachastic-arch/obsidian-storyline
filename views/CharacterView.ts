@@ -712,15 +712,26 @@ export class CharacterView extends ItemView {
         });
 
         const headerRight = header.createDiv('character-detail-header-right');
-        // Delete button
-        const deleteBtn = headerRight.createEl('button', { cls: 'character-delete-btn', attr: { title: 'Delete character' } });
-        obsidian.setIcon(deleteBtn, 'trash-2');
-        deleteBtn.addEventListener('click', () => this.confirmDeleteCharacter(character));
 
         // Open file button
-        const openBtn = headerRight.createEl('button', { cls: 'character-open-btn', attr: { title: 'Open character file' } });
-        obsidian.setIcon(openBtn, 'file-text');
+        const openBtn = headerRight.createEl('button', {
+            cls: 'codex-detail-action-btn',
+            attr: { 'aria-label': 'Open character file' },
+        });
+        const openIcon = openBtn.createSpan();
+        obsidian.setIcon(openIcon, 'file');
+        attachTooltip(openBtn, 'Open character file');
         openBtn.addEventListener('click', () => this.openCharacterFile(character));
+
+        // Delete button
+        const deleteBtn = headerRight.createEl('button', {
+            cls: 'codex-detail-action-btn codex-detail-delete-btn',
+            attr: { 'aria-label': 'Delete character' },
+        });
+        const deleteIcon = deleteBtn.createSpan();
+        obsidian.setIcon(deleteIcon, 'trash');
+        attachTooltip(deleteBtn, 'Delete character');
+        deleteBtn.addEventListener('click', () => this.confirmDeleteCharacter(character));
 
         // Portrait area (detail view — larger, clickable to change)
         const portraitArea = container.createDiv('character-detail-portrait');

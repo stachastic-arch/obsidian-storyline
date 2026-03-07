@@ -438,13 +438,25 @@ export class LocationView extends ItemView {
 
         const headerRight = header.createDiv('location-detail-header-right');
 
-        const deleteBtn = headerRight.createEl('button', { cls: 'location-delete-btn', attr: { title: 'Delete' } });
-        obsidian.setIcon(deleteBtn, 'trash-2');
-        deleteBtn.addEventListener('click', () => this.confirmDelete(item));
-
-        const openBtn = headerRight.createEl('button', { cls: 'location-open-btn', attr: { title: 'Open file' } });
-        obsidian.setIcon(openBtn, 'file-text');
+        // Open file button
+        const openBtn = headerRight.createEl('button', {
+            cls: 'codex-detail-action-btn',
+            attr: { 'aria-label': 'Open file' },
+        });
+        const openIcon = openBtn.createSpan();
+        obsidian.setIcon(openIcon, 'file');
+        attachTooltip(openBtn, 'Open file');
         openBtn.addEventListener('click', () => this.openFile(item));
+
+        // Delete button
+        const deleteBtn = headerRight.createEl('button', {
+            cls: 'codex-detail-action-btn codex-detail-delete-btn',
+            attr: { 'aria-label': 'Delete' },
+        });
+        const deleteIcon = deleteBtn.createSpan();
+        obsidian.setIcon(deleteIcon, 'trash');
+        attachTooltip(deleteBtn, 'Delete');
+        deleteBtn.addEventListener('click', () => this.confirmDelete(item));
 
         // Type label
         const typeLabel = container.createDiv('location-detail-type');
