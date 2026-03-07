@@ -72,6 +72,13 @@ export class SceneManager implements ISceneStore {
         return `${root}/Locations`;
     }
 
+    /** Computed codex folder for the active project (generic codex categories) */
+    getCodexFolder(): string {
+        if (this._activeProject) return this._activeProject.codexFolder;
+        const root = this.plugin.settings.storyLineRoot;
+        return `${root}/Codex`;
+    }
+
     /**
      * Scan the StoryLine root folder for project .md files
      * (files with `type: storyline` in frontmatter).
@@ -96,7 +103,10 @@ export class SceneManager implements ISceneStore {
             try {
                 const content = await adapter.read(filePath);
                 const project = this.parseProjectContent(content, filePath);
-                if (project) this.projects.set(filePath, project);
+                if (project) {
+                    await this.detectLegacyFolders(project);
+                    this.projects.set(filePath, project);
+                }
             } catch { /* file unreadable — skip */ }
         };
 
@@ -111,7 +121,7 @@ export class SceneManager implements ISceneStore {
                 for (const sub of listing.folders) {
                     // Skip internal folders that never contain project files
                     const folderName = sub.split('/').pop() ?? '';
-                    if (['System', 'Scenes', 'Characters', 'Locations'].includes(folderName)) continue;
+                    if (['System', 'Scenes', 'Characters', 'Locations', 'Codex'].includes(folderName)) continue;
                     await scanFolder(sub);
                 }
             } catch { /* folder unreadable — skip */ }
@@ -189,8 +199,9 @@ export class SceneManager implements ISceneStore {
             // Create project file inside the folder
             await this.app.vault.create(filePath, content);
 
-            // Create subfolders
+            // Create subfolders (Codex first — Characters & Locations live inside it)
             await this.ensureFolder(folders.sceneFolder);
+            await this.ensureFolder(folders.codexFolder);
             await this.ensureFolder(folders.characterFolder);
             await this.ensureFolder(folders.locationFolder);
 
@@ -298,7 +309,9 @@ export class SceneManager implements ISceneStore {
     /** Parse a single .md file as a StoryLine project */
     private async parseProjectFile(file: TFile): Promise<StoryLineProject | null> {
         const content = await this.app.vault.read(file);
-        return this.parseProjectContent(content, file.path);
+        const project = this.parseProjectContent(content, file.path);
+        if (project) await this.detectLegacyFolders(project);
+        return project;
     }
 
     /**
@@ -338,6 +351,25 @@ export class SceneManager implements ISceneStore {
             };
         } catch {
             return null;
+        }
+    }
+
+    /**
+     * Legacy detection: if the project has Characters/ and Locations/ at the
+     * project root (old layout) instead of inside Codex/, patch the paths so
+     * CharacterManager and LocationManager still find the right folders.
+     */
+    private async detectLegacyFolders(project: StoryLineProject): Promise<void> {
+        const adapter = this.app.vault.adapter;
+        const folders = deriveProjectFoldersFromFilePath(project.filePath);
+        const legacyCharFolder = normalizePath(`${folders.baseFolder}/Characters`);
+        const legacyLocFolder = normalizePath(`${folders.baseFolder}/Locations`);
+        // If old-style Characters/ exists at project root, use legacy paths
+        if (await adapter.exists(legacyCharFolder)) {
+            project.characterFolder = legacyCharFolder;
+        }
+        if (await adapter.exists(legacyLocFolder)) {
+            project.locationFolder = legacyLocFolder;
         }
     }
 

@@ -2,6 +2,39 @@
 
 ---
 
+## Version 1.5.0
+
+### New Features
+
+- **Codex Hub** — Characters and Locations now live inside a unified **Codex** view with tab-based navigation. Add your own custom categories (e.g., Props, Factions, Magic Systems) — each category gets its own folder, search, and detail pages. The Codex replaces the separate Characters and Locations tabs with a single, extensible hub.
+
+- **Plotgrid Auto-Note** — Typing into an empty, unlinked Plotgrid cell now automatically creates a corkboard note and links it back to the cell. The note is created as an *idea* with a plotgrid-origin label (row / column) for easy tracking. Enabled by default; toggle on or off from the Plotgrid toolbar.
+
+### Design Overhaul
+
+The entire UI has been refined for a cleaner, less cluttered look:
+
+- **Minimal tab navigation** — View mode toggles (Corkboard/Kanban, List/Subway, Grid/Map/Story Graph) now use a clean underline-tab style instead of bordered buttons.
+- **Icon-only action buttons** — "New Character", "New World", and "New Location" buttons have been replaced with compact icon-only buttons with tooltips, freeing up toolbar space.
+- **Streamlined toolbars** — Toolbar gaps and spacing have been tightened across all views for a more compact layout. 
+
+### Improvements
+
+- **Codex folder structure** — New projects now store Characters and Locations inside a `Codex/` folder. Existing projects with the old folder layout are detected and work without changes.
+- **Codex search** — The Codex hub search now includes Characters, Locations, and any custom categories in its results.
+
+### Bug Fixes
+
+- **YAML frontmatter corruption** — Fixed an issue where invisible characters (zero-width non-joiners, byte order marks) could be inserted into frontmatter, breaking YAML parsing. All frontmatter is now sanitized on read and write.
+- **Kanban rubber-banding** — Fixed an issue where Kanban columns could snap back after dragging if the underlying data hadn't finished saving.
+- **Relationship Map scaling** — Fixed a rendering issue where the relationship map could appear at the wrong scale after switching views.
+- **Story Graph scaling** — Fixed a similar scaling issue in the story graph visualization.
+- **Location portrait layout** — Location detail portraits are now styled consistently with character portraits.
+- **Codex hub category reset** — Fixed the category tabs sometimes resetting to the first tab when switching back to the hub.
+- **Plotgrid left padding** — Fixed the first column in the Plot Grid being too close to the edge.
+
+---
+
 ## Version 1.4.0
 
 ### New Features

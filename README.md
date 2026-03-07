@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.4.0** · By Jan Sandström
+**Version 1.5.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
@@ -38,6 +38,8 @@ Spreadsheet-style grid for mapping scenes against plotlines, themes, or story th
 
 Act and chapter divider bands show where story sections begin and end. Scene rows are color-coded by status. Click any row or column header to jump straight to the file. Uses the same shared filters as the Board and Timeline views. When a cell has a linked scene, the inspector shows a tabbed panel — edit cell notes or the full scene details without leaving the grid.
 
+**Auto-Note** — When enabled (on by default), typing into an empty cell automatically creates a linked corkboard note. The note is tagged as an idea with a plotgrid origin label so you can trace it back to the row and column it came from. Toggle Auto-Note on or off from the toolbar.
+
 ![Plotgrid View](screenshots/02.Plotgrid.jpg)
 
 ---
@@ -66,6 +68,8 @@ Track plotlines across your scenes with two view modes: a transit-style **subway
 
 Rich character profiles with collapsible sections: basic info, physical traits, personality, backstory, relationships, character arc, and custom fields. **Portrait images** — click to add a character image (import from computer or choose from vault). Portraits display on overview cards (64×64 px) and in the detail editor (96×96 px). **Image gallery** with carousel, captions, and a floating lightbox viewer. Includes a force-directed relationship map and a story graph showing how characters connect to scenes, locations, and props.
 
+In version 1.5.0, Characters live inside the new **Codex** hub alongside Locations and any custom categories you create.
+
 ![Characters — Profile](screenshots/06.Characters.jpg)
 
 ![Characters — Relationship Map](screenshots/07.Characters.jpg)
@@ -79,6 +83,8 @@ Rich character profiles with collapsible sections: basic info, physical traits, 
 ### Locations View
 
 Hierarchical worldbuilding with worlds as top-level containers and locations nested underneath. Each location has fields for atmosphere, significance, and narrative role. **Portrait images** — add images to worlds and locations; thumbnails appear in the tree view and larger portraits in the detail editor. **Image gallery** with carousel, captions, and lightbox.
+
+Locations are now part of the **Codex** hub in version 1.5.0.
 
 ![Locations — Overview](screenshots/10.Locations.jpg)
 
@@ -118,6 +124,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 
 ## Key Features
 
+- **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages.
 - **Scene Management** — Full metadata, six-stage status pipeline, drag-and-drop, multi-select bulk edits, notes, snapshots, and reusable templates.
 - **Corkboard Mode** — Freeform spatial canvas with sticky notes for brainstorming. Convert notes into scenes when ready.
 - **DOCX / PDF / HTML Export** — Export manuscripts and outlines to Word, PDF, and standalone HTML. DOCX includes configurable page size, margins, and font settings.
@@ -163,8 +170,10 @@ StoryLine/
   My Novel.md              ← Project file (Markdown + YAML frontmatter)
   My Novel/
     Scenes/                ← Scene files (Markdown + frontmatter)
-    Characters/            ← Character profiles (Markdown + frontmatter)
-    Locations/             ← Location & world profiles (Markdown + frontmatter)
+    Codex/                 ← Codex hub folder
+      Characters/          ← Character profiles (Markdown + frontmatter)
+      Locations/           ← Location & world profiles (Markdown + frontmatter)
+      [Custom]/            ← Any custom categories you add
     System/                ← Per-project settings (JSON, auto-managed)
     Exports/               ← Exported files
 ```
@@ -179,7 +188,7 @@ Create, switch, and fork projects from the command palette. Each project gets it
 
 ---
 
-*For detailed documentation of every feature, field, and option, see [HELP.md](HELP.md). For version history and upgrade notes, see the [CHANGELOG](CHANGELOG.md).*
+*StoryLine v1.5.0 — Transform your vault into a powerful book planning tool.*
 
 ---
 

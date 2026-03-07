@@ -11,6 +11,7 @@ import {
     LOCATION_VIEW_TYPE,
     HELP_VIEW_TYPE,
     NAVIGATOR_VIEW_TYPE,
+    CODEX_VIEW_TYPE,
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
@@ -22,8 +23,11 @@ import { StatsView } from './views/StatsView';
 import { LocationView } from './views/LocationView';
 import { HelpView } from './views/HelpView';
 import { NavigatorView } from './views/NavigatorView';
+import { CodexView } from './views/CodexView';
 import { LocationManager } from './services/LocationManager';
 import { CharacterManager } from './services/CharacterManager';
+import { CodexManager } from './services/CodexManager';
+import { makeCustomCodexCategory } from './models/Codex';
 import { QuickAddModal } from './components/QuickAddModal';
 import { ExportModal } from './components/ExportModal';
 import { WritingTracker } from './services/WritingTracker';
@@ -48,6 +52,7 @@ export default class SceneCardsPlugin extends Plugin {
     private _globalColorDefaults: Record<string, any> = {};
     locationManager: LocationManager;
     characterManager: CharacterManager;
+    codexManager: CodexManager;
     writingTracker: WritingTracker = new WritingTracker();
     snapshotManager: SnapshotManager;
     linkScanner: LinkScanner;
@@ -65,6 +70,7 @@ export default class SceneCardsPlugin extends Plugin {
         this.sceneManager = new SceneManager(this.app, this);
         this.locationManager = new LocationManager(this.app);
         this.characterManager = new CharacterManager(this.app);
+        this.codexManager = new CodexManager(this.app);
         this.snapshotManager = new SnapshotManager(this.app);
         this.linkScanner = new LinkScanner(this.characterManager, this.locationManager);
         this.cascadeRename = new CascadeRenameService(this.app, this.sceneManager, this.characterManager, this.locationManager);
@@ -131,6 +137,9 @@ export default class SceneCardsPlugin extends Plugin {
         );
         this.registerView(NAVIGATOR_VIEW_TYPE, (leaf) =>
             new NavigatorView(leaf, this, this.sceneManager)
+        );
+        this.registerView(CODEX_VIEW_TYPE, (leaf) =>
+            new CodexView(leaf, this, this.sceneManager)
         );
 
         // Wait for the workspace layout to be ready, then bootstrap projects
@@ -231,6 +240,13 @@ export default class SceneCardsPlugin extends Plugin {
             name: 'Open Location View',
             hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '7' }],
             callback: () => this.activateView(LOCATION_VIEW_TYPE),
+        });
+
+        this.addCommand({
+            id: 'open-codex-view',
+            name: 'Open Codex',
+            hotkeys: [{ modifiers: ['Mod', 'Shift'], key: '8' }],
+            callback: () => this.activateView(CODEX_VIEW_TYPE),
         });
 
         this.addCommand({
@@ -884,12 +900,20 @@ export default class SceneCardsPlugin extends Plugin {
      * Refresh all open Scene Cards views
      */
     refreshOpenViews(): void {
-        // Keep LocationManager and CharacterManager in sync with the active project
+        // Keep LocationManager, CharacterManager, and CodexManager in sync
         try {
             const locFolder = this.sceneManager.getLocationFolder();
             if (locFolder) this.locationManager.loadAll(locFolder);
             const charFolder = this.sceneManager.getCharacterFolder();
             if (charFolder) this.characterManager.loadCharacters(charFolder);
+            const codexFolder = this.sceneManager.getCodexFolder();
+            if (codexFolder) {
+                const customDefs = (this.settings.codexCustomCategories || []).map(
+                    (cc: { id: string; label: string; icon: string }) => makeCustomCodexCategory(cc.id, cc.label, cc.icon)
+                );
+                this.codexManager.initCategories(this.settings.codexEnabledCategories || [], customDefs);
+                this.codexManager.loadAll(codexFolder);
+            }
         } catch { /* project may not be set yet */ }
 
         // Re-scan wikilinks after entity data may have changed
@@ -904,6 +928,7 @@ export default class SceneCardsPlugin extends Plugin {
             STORYLINE_VIEW_TYPE,
             CHARACTER_VIEW_TYPE,
             LOCATION_VIEW_TYPE,
+            CODEX_VIEW_TYPE,
             STATS_VIEW_TYPE,
             NAVIGATOR_VIEW_TYPE,
         ];

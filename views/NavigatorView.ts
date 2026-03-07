@@ -4,6 +4,7 @@ import { SceneManager } from '../services/SceneManager';
 import { Scene, SceneStatus, STATUS_CONFIG } from '../models/Scene';
 import { NAVIGATOR_VIEW_TYPE } from '../constants';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
+import { attachTooltip } from '../components/Tooltip';
 
 /**
  * Sort modes available in the navigator.
@@ -94,8 +95,8 @@ export class NavigatorView extends ItemView {
         });
 
         this.sortBtn = toolbar.createDiv('sl-nav-sort-btn');
-        this.sortBtn.setAttribute('aria-label', 'Sort');
         setIcon(this.sortBtn, SORT_ICONS[this.sortMode]);
+        attachTooltip(this.sortBtn, 'Sort');
         this.sortBtn.addEventListener('click', (e) => {
             const menu = new Menu();
             for (const mode of Object.keys(SORT_LABELS) as NavSortMode[]) {

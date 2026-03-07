@@ -16,7 +16,9 @@ import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
 
 import type SceneCardsPlugin from '../main';
 
-import { CHARACTER_VIEW_TYPE } from '../constants';
+import { CHARACTER_VIEW_TYPE, CODEX_VIEW_TYPE } from '../constants';
+import { attachTooltip } from '../components/Tooltip';
+import { renderCodexCategoryTabs } from '../components/CodexCategoryTabs';
 
 /**
  * Character View - rich character cards with full profile editing.
@@ -47,6 +49,10 @@ export class CharacterView extends ItemView {
     private storyGraph: StoryGraph | null = null;
     /** Original name when the detail view was opened — used for cascade rename detection */
     private originalCharacterName: string | null = null;
+    /** Current search/filter text for overview grid */
+    private searchText: string = '';
+    /** Current sort mode for the overview grid */
+    private sortBy: 'name' | 'modified' | 'created' | 'role' = 'name';
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -102,6 +108,13 @@ export class CharacterView extends ItemView {
 
         const controls = toolbar.createDiv('story-line-toolbar-controls');
 
+        // ── Codex category tabs ─────────────────────
+        renderCodexCategoryTabs(container, {
+            activeId: 'characters-pseudo',
+            leaf: this.leaf,
+            plugin: this.plugin,
+        });
+
         // View mode toggle (Grid / Map) — only shown in overview
         if (!this.selectedCharacter) {
             const modeToggle = controls.createDiv('character-mode-toggle');
@@ -154,7 +167,9 @@ export class CharacterView extends ItemView {
         }
 
         // New character button
-        const addBtn = controls.createEl('button', { cls: 'mod-cta character-add-btn', text: '+ New Character' });
+        const addBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        obsidian.setIcon(addBtn, 'user-round-plus');
+        attachTooltip(addBtn, 'New Character');
         addBtn.addEventListener('click', () => this.promptNewCharacter());
 
         const content = container.createDiv('story-line-character-content');
@@ -186,7 +201,42 @@ export class CharacterView extends ItemView {
         container.empty();
         container.createEl('h3', { text: 'Characters' });
 
-        const fileCharacters = this.characterManager.getAllCharacters();
+        // Search + Sort
+        const searchRow = container.createDiv('codex-search-row');
+        const searchInput = searchRow.createEl('input', {
+            cls: 'codex-search-input',
+            attr: { type: 'text', placeholder: 'Search characters…' },
+        });
+        searchInput.value = this.searchText;
+        searchInput.addEventListener('input', () => {
+            this.searchText = searchInput.value;
+            this.renderCharacterOverview(container);
+        });
+        // Auto-focus the search field and restore cursor position
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.selectionStart = searchInput.selectionEnd = searchInput.value.length;
+        }, 0);
+
+        searchRow.createSpan({ cls: 'codex-sort-label', text: 'Sort by' });
+        const sortSelect = searchRow.createEl('select', { cls: 'codex-sort-select' });
+        for (const opt of [
+            { value: 'name', label: 'Name' },
+            { value: 'modified', label: 'Last edited' },
+            { value: 'created', label: 'Date created' },
+            { value: 'role', label: 'Role' },
+        ]) {
+            const el = sortSelect.createEl('option', { text: opt.label, value: opt.value });
+            if (this.sortBy === opt.value) el.selected = true;
+        }
+        sortSelect.addEventListener('change', () => {
+            this.sortBy = sortSelect.value as any;
+            this.renderCharacterOverview(container);
+        });
+
+        const q = this.searchText.toLowerCase();
+
+        let fileCharacters = this.characterManager.getAllCharacters();
         const sceneCharNames = this.sceneManager.getAllCharacters();
         const scenes = this.sceneManager.getAllScenes();
 
@@ -203,6 +253,27 @@ export class CharacterView extends ItemView {
                 // Re-render plotgrid badges into already-rendered cards
                 this.patchPlotGridBadges(container, plotgridCharacters, aliasMap);
             }).catch(() => { /* non-fatal */ });
+        }
+
+        // Apply search filter to file-backed characters
+        if (q) {
+            fileCharacters = fileCharacters.filter(c => c.name.toLowerCase().includes(q));
+        }
+
+        // Apply sort
+        if (this.sortBy === 'role') {
+            const roleOrder: Record<string, number> = { protagonist: 0, antagonist: 1, supporting: 2, minor: 3 };
+            fileCharacters.sort((a, b) => {
+                const ra = roleOrder[(a.role || '').toLowerCase()] ?? 99;
+                const rb = roleOrder[(b.role || '').toLowerCase()] ?? 99;
+                return ra !== rb ? ra - rb : a.name.localeCompare(b.name);
+            });
+        } else if (this.sortBy === 'modified') {
+            fileCharacters.sort((a, b) => (b.modified ?? '').localeCompare(a.modified ?? ''));
+        } else if (this.sortBy === 'created') {
+            fileCharacters.sort((a, b) => (b.created ?? '').localeCompare(a.created ?? ''));
+        } else {
+            fileCharacters.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
         }
 
         // Characters with files
@@ -236,7 +307,10 @@ export class CharacterView extends ItemView {
             // Deduplicate unlinked names: if "Micke" and "Micke Barr" both
             // appear, merge the short (first-name-only) form into the longer
             // full name so only "Micke Barr" is shown.
-            const deduped = this.deduplicateUnlinked(unlinked);
+            let deduped = this.deduplicateUnlinked(unlinked);
+            if (q) {
+                deduped = deduped.filter(n => n.toLowerCase().includes(q));
+            }
 
             if (deduped.length > 0) {
                 // Divider
@@ -628,8 +702,9 @@ export class CharacterView extends ItemView {
 
         // Back button + character name header
         const header = container.createDiv('character-detail-header');
-        const backBtn = header.createEl('button', { cls: 'character-back-btn' });
-        obsidian.setIcon(backBtn, 'arrow-left');
+        const backBtn = header.createEl('span', { cls: 'codex-nav-back-link' });
+        const backIcon = backBtn.createSpan();
+        obsidian.setIcon(backIcon, 'circle-arrow-left');
         backBtn.createSpan({ text: ' All Characters' });
         backBtn.addEventListener('click', () => {
             this.selectedCharacter = null;

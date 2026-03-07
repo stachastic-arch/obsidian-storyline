@@ -16,8 +16,10 @@ import type SceneCardsPlugin from '../main';
 import { CharacterManager } from '../services/CharacterManager';
 import { RenameConfirmModal } from '../components/RenameConfirmModal';
 
-import { LOCATION_VIEW_TYPE } from '../constants';
+import { LOCATION_VIEW_TYPE, CODEX_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
+import { attachTooltip } from '../components/Tooltip';
+import { renderCodexCategoryTabs } from '../components/CodexCategoryTabs';
 
 /**
  * Location View — hierarchical World → Location browser with inline editing.
@@ -44,6 +46,10 @@ export class LocationView extends ItemView {
     private originalItemName: string | null = null;
     /** Original type (world vs location) when the detail view was opened */
     private originalItemType: 'world' | 'location' | null = null;
+    /** Current search/filter text for overview tree */
+    private searchText: string = '';
+    /** Current sort mode for the overview tree */
+    private sortBy: 'name' | 'modified' | 'created' | 'type' = 'name';
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -94,11 +100,22 @@ export class LocationView extends ItemView {
 
         const controls = toolbar.createDiv('story-line-toolbar-controls');
 
+        // ── Codex category tabs ─────────────────────
+        renderCodexCategoryTabs(container, {
+            activeId: 'locations-pseudo',
+            leaf: this.leaf,
+            plugin: this.plugin,
+        });
+
         // Add buttons
-        const addWorldBtn = controls.createEl('button', { cls: 'mod-cta location-add-btn', text: '+ World' });
+        const addWorldBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        obsidian.setIcon(addWorldBtn, 'map-plus');
+        attachTooltip(addWorldBtn, 'New World');
         addWorldBtn.addEventListener('click', () => this.promptNewWorld());
 
-        const addLocBtn = controls.createEl('button', { cls: 'location-add-btn', text: '+ Location' });
+        const addLocBtn = controls.createEl('button', { cls: 'clickable-icon' });
+        obsidian.setIcon(addLocBtn, 'map-pin-plus-inside');
+        attachTooltip(addLocBtn, 'New Location');
         addLocBtn.addEventListener('click', () => this.promptNewLocation());
 
         const content = container.createDiv('story-line-location-content');
@@ -116,11 +133,76 @@ export class LocationView extends ItemView {
         container.empty();
         container.createEl('h3', { text: 'Worlds & Locations' });
 
-        const worlds = this.locationManager.getAllWorlds();
-        const orphanLocations = this.locationManager.getOrphanLocations();
+        // Search + Sort
+        const searchRow = container.createDiv('codex-search-row');
+        const searchInput = searchRow.createEl('input', {
+            cls: 'codex-search-input',
+            attr: { type: 'text', placeholder: 'Search locations…' },
+        });
+        searchInput.value = this.searchText;
+        searchInput.addEventListener('input', () => {
+            this.searchText = searchInput.value;
+            this.renderOverview(container);
+        });
+        setTimeout(() => {
+            searchInput.focus();
+            searchInput.selectionStart = searchInput.selectionEnd = searchInput.value.length;
+        }, 0);
+
+        searchRow.createSpan({ cls: 'codex-sort-label', text: 'Sort by' });
+        const sortSelect = searchRow.createEl('select', { cls: 'codex-sort-select' });
+        for (const opt of [
+            { value: 'name', label: 'Name' },
+            { value: 'modified', label: 'Last edited' },
+            { value: 'created', label: 'Date created' },
+            { value: 'type', label: 'Type' },
+        ]) {
+            const el = sortSelect.createEl('option', { text: opt.label, value: opt.value });
+            if (this.sortBy === opt.value) el.selected = true;
+        }
+        sortSelect.addEventListener('change', () => {
+            this.sortBy = sortSelect.value as any;
+            this.renderOverview(container);
+        });
+
+        const q = this.searchText.toLowerCase();
+
+        const allWorlds = this.locationManager.getAllWorlds();
+        const allOrphans = this.locationManager.getOrphanLocations();
         const scenes = this.sceneManager.getAllScenes();
 
-        if (worlds.length === 0 && orphanLocations.length === 0) {
+        // Filter worlds: show a world if its name OR any child location name matches
+        let worlds = q ? allWorlds.filter(w => {
+            if (w.name.toLowerCase().includes(q)) return true;
+            const locs = this.locationManager.getLocationsForWorld(w.name);
+            return locs.some(l => l.name.toLowerCase().includes(q));
+        }) : [...allWorlds];
+
+        let orphanLocations = q
+            ? allOrphans.filter(l => l.name.toLowerCase().includes(q))
+            : [...allOrphans];
+
+        // Apply sort
+        const sortItems = (arr: any[]) => {
+            if (this.sortBy === 'modified') {
+                arr.sort((a: any, b: any) => (b.modified ?? '').localeCompare(a.modified ?? ''));
+            } else if (this.sortBy === 'created') {
+                arr.sort((a: any, b: any) => (b.created ?? '').localeCompare(a.created ?? ''));
+            } else if (this.sortBy === 'type') {
+                arr.sort((a: any, b: any) => {
+                    const ta = a.locationType || '';
+                    const tb = b.locationType || '';
+                    if (ta !== tb) return ta.localeCompare(tb);
+                    return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
+                });
+            } else {
+                arr.sort((a: any, b: any) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
+            }
+        };
+        sortItems(worlds);
+        sortItems(orphanLocations);
+
+        if (worlds.length === 0 && orphanLocations.length === 0 && !q) {
             const empty = container.createDiv('location-empty-state');
             const emptyIcon = empty.createDiv('location-empty-icon');
             obsidian.setIcon(emptyIcon, 'map');
@@ -149,9 +231,12 @@ export class LocationView extends ItemView {
 
         // Locations from scenes that don't have files yet
         const allLocNames = [...this.locationManager.getAllLocations().map(l => l.name.toLowerCase()),
-            ...worlds.map(w => w.name.toLowerCase())];
+            ...allWorlds.map(w => w.name.toLowerCase())];
         const sceneLocations = this.sceneManager.getUniqueValues('location');
-        const unlinked = sceneLocations.filter(n => !allLocNames.includes(n.toLowerCase()));
+        let unlinked = sceneLocations.filter(n => !allLocNames.includes(n.toLowerCase()));
+        if (q) {
+            unlinked = unlinked.filter(n => n.toLowerCase().includes(q));
+        }
 
         if (unlinked.length > 0) {
             const divider = tree.createDiv('location-orphan-divider');
@@ -342,8 +427,9 @@ export class LocationView extends ItemView {
 
         // Header
         const header = container.createDiv('location-detail-header');
-        const backBtn = header.createEl('button', { cls: 'location-back-btn' });
-        obsidian.setIcon(backBtn, 'arrow-left');
+        const backBtn = header.createEl('span', { cls: 'codex-nav-back-link' });
+        const backIcon = backBtn.createSpan();
+        obsidian.setIcon(backIcon, 'circle-arrow-left');
         backBtn.createSpan({ text: ' All Locations' });
         backBtn.addEventListener('click', () => {
             this.selectedItem = null;
@@ -392,9 +478,10 @@ export class LocationView extends ItemView {
             } else {
                 const ph = portraitArea.createDiv('location-detail-portrait-placeholder');
                 obsidian.setIcon(ph, 'image');
+                ph.createEl('span', { text: 'Click to add image' });
             }
             const changeLabel = portraitArea.createDiv('location-portrait-change-label');
-            changeLabel.textContent = draft.image ? 'Change image' : 'Add image';
+            changeLabel.textContent = draft.image ? 'Change image' : '';
         };
         renderPortrait();
         portraitArea.addEventListener('click', () => {

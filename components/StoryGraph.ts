@@ -93,6 +93,7 @@ export class StoryGraph {
     private nodes: StoryGraphNode[] = [];
     private edges: StoryGraphEdge[] = [];
     private svg: SVGSVGElement | null = null;
+    private wrapper: HTMLElement | null = null;
     private width = 900;
     private height = 600;
     private animFrame = 0;
@@ -102,6 +103,7 @@ export class StoryGraph {
     private isPanning = false;
     private panStart = { x: 0, y: 0 };
     private zoom = 1;
+    private resizeObserver: ResizeObserver | null = null;
 
     /** Visibility filters — toggled by the toolbar */
     private showCharacters = true;
@@ -152,6 +154,7 @@ export class StoryGraph {
 
         // SVG wrapper
         const wrapper = this.container.createDiv('story-graph-wrapper');
+        this.wrapper = wrapper;
         const rect = wrapper.getBoundingClientRect();
         this.width = Math.max(700, rect.width || 900);
         this.height = Math.max(450, rect.height || 600);
@@ -159,10 +162,26 @@ export class StoryGraph {
         const svgNS = 'http://www.w3.org/2000/svg';
         this.svg = document.createElementNS(svgNS, 'svg');
         this.svg.setAttribute('width', '100%');
-        this.svg.setAttribute('height', String(this.height));
+        this.svg.setAttribute('height', '100%');
         this.svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
         this.svg.classList.add('story-graph-svg');
         wrapper.appendChild(this.svg);
+
+        // Resize observer — update dimensions when container changes
+        this.resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = entry.contentRect;
+                if (cr.width > 0 && cr.height > 0) {
+                    this.width = Math.max(700, cr.width);
+                    this.height = Math.max(450, cr.height);
+                    if (this.svg) {
+                        this.svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
+                    }
+                    this.renderSVG();
+                }
+            }
+        });
+        this.resizeObserver.observe(wrapper);
 
         // Pan support
         this.svg.addEventListener('mousedown', (e) => {
@@ -201,6 +220,10 @@ export class StoryGraph {
     destroy(): void {
         if (this.animFrame) cancelAnimationFrame(this.animFrame);
         this.animFrame = 0;
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
     }
 
     // ── Filter toolbar ─────────────────────────────────

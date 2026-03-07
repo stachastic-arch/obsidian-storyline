@@ -15,6 +15,7 @@ export class AddFieldModal extends Modal {
     private defaultSection: string;
     private onSubmit: (template: UniversalFieldTemplate) => void;
     private onDelete?: () => void;
+    private customSectionNames?: string[];
 
     // Working state
     private label = '';
@@ -29,6 +30,7 @@ export class AddFieldModal extends Modal {
      * @param existing       If editing, the existing template; null for new
      * @param onSubmit       Called when the user confirms
      * @param onDelete       Called when the user clicks Delete (edit mode only)
+     * @param sectionNames   Optional override for section dropdown (e.g. Codex categories)
      */
     constructor(
         app: App,
@@ -36,12 +38,14 @@ export class AddFieldModal extends Modal {
         existing: UniversalFieldTemplate | null,
         onSubmit: (template: UniversalFieldTemplate) => void,
         onDelete?: () => void,
+        sectionNames?: string[],
     ) {
         super(app);
         this.defaultSection = defaultSection;
         this.existing = existing;
         this.onSubmit = onSubmit;
         this.onDelete = onDelete;
+        this.customSectionNames = sectionNames;
 
         if (existing) {
             this.label = existing.label;
@@ -63,9 +67,10 @@ export class AddFieldModal extends Modal {
             text: this.existing ? 'Edit Universal Field' : 'Add Universal Field',
         });
 
+        const sheetLabel = this.customSectionNames ? 'entry' : 'character sheet';
         contentEl.createEl('p', {
             cls: 'storyline-add-field-desc',
-            text: 'This field will appear on every character sheet in the chosen section.',
+            text: `This field will appear on every ${sheetLabel} in the chosen section.`,
         });
 
         // ── Label ──
@@ -80,10 +85,10 @@ export class AddFieldModal extends Modal {
             });
 
         // ── Section ──
-        const sectionNames = CHARACTER_CATEGORIES.map(c => c.title);
+        const sectionNames = this.customSectionNames || CHARACTER_CATEGORIES.map(c => c.title);
         new Setting(contentEl)
             .setName('Section')
-            .setDesc('Where this field appears on the character sheet')
+            .setDesc(`Where this field appears on the ${sheetLabel}`)
             .addDropdown(dd => {
                 for (const name of sectionNames) {
                     dd.addOption(name, name);

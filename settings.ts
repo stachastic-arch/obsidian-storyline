@@ -534,6 +534,7 @@ export interface SceneCardsSettings {
     autoOpenNavigator: boolean;
     showNotesInKanban: boolean;
     showScenesInCorkboard: boolean;
+    plotgridAutoNote: boolean;
     colorCoding: ColorCodingMode;
     showWordCounts: boolean;
     compactCardView: boolean;
@@ -601,6 +602,16 @@ export interface SceneCardsSettings {
     // When true, colorScheme, plotline HSL, stickyNote theme/HSL/overrides
     // are saved into/loaded from the project’s System/plotlines.json
     useProjectColors: boolean;
+
+    // ── Codex settings ─────────────────────────────────
+    /** IDs of enabled codex categories (e.g. ['items', 'creatures']) */
+    codexEnabledCategories: string[];
+    /** User-created custom codex category definitions */
+    codexCustomCategories: Array<{ id: string; label: string; icon: string }>;
+    /** Series name — groups projects that share a common universe / codex */
+    series: string;
+    /** Optional vault-relative path to a shared codex folder for series */
+    sharedCodex: string;
 }
 
 /**
@@ -619,6 +630,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     autoOpenNavigator: true,
     showNotesInKanban: false,
     showScenesInCorkboard: true,
+    plotgridAutoNote: true,
     colorCoding: 'status',
     showWordCounts: true,
     compactCardView: false,
@@ -666,6 +678,11 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     stickyNoteLightness: 0,
 
     useProjectColors: false,
+
+    codexEnabledCategories: ['items'],
+    codexCustomCategories: [],
+    series: '',
+    sharedCodex: '',
 };
 
 /**

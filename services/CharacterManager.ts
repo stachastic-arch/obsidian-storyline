@@ -323,7 +323,9 @@ export class CharacterManager {
     }
 
     private extractFrontmatter(content: string): Record<string, any> | null {
-        const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        // Strip BOM + invisible zero-width characters before matching
+        const clean = content.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
+        const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---/);
         if (!match) return null;
         try {
             return parseYaml(match[1]);
@@ -333,7 +335,8 @@ export class CharacterManager {
     }
 
     private extractBody(content: string): string {
-        const match = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
+        const clean = content.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
+        const match = clean.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?([\s\S]*)$/);
         return match ? match[1].trim() : '';
     }
 

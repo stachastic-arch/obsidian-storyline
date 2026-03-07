@@ -54,6 +54,7 @@ export class MetadataParser {
             notes: frontmatter.notes,
             corkboardNote: this.parseBooleanFlag(frontmatter.corkboardNote ?? frontmatter.corkboard_note),
             corkboardNoteColor: frontmatter.corkboardNoteColor ?? frontmatter.corkboard_note_color,
+            plotgridOrigin: frontmatter.plotgridOrigin ?? frontmatter.plotgrid_origin,
             timeline_mode: this.parseTimelineMode(frontmatter.timeline_mode),
             timeline_strand: frontmatter.timeline_strand,
         };
@@ -99,6 +100,7 @@ export class MetadataParser {
             if (key === 'notes' && !value) { delete frontmatter[key]; continue; }
             if (key === 'corkboardNote' && !value) { delete frontmatter[key]; continue; }
             if (key === 'corkboardNoteColor' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'plotgridOrigin' && !value) { delete frontmatter[key]; continue; }
             if (value !== undefined) {
                 frontmatter[key] = value;
             }
@@ -143,6 +145,7 @@ export class MetadataParser {
         if (scene.notes) fm.notes = scene.notes;
         if (scene.corkboardNote) fm.corkboardNote = true;
         if (scene.corkboardNoteColor) fm.corkboardNoteColor = scene.corkboardNoteColor;
+        if (scene.plotgridOrigin) fm.plotgridOrigin = scene.plotgridOrigin;
         if (scene.timeline_mode && scene.timeline_mode !== 'linear') fm.timeline_mode = scene.timeline_mode;
         if (scene.timeline_strand) fm.timeline_strand = scene.timeline_strand;
         fm.wordcount = scene.body ? this.countWords(scene.body) : 0;

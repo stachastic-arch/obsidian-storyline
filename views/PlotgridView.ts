@@ -16,7 +16,8 @@ import { FiltersComponent } from '../components/Filters';
 import { enableDragToPan } from '../components/DragToPan';
 import { isMobile } from '../components/MobileAdapter';
 import { PLOTGRID_VIEW_TYPE } from '../constants';
-import { resolveTagColor, getPlotlineHSL } from '../settings';
+import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
+import { attachTooltip } from '../components/Tooltip';
 import type SceneCardsPlugin from '../main';
 
 // Use the shared view-type constant from `constants.ts` so the ViewSwitcher
@@ -152,7 +153,6 @@ export class PlotgridView extends ItemView {
 
         const toolbar = this.wrapperEl.createDiv('story-line-toolbar plot-grid-toolbar');
         toolbar.style.flex = '0 0 auto';
-        toolbar.style.padding = '8px';
 
         // Filter bar (shared component, same as Board/Timeline)
         const filterContainer = this.wrapperEl.createDiv('story-line-filters-container');
@@ -255,9 +255,9 @@ export class PlotgridView extends ItemView {
         } catch (e) { /* safe no-op */ }
 
         // Sync from Scenes button
-        const syncBtn = left.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Sync from Scenes' } });
-        syncBtn.title = 'Sync from Scenes';
+        const syncBtn = left.createEl('button', { cls: 'clickable-icon' });
         obsidian.setIcon(syncBtn, 'refresh-cw');
+        attachTooltip(syncBtn, 'Sync from Scenes');
         syncBtn.addEventListener('click', () => { this.openSyncModal(); });
 
         // Separator between Sync and Add Row/Column
@@ -268,28 +268,31 @@ export class PlotgridView extends ItemView {
         syncSep.style.margin = '0 4px';
 
         // Add Row / Add Column buttons
-        const addRowBtn = left.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Add Row' } });
-        addRowBtn.title = 'Add Row';
+        const addRowBtn = left.createEl('button', { cls: 'clickable-icon' });
+
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(addRowBtn, 'rows-3');
         } else {
             addRowBtn.innerHTML = '<i data-lucide="rows-3" aria-hidden="true"></i>';
         }
+        attachTooltip(addRowBtn, 'Add Row');
         addRowBtn.addEventListener('click', () => { this.addRow(); });
 
-        const addColBtn = left.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Add Column' } });
-        addColBtn.title = 'Add Column';
+        const addColBtn = left.createEl('button', { cls: 'clickable-icon' });
+
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(addColBtn, 'columns-3');
         } else {
             addColBtn.innerHTML = '<i data-lucide="columns-3" aria-hidden="true"></i>';
         }
+        attachTooltip(addColBtn, 'Add Column');
         addColBtn.addEventListener('click', () => { this.addColumn(); });
 
         // Sticky headers toggle
-        const stickyBtn = left.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Toggle sticky headers' } });
-        stickyBtn.title = this.data.stickyHeaders !== false ? 'Disable sticky headers' : 'Enable sticky headers';
+        const stickyLabel = this.data.stickyHeaders !== false ? 'Disable sticky headers' : 'Enable sticky headers';
+        const stickyBtn = left.createEl('button', { cls: 'clickable-icon' });
         obsidian.setIcon(stickyBtn, this.data.stickyHeaders !== false ? 'pin' : 'pin-off');
+        attachTooltip(stickyBtn, stickyLabel);
         stickyBtn.addEventListener('click', () => {
             this.data.stickyHeaders = !(this.data.stickyHeaders !== false);
             this.scheduleSave();
@@ -297,27 +300,45 @@ export class PlotgridView extends ItemView {
             this.renderGrid();
         });
 
+        // Auto-Note toggle
+        if (this.plugin) {
+            const autoNoteLabel = this.plugin.settings.plotgridAutoNote ? 'Auto-Note: On' : 'Auto-Note: Off';
+            const autoNoteBtn = left.createEl('button', {
+                cls: `clickable-icon ${this.plugin.settings.plotgridAutoNote ? 'is-active' : ''}`,
+            });
+            obsidian.setIcon(autoNoteBtn, 'sticky-note');
+            attachTooltip(autoNoteBtn, autoNoteLabel);
+            if (this.plugin.settings.plotgridAutoNote) {
+                autoNoteBtn.style.color = 'var(--interactive-accent)';
+            }
+            autoNoteBtn.addEventListener('click', async () => {
+                this.plugin!.settings.plotgridAutoNote = !this.plugin!.settings.plotgridAutoNote;
+                await this.plugin!.saveSettings();
+                this.renderToolbar();
+            });
+        }
+
         // Formatting controls (moved to the right actions area so B/I move right)
         const fmtGroup = actions.createDiv('plot-grid-formatting-group');
         fmtGroup.style.display = 'flex';
         fmtGroup.style.gap = '2px';
 
-        const boldBtn = fmtGroup.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Toggle bold for selected cell' } });
-        boldBtn.title = 'Toggle bold for selected cell';
+        const boldBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(boldBtn, 'bold');
         } else {
             boldBtn.innerHTML = '<i data-lucide="bold" aria-hidden="true"></i>';
         }
+        attachTooltip(boldBtn, 'Bold');
         boldBtn.addEventListener('click', () => this.toggleBoldSelected());
 
-        const italicBtn = fmtGroup.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Toggle italic for selected cell' } });
-        italicBtn.title = 'Toggle italic for selected cell';
+        const italicBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(italicBtn, 'italic');
         } else {
             italicBtn.innerHTML = '<i data-lucide="italic" aria-hidden="true"></i>';
         }
+        attachTooltip(italicBtn, 'Italic');
         italicBtn.addEventListener('click', () => this.toggleItalicSelected());
 
         const alignSelect = fmtGroup.createEl('select');
@@ -329,22 +350,22 @@ export class PlotgridView extends ItemView {
         // default to centered
         alignSelect.value = 'center';
 
-        const bgColorBtn = fmtGroup.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Set background color for selected cell' } });
-        bgColorBtn.title = 'Set background color for selected cell';
+        const bgColorBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(bgColorBtn, 'palette');
         } else {
             bgColorBtn.innerHTML = '<i data-lucide="palette" aria-hidden="true"></i>';
         }
+        attachTooltip(bgColorBtn, 'Background color');
         bgColorBtn.addEventListener('click', () => this.setCellBgColorSelected());
 
-        const textColorBtn = fmtGroup.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Set text color for selected cell' } });
-        textColorBtn.title = 'Set text color for selected cell';
+        const textColorBtn = fmtGroup.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(textColorBtn, 'paintbrush');
         } else {
             textColorBtn.innerHTML = '<i data-lucide="paintbrush" aria-hidden="true"></i>';
         }
+        attachTooltip(textColorBtn, 'Text color');
         textColorBtn.addEventListener('click', () => this.setCellTextColorSelected());
 
 
@@ -354,13 +375,13 @@ export class PlotgridView extends ItemView {
 
         // Add Row / Add Column created above in the left controls (they replace B/I position)
 
-        const zoomOut = actions.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Zoom out' } });
-        zoomOut.title = 'Zoom out';
+        const zoomOut = actions.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(zoomOut, 'zoom-out');
         } else {
             zoomOut.innerHTML = '<i data-lucide="zoom-out" aria-hidden="true"></i>';
         }
+        attachTooltip(zoomOut, 'Zoom out');
         zoomOut.addEventListener('click', () => this.setZoom(Math.max(0.3, this.data.zoom - 0.1)));
 
         const zoomLabel = actions.createEl('span', { cls: 'plot-grid-zoom-label', text: Math.round(this.data.zoom * 100) + '%' });
@@ -391,22 +412,22 @@ export class PlotgridView extends ItemView {
             inp.select();
         });
 
-        const resetZoomBtn = actions.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Reset zoom to 100%' } });
-        resetZoomBtn.title = 'Reset zoom to 100%';
+        const resetZoomBtn = actions.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(resetZoomBtn, 'maximize-2');
         } else {
             resetZoomBtn.innerHTML = '<i data-lucide="maximize-2" aria-hidden="true"></i>';
         }
+        attachTooltip(resetZoomBtn, 'Reset zoom');
         resetZoomBtn.addEventListener('click', () => this.setZoom(1));
 
-        const zoomIn = actions.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Zoom in' } });
-        zoomIn.title = 'Zoom in';
+        const zoomIn = actions.createEl('button', { cls: 'clickable-icon' });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(zoomIn, 'zoom-in');
         } else {
             zoomIn.innerHTML = '<i data-lucide="zoom-in" aria-hidden="true"></i>';
         }
+        attachTooltip(zoomIn, 'Zoom in');
         zoomIn.addEventListener('click', () => this.setZoom(Math.min(2.0, this.data.zoom + 0.1)));
 
         actions.appendChild(zoomOut);
@@ -925,6 +946,46 @@ export class PlotgridView extends ItemView {
                     const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
                     const scene = scMgr?.getScene(cell.linkedSceneId) as Scene | undefined;
                     if (scene) {
+                        // Check if this is a corkboard note
+                        const isCorkboardNote = (scene as Scene & { corkboardNote?: unknown }).corkboardNote === true;
+
+                        if (isCorkboardNote) {
+                            // Determine note color
+                            let noteBg = '#F6EDB4'; // fallback yellow
+                            if (this.plugin) {
+                                const noteColor = (scene as any).corkboardNoteColor;
+                                if (noteColor) {
+                                    noteBg = noteColor;
+                                } else {
+                                    const presets = resolveStickyNoteColors(this.plugin.settings);
+                                    if (presets.length > 0) noteBg = presets[0].color;
+                                }
+                            }
+
+                            // Apply note bg to the entire cell
+                            cellEl.style.background = noteBg;
+                            cellEl.style.color = '#2b2510';
+                            cellEl.addClass('pg-cell-note');
+
+                            // Hide standard content div — replace with note body
+                            contentEl.style.display = 'none';
+
+                            // "Note" label + optional origin so it's visually distinct from plain cell text
+                            const noteLabel = cellEl.createDiv('pg-cell-note-label');
+                            const noteIcon = noteLabel.createSpan({ cls: 'pg-cell-note-icon' });
+                            obsidian.setIcon(noteIcon, 'sticky-note');
+                            if (scene.plotgridOrigin) {
+                                noteLabel.createSpan({ text: scene.plotgridOrigin });
+                            } else {
+                                noteLabel.createSpan({ text: 'Note' });
+                            }
+
+                            // Render note content directly in the cell
+                            const noteBody = cellEl.createDiv('pg-cell-note-body');
+                            if (scene.body && scene.body.trim()) {
+                                noteBody.textContent = scene.body.trim();
+                            }
+                        } else {
                         // Render mini scene card inside the cell
                         const miniCard = cellEl.createDiv('plot-grid-mini-card');
 
@@ -955,6 +1016,7 @@ export class PlotgridView extends ItemView {
                         } else {
                             contentEl.style.display = 'none';
                         }
+                        } // end else (regular scene mini-card)
                     } else {
                         // Scene not found — show simple badge
                         const badge = cellEl.createDiv('plot-grid-linked-badge');
@@ -995,8 +1057,56 @@ export class PlotgridView extends ItemView {
                     const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
                     const linkedScene = cell.linkedSceneId ? scMgr?.getScene(cell.linkedSceneId) : undefined;
 
-                    if (linkedScene) {
-                        // Scene-specific actions
+                    if (linkedScene && linkedScene.corkboardNote) {
+                        // ── Corkboard Note actions ──
+                        const notePresets = resolveStickyNoteColors(this.plugin.settings);
+                        notePresets.forEach((preset) => {
+                            menu.addItem(item => item
+                                .setTitle(`Color: ${preset.label}`)
+                                .setIcon('palette')
+                                .onClick(() => { void this.setNoteColor(linkedScene, preset.color, key); }));
+                        });
+                        menu.addItem(item => item
+                            .setTitle('Color: Custom…')
+                            .setIcon('pipette')
+                            .onClick(() => { this.openNoteColorModal(linkedScene, key); }));
+                        menu.addItem(item => item
+                            .setTitle('Color: Default')
+                            .setIcon('rotate-ccw')
+                            .onClick(() => { void this.setNoteColor(linkedScene, undefined, key); }));
+
+                        menu.addSeparator();
+                        menu.addItem((it) => it.setTitle('Duplicate Note').setIcon('copy').onClick(async () => {
+                            await scMgr?.duplicateScene(linkedScene.filePath);
+                            this.renderGrid();
+                        }));
+                        menu.addItem((it) => it.setTitle('Delete Note').setIcon('trash').onClick(async () => {
+                            openConfirmModal(this.app, {
+                                title: 'Delete Note',
+                                message: `Delete note "${linkedScene.title || 'Note'}"?`,
+                                confirmLabel: 'Delete',
+                                onConfirm: async () => {
+                                    await this.deleteScene(linkedScene);
+                                    const c = this.data.cells[key];
+                                    if (c) { c.linkedSceneId = undefined; c.content = ''; c.manualContent = undefined; }
+                                    this.scheduleSave();
+                                },
+                            });
+                        }));
+
+                        menu.addSeparator();
+                        menu.addItem((it) => it.setTitle('Convert to Scene').setIcon('clapperboard').onClick(async () => {
+                            await scMgr?.updateScene(linkedScene.filePath, { corkboardNote: false, plotgridOrigin: undefined });
+                            linkedScene.corkboardNote = false;
+                            linkedScene.plotgridOrigin = undefined;
+                            this.renderGrid();
+                        }));
+                        menu.addItem((it) => it.setTitle('Edit Cell Text').onClick(() => this.enterEditMode(cellEl, cell, contentEl)));
+                        menu.addItem((it) => it.setTitle('Unlink Note').setIcon('unlink').onClick(() => {
+                            const c = this.data.cells[key]; if (c) c.linkedSceneId = undefined; this.scheduleSave(); this.renderGrid();
+                        }));
+                    } else if (linkedScene) {
+                        // ── Regular Scene actions ──
                         menu.addItem((it) => it.setTitle('Open Scene').setIcon('file-text').onClick(() => this.openScene(linkedScene)));
                         menu.addItem((it) => it.setTitle('Show in Inspector').setIcon('info').onClick(() => {
                             this.inspectorComponent?.show(linkedScene);
@@ -1814,6 +1924,9 @@ export class PlotgridView extends ItemView {
         // Remove wrapper focusability while editing so it can't steal focus
         if (this.wrapperEl) this.wrapperEl.tabIndex = -1;
 
+        const hadContentBefore = !!(cell.content && cell.content.trim());
+        const hadLinkedScene = !!cell.linkedSceneId;
+
         let committed = false;
         const commit = () => {
             if (committed) return;
@@ -1824,7 +1937,13 @@ export class PlotgridView extends ItemView {
             // Mark as manually edited so sync won't overwrite
             cell.manualContent = true;
             this.scheduleSave();
-            this.renderGrid();
+            // Auto-Note: if toggled on and new non-empty text entered into an unlinked cell
+            const hasNewContent = !!(ta.value && ta.value.trim());
+            if (this.plugin?.settings.plotgridAutoNote && hasNewContent && !hadLinkedScene && !hadContentBefore) {
+                void this.autoCreateNoteFromCell(cell);
+            } else {
+                this.renderGrid();
+            }
         };
 
         // Use requestAnimationFrame + focus to guarantee it happens after the current event cycle
@@ -1858,6 +1977,94 @@ export class PlotgridView extends ItemView {
         ta.addEventListener('blur', () => {
             commit();
         });
+    }
+
+    /* ── Note color helpers (mirrors BoardView) ── */
+
+    private normalizeHexColor(value: string | undefined): string | undefined {
+        if (!value) return undefined;
+        const trimmed = value.trim();
+        const short = trimmed.match(/^#([0-9a-fA-F]{3})$/);
+        if (short) {
+            const [r, g, b] = short[1].split('');
+            return `#${r}${r}${g}${g}${b}${b}`.toUpperCase();
+        }
+        const full = trimmed.match(/^#([0-9a-fA-F]{6})$/);
+        if (full) return `#${full[1].toUpperCase()}`;
+        return undefined;
+    }
+
+    private async setNoteColor(scene: Scene, color: string | undefined, cellKey: string): Promise<void> {
+        const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
+        const normalized = this.normalizeHexColor(color);
+        await scMgr?.updateScene(scene.filePath, { corkboardNoteColor: normalized });
+        scene.corkboardNoteColor = normalized;
+        this.renderGrid();
+    }
+
+    private openNoteColorModal(scene: Scene, cellKey: string): void {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Custom note color');
+        const current = this.normalizeHexColor(scene.corkboardNoteColor) ?? '#F6EDB4';
+        const row = modal.contentEl.createDiv('story-line-note-color-modal-row');
+        row.createEl('label', { text: 'Pick color' });
+        const picker = row.createEl('input', {
+            attr: { type: 'color', value: current },
+        });
+        new obsidian.Setting(modal.contentEl)
+            .addButton(btn => { btn.setButtonText('Cancel').onClick(() => modal.close()); })
+            .addButton(btn => {
+                btn.setButtonText('Apply').setCta().onClick(async () => {
+                    await this.setNoteColor(scene, picker.value, cellKey);
+                    modal.close();
+                });
+            });
+        modal.open();
+    }
+
+    /**
+     * Auto-Note: create a corkboard note from a cell's manual text
+     * and link it back to the cell.
+     */
+    private async autoCreateNoteFromCell(cell: CellData): Promise<void> {
+        const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
+        if (!scMgr || !cell.content?.trim()) return;
+
+        // Resolve row/column labels for context
+        const parts = cell.id.split('-');
+        // cell.id format: "rowId-colId" but IDs may contain hyphens from makeId,
+        // so find the matching row/col by checking all combinations
+        let rowLabel = '';
+        let colLabel = '';
+        for (const row of this.data.rows) {
+            for (const col of this.data.columns) {
+                if (`${row.id}-${col.id}` === cell.id) {
+                    rowLabel = row.label || '';
+                    colLabel = col.label || '';
+                }
+            }
+        }
+
+        // Build body — no longer appending origin as text
+        const body = cell.content.trim();
+        const contextParts: string[] = [];
+        if (rowLabel) contextParts.push(rowLabel);
+        if (colLabel) contextParts.push(colLabel);
+        const originLabel = contextParts.length > 0 ? contextParts.join(' / ') : undefined;
+
+        const file = await scMgr.createScene({
+            status: 'idea',
+            corkboardNote: true,
+            title: 'Note',
+            body,
+            plotgridOrigin: originLabel,
+        });
+
+        // Link the note back to the cell
+        cell.linkedSceneId = file.path;
+        this.scheduleSave();
+        this.renderGrid();
+        new Notice('Auto-Note created from cell');
     }
 
     // Scene link modal
@@ -2419,6 +2626,10 @@ export class PlotgridView extends ItemView {
         const scanContainer = cellBody.createDiv('inspector-scan-results');
         this.updateCellInspectorScan(scanContainer, cell);
 
+        // Track initial cell state for auto-note (only create once per empty cell)
+        const inspectorHadContent = !!(cell.content && cell.content.trim());
+        const inspectorHadLinkedScene = !!cell.linkedSceneId;
+
         let textSaveTimer: number | null = null;
         textArea.addEventListener('input', () => {
             const liveCell = getCell();
@@ -2448,6 +2659,11 @@ export class PlotgridView extends ItemView {
             cell.manualContent = true;
             this.scheduleSave();
             this.updateCellInspectorScan(scanContainer, liveCell);
+            // Auto-Note from inspector: if toggled on and new text on a previously empty, unlinked cell
+            const hasNewContent = !!(textArea.value && textArea.value.trim());
+            if (this.plugin?.settings.plotgridAutoNote && hasNewContent && !inspectorHadLinkedScene && !inspectorHadContent && !liveCell.linkedSceneId) {
+                void this.autoCreateNoteFromCell(liveCell);
+            }
         });
 
         // ── Linked scene summary (shown on Cell tab as a small info block) ──

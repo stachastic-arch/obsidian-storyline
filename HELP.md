@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.4.0** · By Jan Sandström
+**Version 1.5.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -18,6 +18,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
   - [Plotlines View](#plotlines-view)
   - [Characters View](#characters-view)
   - [Locations View](#locations-view)
+  - [Codex Hub](#codex-hub)
   - [Stats View](#stats-view)
   - [Navigator View](#navigator-view)
 - [Scene Cards](#scene-cards)
@@ -82,8 +83,9 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
    StoryLine/
      My Novel/
        Scenes/
-       Characters/
-       Locations/
+       Codex/
+         Characters/
+         Locations/
    ```
 3. **Create your first scene** — Use `Ctrl+Shift+N` or click the **+** button in the Board view.
 4. **Switch between views** using the tab bar at the top of any StoryLine view.
@@ -133,6 +135,7 @@ A spreadsheet-like grid for detailed scene planning.
 - **Tabbed cell inspector** — when a cell has a linked scene, the inspector shows two tabs:
   - **Cell tab** — cell content, detected characters/locations/tags, and a linked scene link.
   - **Scene tab** — the full scene editor (status, POV, characters, location, tags, conflict, synopsis, etc.) so you can edit scene details without leaving the grid.
+- **Auto-Note** — When the Auto-Note toggle is on (enabled by default), typing text into an empty, unlinked cell automatically creates a corkboard note and links it back to the cell. The note is saved as an *idea* with a `plotgridOrigin` label built from the row and column names, so you can always trace it back to where it started. Toggle Auto-Note on or off with the sticky-note icon in the Plotgrid toolbar — the icon turns accent-colored when active.
 
 ### Timeline View
 
@@ -173,7 +176,7 @@ Track your story's plotlines (tags) across the narrative. Two view modes are ava
 
 ### Characters View
 
-A dedicated character management system with rich profiles.
+A dedicated character management system with rich profiles. Characters are accessed through the **Codex** hub.
 
 #### Overview Grid
 - All characters displayed as **compact cards** with role badge, snippet, and completeness bar.
@@ -205,7 +208,7 @@ A dedicated character management system with rich profiles.
 
 ### Locations View
 
-A hierarchical worldbuilding and location management system.
+A hierarchical worldbuilding and location management system. Locations are accessed through the **Codex** hub.
 
 #### Two-Level Structure
 - **Worlds** — top-level containers for worldbuilding (geography, culture, politics, magic/technology, beliefs, economy, history).
@@ -232,6 +235,16 @@ A hierarchical worldbuilding and location management system.
   - List of scenes set at the location.
   - Characters who appear at the location (with frequency count).
   - For worlds: all locations in that world with one-click navigation.
+
+### Codex Hub
+
+The Codex is a unified hub that brings Characters, Locations, and custom categories together in one place.
+
+- **Tab navigation** — Switch between Characters, Locations, and any custom categories using the tab bar at the top of the Codex.
+- **Custom categories** — Add your own categories (for example: Props, Factions, Magic Systems, Creatures) from the Codex toolbar. Each category gets its own folder inside `Codex/`, its own search, and individual detail pages with editable fields.
+- **Search** — A search bar at the top of the hub filters across all entries, including Characters and Locations.
+- **Back navigation** — From any detail page, click the back arrow to return to the Codex hub.
+- **Backward compatible** — Existing projects that have Characters and Locations folders at the top level (outside Codex/) continue to work without any changes.
 
 ### Stats View
 
@@ -1031,12 +1044,15 @@ YourVault/
         01 - The Beginning.md
         02 - The Chase.md
         ...
-      Characters/                 ← Character profiles (Markdown with frontmatter)
-      Locations/                  ← Location & world profiles
-        Eryndor.md                ← World file
-        Eryndor/                  ← Locations in this world
-          The Iron Citadel.md
-          Port Veyra.md
+      Codex/                      ← Codex hub folder
+        Characters/               ← Character profiles (Markdown with frontmatter)
+        Locations/                ← Location & world profiles
+          Eryndor.md              ← World file
+          Eryndor/                ← Locations in this world
+            The Iron Citadel.md
+            Port Veyra.md
+        Props/                    ← Example custom category
+        Factions/                 ← Example custom category
       System/                     ← Per-project settings (auto-managed)
         settings.json             ← Tag colors, aliases, overrides
         plotgrid.json             ← Plotgrid layout data
@@ -1048,6 +1064,8 @@ YourVault/
       Scenes/
       ...
 ```
+
+Existing projects with Characters and Locations at the top level (outside Codex/) continue to work — StoryLine detects the old layout automatically.
 
 Scene files are standard Markdown — you can edit them directly in Obsidian's editor, and StoryLine reads the frontmatter automatically.
 
@@ -1081,4 +1099,4 @@ MIT
 
 ---
 
-*StoryLine v1.4.0 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.5.0 — Transform your vault into a powerful book planning tool.*

@@ -72,6 +72,7 @@ export class RelationshipMap {
     private nodes: GraphNode[] = [];
     private edges: GraphEdge[] = [];
     private svg: SVGSVGElement | null = null;
+    private wrapper: HTMLElement | null = null;
     private width = 800;
     private height = 500;
     private animFrame = 0;
@@ -82,6 +83,7 @@ export class RelationshipMap {
     private panStart = { x: 0, y: 0 };
     private zoom = 1;
     private onSelectCharacter?: (name: string) => void;
+    private resizeObserver: ResizeObserver | null = null;
 
     constructor(
         container: HTMLElement,
@@ -119,6 +121,7 @@ export class RelationshipMap {
 
         // SVG container
         const wrapper = this.container.createDiv('relationship-map-wrapper');
+        this.wrapper = wrapper;
         const rect = wrapper.getBoundingClientRect();
         this.width = Math.max(600, rect.width || 800);
         this.height = Math.max(400, rect.height || 500);
@@ -126,10 +129,26 @@ export class RelationshipMap {
         const svgNS = 'http://www.w3.org/2000/svg';
         this.svg = document.createElementNS(svgNS, 'svg');
         this.svg.setAttribute('width', '100%');
-        this.svg.setAttribute('height', String(this.height));
+        this.svg.setAttribute('height', '100%');
         this.svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
         this.svg.classList.add('relationship-map-svg');
         wrapper.appendChild(this.svg);
+
+        // Resize observer — update dimensions when container changes
+        this.resizeObserver = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = entry.contentRect;
+                if (cr.width > 0 && cr.height > 0) {
+                    this.width = Math.max(600, cr.width);
+                    this.height = Math.max(400, cr.height);
+                    if (this.svg) {
+                        this.svg.setAttribute('viewBox', `0 0 ${this.width} ${this.height}`);
+                    }
+                    this.renderSVG();
+                }
+            }
+        });
+        this.resizeObserver.observe(wrapper);
 
         // Pan support
         this.svg.addEventListener('mousedown', (e) => {
@@ -169,6 +188,10 @@ export class RelationshipMap {
     destroy(): void {
         if (this.animFrame) cancelAnimationFrame(this.animFrame);
         this.animFrame = 0;
+        if (this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
     }
 
     // ── Graph building ─────────────────────────────────

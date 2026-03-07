@@ -9,6 +9,7 @@ import { STORYLINE_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
 import { enableDragToPan } from '../components/DragToPan';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
+import { attachTooltip } from '../components/Tooltip';
 
 type SortMode = 'alpha' | 'scenes-desc' | 'scenes-asc' | 'book-order';
 type PlotlineViewMode = 'list' | 'subway';
@@ -75,11 +76,11 @@ export class StorylineView extends ItemView {
 
         // Sort button
         const sortBtn = controls.createEl('button', {
-            cls: 'story-line-toolbar-btn',
-            attr: { 'aria-label': 'Sort plotlines', title: 'Sort plotlines' },
+            cls: 'clickable-icon',
         });
         const sortIconSpan = sortBtn.createSpan();
         obsidian.setIcon(sortIconSpan, 'arrow-down-up');
+        attachTooltip(sortBtn, 'Sort plotlines');
         sortBtn.addEventListener('click', (e) => {
             const menu = new Menu();
             menu.addItem((item: any) => {
@@ -112,18 +113,18 @@ export class StorylineView extends ItemView {
         const viewToggle = controls.createDiv('storyline-view-toggle');
         const listBtn = viewToggle.createEl('button', {
             cls: `storyline-toggle-btn ${this.plotlineViewMode === 'list' ? 'active' : ''}`,
-            attr: { 'aria-label': 'List view', title: 'List view' },
         });
         const listIcon = listBtn.createSpan();
         obsidian.setIcon(listIcon, 'list');
+        attachTooltip(listBtn, 'List view');
         listBtn.addEventListener('click', () => { this.plotlineViewMode = 'list'; this.refresh(); });
 
         const subwayBtn = viewToggle.createEl('button', {
             cls: `storyline-toggle-btn ${this.plotlineViewMode === 'subway' ? 'active' : ''}`,
-            attr: { 'aria-label': 'Subway map', title: 'Subway map' },
         });
         const subwayIcon = subwayBtn.createSpan();
         obsidian.setIcon(subwayIcon, 'chart-gantt');
+        attachTooltip(subwayBtn, 'Subway map');
         subwayBtn.addEventListener('click', () => { this.plotlineViewMode = 'subway'; this.refresh(); });
 
         const content = container.createDiv('story-line-storyline-content');

@@ -14,6 +14,7 @@ import { SplitSceneModal, MergeSceneModal } from '../components/SplitMergeModals
 import { isMobile, applyMobileClass, enableTouchDrag } from '../components/MobileAdapter';
 import { BOARD_VIEW_TYPE } from '../constants';
 import { resolveStickyNoteColors } from '../settings';
+import { attachTooltip } from '../components/Tooltip';
 import type SceneCardsPlugin from '../main';
 
 type BoardMode = 'kanban' | 'corkboard';
@@ -55,6 +56,8 @@ export class BoardView extends ItemView {
     private quickNoteChainIndex = 0;
     /** Active virtual scrollers — cleaned up on re-render */
     private scrollers: VirtualScroller<Scene>[] = [];
+    /** Saved column scroll positions across refreshes (keyed by group title) */
+    private columnScrollPositions: Map<string, number> = new Map();
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -123,6 +126,7 @@ export class BoardView extends ItemView {
         // Filters
         const filterContainer = mainArea.createDiv('story-line-filters-container');
         filterContainer.toggleClass('is-corkboard-mode', this.boardMode === 'corkboard');
+        filterContainer.toggleClass('is-kanban-mode', this.boardMode === 'kanban');
         this.filtersComponent = new FiltersComponent(
             filterContainer,
             this.sceneManager,
@@ -134,6 +138,36 @@ export class BoardView extends ItemView {
             this.plugin
         );
         this.filtersComponent.render();
+
+        // In Kanban mode, add Group by dropdown to the filter bar
+        if (this.boardMode === 'kanban') {
+            const filterBar = filterContainer.querySelector('.story-line-filter-bar') as HTMLElement | null;
+            if (filterBar) {
+                const searchWrapper = filterBar.querySelector('.story-line-search-wrapper');
+                const groupContainer = createDiv('story-line-group-control');
+                groupContainer.createSpan({ text: 'Group by: ' });
+                const groupSelect = groupContainer.createEl('select', { cls: 'dropdown' });
+                const groupOptions: { value: BoardGroupBy; label: string }[] = [
+                    { value: 'act', label: 'Act' },
+                    { value: 'chapter', label: 'Chapter' },
+                    { value: 'status', label: 'Status' },
+                    { value: 'pov', label: 'POV' },
+                ];
+                groupOptions.forEach(opt => {
+                    const option = groupSelect.createEl('option', { text: opt.label, value: opt.value });
+                    if (opt.value === this.groupBy) option.selected = true;
+                });
+                groupSelect.addEventListener('change', () => {
+                    this.groupBy = groupSelect.value as BoardGroupBy;
+                    this.refreshBoard();
+                });
+                if (searchWrapper && searchWrapper.nextSibling) {
+                    filterBar.insertBefore(groupContainer, searchWrapper.nextSibling);
+                } else {
+                    filterBar.appendChild(groupContainer);
+                }
+            }
+        }
 
         // Board
         this.boardEl = mainArea.createDiv('story-line-board');
@@ -204,43 +238,26 @@ export class BoardView extends ItemView {
         });
 
         if (this.boardMode === 'corkboard') {
-            const showScenesBtn = controls.createEl('button', {
-                cls: `story-line-show-notes-btn ${this.plugin.settings.showScenesInCorkboard ? 'active' : ''}`,
-                text: this.plugin.settings.showScenesInCorkboard ? 'Scenes: On' : 'Scenes: Off'
-            });
-            showScenesBtn.addEventListener('click', async () => {
-                this.plugin.settings.showScenesInCorkboard = !this.plugin.settings.showScenesInCorkboard;
+            const toggleWrap = controls.createEl('label', { cls: 'sl-toggle-wrap' });
+            toggleWrap.createSpan({ cls: 'sl-toggle-label', text: 'Scenes' });
+            const cb = toggleWrap.createEl('input', { type: 'checkbox' });
+            cb.checked = this.plugin.settings.showScenesInCorkboard;
+            toggleWrap.createSpan({ cls: 'sl-toggle-track' });
+            cb.addEventListener('change', async () => {
+                this.plugin.settings.showScenesInCorkboard = cb.checked;
                 await this.plugin.saveSettings();
                 this.refresh();
             });
         }
 
         if (this.boardMode === 'kanban') {
-            // Group by dropdown
-            const groupContainer = controls.createDiv('story-line-group-control');
-            groupContainer.createSpan({ text: 'Group by: ' });
-            const groupSelect = groupContainer.createEl('select', { cls: 'dropdown' });
-            const groupOptions: { value: BoardGroupBy; label: string }[] = [
-                { value: 'act', label: 'Act' },
-                { value: 'chapter', label: 'Chapter' },
-                { value: 'status', label: 'Status' },
-                { value: 'pov', label: 'POV' },
-            ];
-            groupOptions.forEach(opt => {
-                const option = groupSelect.createEl('option', { text: opt.label, value: opt.value });
-                if (opt.value === this.groupBy) option.selected = true;
-            });
-            groupSelect.addEventListener('change', () => {
-                this.groupBy = groupSelect.value as BoardGroupBy;
-                this.refreshBoard();
-            });
-
-            const showNotesBtn = controls.createEl('button', {
-                cls: `story-line-show-notes-btn ${this.plugin.settings.showNotesInKanban ? 'active' : ''}`,
-                text: this.plugin.settings.showNotesInKanban ? 'Notes: On' : 'Notes: Off'
-            });
-            showNotesBtn.addEventListener('click', async () => {
-                this.plugin.settings.showNotesInKanban = !this.plugin.settings.showNotesInKanban;
+            const notesToggleWrap = controls.createEl('label', { cls: 'sl-toggle-wrap' });
+            notesToggleWrap.createSpan({ cls: 'sl-toggle-label', text: 'Notes' });
+            const notesCb = notesToggleWrap.createEl('input', { type: 'checkbox' });
+            notesCb.checked = this.plugin.settings.showNotesInKanban;
+            notesToggleWrap.createSpan({ cls: 'sl-toggle-track' });
+            notesCb.addEventListener('change', async () => {
+                this.plugin.settings.showNotesInKanban = notesCb.checked;
                 await this.plugin.saveSettings();
                 this.refresh();
             });
@@ -259,28 +276,31 @@ export class BoardView extends ItemView {
             }
         });
 
+        // Icon button group
+        const iconGroup = controls.createDiv('story-line-icon-group');
+
         // Add acts/chapters button
-        const structBtn = controls.createEl('button', {
+        const structBtn = iconGroup.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Add acts or chapters' }
         });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(structBtn, 'columns-3');
         } else {
             console.error('obsidian.setIcon is not defined when setting structBtn');
         }
+        attachTooltip(structBtn, 'Add acts or chapters');
         structBtn.addEventListener('click', () => this.openStructureModal());
 
         // Resequence button
-        const reseqBtn = controls.createEl('button', {
+        const reseqBtn = iconGroup.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Resequence all scenes from 1' }
         });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(reseqBtn, 'list-ordered');
         } else {
             console.error('obsidian.setIcon is not defined when setting reseqBtn');
         }
+        attachTooltip(reseqBtn, 'Resequence all scenes');
         reseqBtn.addEventListener('click', async () => {
             const scenes = this.sceneManager.getFilteredScenes(
                 undefined,
@@ -293,19 +313,70 @@ export class BoardView extends ItemView {
             this.refreshBoard();
         });
 
-        // Refresh button
-        const refreshBtn = controls.createEl('button', {
+        // Undo button
+        const undoBtn = iconGroup.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Refresh' }
+        });
+        obsidian.setIcon(undoBtn, 'undo');
+        attachTooltip(undoBtn, 'Undo (Ctrl+Z)');
+        undoBtn.addEventListener('click', async () => {
+            await this.sceneManager.undoManager.undo();
+        });
+
+        // Redo button
+        const redoBtn = iconGroup.createEl('button', {
+            cls: 'clickable-icon',
+        });
+        obsidian.setIcon(redoBtn, 'redo');
+        attachTooltip(redoBtn, 'Redo (Ctrl+Shift+Z)');
+        redoBtn.addEventListener('click', async () => {
+            await this.sceneManager.undoManager.redo();
+        });
+
+        // Refresh button
+        const refreshBtn = iconGroup.createEl('button', {
+            cls: 'clickable-icon',
         });
         if (typeof obsidian.setIcon === 'function') {
             obsidian.setIcon(refreshBtn, 'refresh-cw');
         } else {
             console.error('obsidian.setIcon is not defined when setting refreshBtn');
         }
+        attachTooltip(refreshBtn, 'Refresh');
         refreshBtn.addEventListener('click', async () => {
             await this.sceneManager.initialize();
             this.refreshBoard();
+        });
+    }
+
+    /**
+     * Save scroll positions of all Kanban column bodies before a re-render.
+     */
+    private saveColumnScrollPositions(): void {
+        this.columnScrollPositions.clear();
+        if (!this.boardEl) return;
+        const columns = this.boardEl.querySelectorAll('.story-line-column');
+        columns.forEach((col) => {
+            const group = col.getAttribute('data-group');
+            const body = col.querySelector('.story-line-column-body') as HTMLElement | null;
+            if (group && body) {
+                this.columnScrollPositions.set(group, body.scrollTop);
+            }
+        });
+    }
+
+    /**
+     * Restore previously saved scroll positions after a re-render.
+     */
+    private restoreColumnScrollPositions(): void {
+        if (!this.boardEl || this.columnScrollPositions.size === 0) return;
+        const columns = this.boardEl.querySelectorAll('.story-line-column');
+        columns.forEach((col) => {
+            const group = col.getAttribute('data-group');
+            const body = col.querySelector('.story-line-column-body') as HTMLElement | null;
+            if (group && body && this.columnScrollPositions.has(group)) {
+                body.scrollTop = this.columnScrollPositions.get(group)!;
+            }
         });
     }
 
@@ -461,6 +532,14 @@ export class BoardView extends ItemView {
         this.applyCorkboardNoteColor(cardEl, scene);
 
         const editorWrap = cardEl.createDiv('story-line-corkboard-note-editor');
+
+        // Show plotgrid origin label if present
+        if (scene.plotgridOrigin) {
+            const originEl = editorWrap.createDiv('story-line-corkboard-note-origin');
+            const originIcon = originEl.createSpan({ cls: 'story-line-corkboard-note-origin-icon' });
+            obsidian.setIcon(originIcon, 'sticky-note');
+            originEl.createSpan({ text: scene.plotgridOrigin });
+        }
 
         const textarea = editorWrap.createEl('textarea', {
             cls: 'story-line-corkboard-note-text',
@@ -642,9 +721,34 @@ export class BoardView extends ItemView {
     private async convertCorkboardNoteToScene(scene: Scene): Promise<void> {
         await this.sceneManager.updateScene(scene.filePath, {
             corkboardNote: false,
+            plotgridOrigin: undefined,
         });
         scene.corkboardNote = false;
+        scene.plotgridOrigin = undefined;
         this.refreshBoard();
+    }
+
+    /**
+     * Duplicate a corkboard sticky note, preserving its body and color.
+     */
+    private async duplicateCorkboardNote(scene: Scene): Promise<void> {
+        const file = await this.sceneManager.createScene({
+            status: 'idea',
+            corkboardNote: true,
+            body: scene.body || '',
+            corkboardNoteColor: scene.corkboardNoteColor,
+        });
+
+        // Position the duplicate offset from the original
+        const origPos = this.corkboardPositions.get(scene.filePath);
+        const pos = origPos
+            ? { x: origPos.x + 30, y: origPos.y + 30, z: this.getCurrentMaxCorkboardZ() + 1 }
+            : this.getNextQuickNotePosition();
+        this.corkboardPositions.set(file.path, pos);
+        this.schedulePersistCorkboardLayout();
+
+        this.refreshBoard();
+        new Notice('Note duplicated');
     }
 
     private isCorkboardNoteScene(scene: Scene): boolean {
@@ -1101,6 +1205,11 @@ export class BoardView extends ItemView {
             .onClick(() => { void this.setCorkboardNoteColor(scene, undefined); }));
 
         menu.addSeparator();
+        menu.addItem(item => item
+            .setTitle('Duplicate Note')
+            .setIcon('copy')
+            .onClick(() => { void this.duplicateCorkboardNote(scene); }));
+
         menu.addItem(item => item
             .setTitle('Delete Note')
             .setIcon('trash')
@@ -2499,7 +2608,10 @@ export class BoardView extends ItemView {
         if (this.boardMode === 'corkboard') {
             this.renderCorkboard();
         } else {
+            this.saveColumnScrollPositions();
             this.renderBoard();
+            // Restore scroll positions after DOM is rebuilt
+            requestAnimationFrame(() => this.restoreColumnScrollPositions());
         }
         // Also refresh inspector if a scene is selected
         if (this.selectedScene) {
@@ -2517,7 +2629,9 @@ export class BoardView extends ItemView {
     refresh(): void {
         if (this.rootContainer) {
             const prevSelectedPath = this.selectedScene?.filePath ?? null;
+            this.saveColumnScrollPositions();
             this.renderView(this.rootContainer);
+            requestAnimationFrame(() => this.restoreColumnScrollPositions());
             // Restore scene selection & inspector after full re-render
             if (prevSelectedPath) {
                 const updated = this.sceneManager.getScene(prevSelectedPath);

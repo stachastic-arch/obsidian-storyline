@@ -12,6 +12,7 @@ import type SceneCardsPlugin from '../main';
 
 import { TIMELINE_VIEW_TYPE } from '../constants';
 import { applyMobileClass } from '../components/MobileAdapter';
+import { attachTooltip } from '../components/Tooltip';
 
 /**
  * Timeline ordering mode
@@ -108,17 +109,17 @@ export class TimelineView extends ItemView {
         // Add acts/chapters button
         const structBtn = controls.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Add acts or chapters' }
         });
         obsidian.setIcon(structBtn, 'columns-3');
+        attachTooltip(structBtn, 'Add acts or chapters');
         structBtn.addEventListener('click', () => this.openStructureModal());
 
         // Swimlane toggle
         const swimToggle = controls.createEl('button', {
             cls: `clickable-icon${this.swimlaneMode ? ' is-active' : ''}`,
-            attr: { 'aria-label': this.swimlaneMode ? 'Switch to linear' : 'Switch to swimlanes', title: this.swimlaneMode ? 'Linear mode' : 'Swimlane mode' },
         });
         obsidian.setIcon(swimToggle, 'columns-2');
+        attachTooltip(swimToggle, this.swimlaneMode ? 'Switch to linear' : 'Switch to swimlanes');
         swimToggle.addEventListener('click', () => {
             this.swimlaneMode = !this.swimlaneMode;
             this.refresh();
@@ -170,9 +171,9 @@ export class TimelineView extends ItemView {
         // Zoom controls
         const zoomOut = controls.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Zoom out' },
             text: '−'
         });
+        attachTooltip(zoomOut, 'Zoom out');
         zoomOut.addEventListener('click', () => {
             this.zoomLevel = Math.max(0.5, this.zoomLevel - 0.25);
             this.refreshTimeline(container);
@@ -185,9 +186,9 @@ export class TimelineView extends ItemView {
 
         const zoomIn = controls.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Zoom in' },
             text: '+'
         });
+        attachTooltip(zoomIn, 'Zoom in');
         zoomIn.addEventListener('click', () => {
             this.zoomLevel = Math.min(3, this.zoomLevel + 0.25);
             this.refreshTimeline(container);
@@ -196,9 +197,9 @@ export class TimelineView extends ItemView {
         // Refresh button
         const refreshBtn = controls.createEl('button', {
             cls: 'clickable-icon',
-            attr: { 'aria-label': 'Refresh' }
         });
         obsidian.setIcon(refreshBtn, 'refresh-cw');
+        attachTooltip(refreshBtn, 'Refresh');
         refreshBtn.addEventListener('click', async () => {
             await this.sceneManager.initialize();
             this.refresh();

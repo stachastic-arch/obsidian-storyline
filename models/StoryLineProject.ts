@@ -7,8 +7,12 @@ import { FilterPreset } from './Scene';
  * (e.g. `StoryLine/My Novel.md`) and owns a subfolder tree:
  *
  *   StoryLine/My Novel/Scenes/
- *   StoryLine/My Novel/Characters/
- *   StoryLine/My Novel/Locations/
+ *   StoryLine/My Novel/Codex/
+ *   StoryLine/My Novel/Codex/Characters/
+ *   StoryLine/My Novel/Codex/Locations/
+ *
+ * Legacy projects may have Characters/ and Locations/ at the project root;
+ * the runtime detects this and uses the old paths transparently.
  */
 export interface StoryLineProject {
     /** Vault-relative path of the project .md file */
@@ -25,6 +29,8 @@ export interface StoryLineProject {
     characterFolder: string;
     /** Derived location folder path */
     locationFolder: string;
+    /** Derived codex folder path (generic codex categories live here) */
+    codexFolder: string;
 
     // ── Project-specific structure ──────────────────────
     /** Defined act numbers (persisted in project frontmatter) */
@@ -51,12 +57,13 @@ export interface StoryLineProject {
 export function deriveProjectFolders(
     rootFolder: string,
     title: string
-): { sceneFolder: string; characterFolder: string; locationFolder: string } {
+): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string } {
     const base = `${rootFolder}/${title}`;
     return {
         sceneFolder: `${base}/Scenes`,
-        characterFolder: `${base}/Characters`,
-        locationFolder: `${base}/Locations`,
+        characterFolder: `${base}/Codex/Characters`,
+        locationFolder: `${base}/Codex/Locations`,
+        codexFolder: `${base}/Codex`,
     };
 }
 
@@ -70,7 +77,7 @@ export function deriveProjectFolders(
  */
 export function deriveProjectFoldersFromFilePath(
     filePath: string
-): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string } {
+): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string } {
     const lastSlash = filePath.lastIndexOf('/');
     const parentDir = lastSlash >= 0 ? filePath.substring(0, lastSlash) : '';
     const basename = (filePath.split('/').pop() ?? '').replace(/\.md$/i, '');
@@ -81,7 +88,8 @@ export function deriveProjectFoldersFromFilePath(
     return {
         baseFolder,
         sceneFolder: `${baseFolder}/Scenes`,
-        characterFolder: `${baseFolder}/Characters`,
-        locationFolder: `${baseFolder}/Locations`,
+        characterFolder: `${baseFolder}/Codex/Characters`,
+        locationFolder: `${baseFolder}/Codex/Locations`,
+        codexFolder: `${baseFolder}/Codex`,
     };
 }

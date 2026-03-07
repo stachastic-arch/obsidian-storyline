@@ -128,6 +128,8 @@ export interface Scene {
     corkboardNote?: boolean;
     /** Optional custom corkboard note color (hex, e.g. #F7E27A) */
     corkboardNoteColor?: string;
+    /** Plot-grid origin label (e.g. "Act 1 / Romance") — informational, stripped on convert-to-scene */
+    plotgridOrigin?: string;
     /** Timeline handling mode (linear, flashback, dream, parallel, etc.) */
     timeline_mode?: TimelineMode;
     /** Named strand for parallel / frame narratives (e.g. "1943", "outer frame") */
