@@ -72,6 +72,13 @@ export class InspectorComponent {
     }
 
     /**
+     * Whether the inspector panel is currently visible
+     */
+    isVisible(): boolean {
+        return this.container.style.display !== 'none';
+    }
+
+    /**
      * Hide inspector
      */
     hide(): void {

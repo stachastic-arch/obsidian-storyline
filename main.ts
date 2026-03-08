@@ -1280,6 +1280,21 @@ export default class SceneCardsPlugin extends Plugin {
         }
 
         if (projects.length === 0) {
+            // If we expect a project to exist (e.g. from a previous session),
+            // verify that its file is actually missing before prompting creation.
+            // This prevents the startup race condition from creating duplicate projects
+            // when the vault/metadata cache is slow to index (e.g. synced folders).
+            if (this.settings.activeProjectFile) {
+                const exists = await this.app.vault.adapter.exists(this.settings.activeProjectFile);
+                if (exists) {
+                    // The file exists but wasn't found by scanProjects — retry once more
+                    // with a longer delay to give the metadata cache time to catch up.
+                    await new Promise(r => setTimeout(r, 5000));
+                    projects = await this.sceneManager.scanProjects();
+                    if (projects.length > 0) return;
+                }
+            }
+
             // Prompt user to name their first project instead of auto-creating "Default"
             const project = await this.openNewProjectModal();
             if (project) {

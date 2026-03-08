@@ -440,10 +440,9 @@ export class BoardView extends ItemView {
         if (!this.plugin.settings.showScenesInCorkboard) {
             scenes = scenes.filter(scene => this.isCorkboardNoteScene(scene));
         }
+        // Only render nodes for visible scenes, but keep positions for
+        // filtered-out scenes so they don't lose their layout.
         const validPaths = new Set(scenes.map(s => s.filePath));
-        for (const key of Array.from(this.corkboardPositions.keys())) {
-            if (!validPaths.has(key)) this.corkboardPositions.delete(key);
-        }
 
         const currentMaxZ = () => {
             let max = 0;
@@ -2613,8 +2612,8 @@ export class BoardView extends ItemView {
             // Restore scroll positions after DOM is rebuilt
             requestAnimationFrame(() => this.restoreColumnScrollPositions());
         }
-        // Also refresh inspector if a scene is selected
-        if (this.selectedScene) {
+        // Only refresh inspector if it was already visible
+        if (this.selectedScene && this.inspectorComponent?.isVisible()) {
             const updated = this.sceneManager.getScene(this.selectedScene.filePath);
             if (updated) {
                 this.selectedScene = updated;
@@ -2629,16 +2628,20 @@ export class BoardView extends ItemView {
     refresh(): void {
         if (this.rootContainer) {
             const prevSelectedPath = this.selectedScene?.filePath ?? null;
+            const inspectorWasVisible = this.inspectorComponent?.isVisible() ?? false;
             this.saveColumnScrollPositions();
             this.renderView(this.rootContainer);
             requestAnimationFrame(() => this.restoreColumnScrollPositions());
             // Restore scene selection & inspector after full re-render
+            // (only re-show inspector if it was already visible)
             if (prevSelectedPath) {
                 const updated = this.sceneManager.getScene(prevSelectedPath);
                 if (updated) {
                     this.selectedScene = updated;
                     this.selectedScenes.add(updated.filePath);
-                    this.inspectorComponent?.show(updated);
+                    if (inspectorWasVisible) {
+                        this.inspectorComponent?.show(updated);
+                    }
                 }
             }
         }
@@ -2663,6 +2666,11 @@ export class BoardView extends ItemView {
     }
 
     private async openQuickAddIdea(): Promise<void> {
+        // Clear selection so the inspector doesn't pop open for the previous scene
+        this.selectedScene = null;
+        this.selectedScenes.clear();
+        this.inspectorComponent?.hide();
+
         const file = await this.sceneManager.createScene({
             status: 'idea',
             corkboardNote: true,
