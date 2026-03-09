@@ -1,5 +1,6 @@
 import { Scene, STATUS_CONFIG, SceneStatus, ColorCodingMode, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode } from '../models/Scene';
 import * as obsidian from 'obsidian';
+import { MarkdownRenderer, Component } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
 import type { LinkScanResult } from '../services/LinkScanner';
@@ -88,11 +89,18 @@ export class SceneCardComponent {
             });
         }
         if (!options?.compact && scene.conflict) {
-            card.createDiv({
-                cls: 'scene-card-conflict',
-                text: scene.conflict.length > 80
-                    ? scene.conflict.substring(0, 80) + '...'
-                    : scene.conflict
+            const conflictEl = card.createDiv({ cls: 'scene-card-conflict markdown-rendered' });
+            const conflictSource = scene.conflict.length > 80
+                ? scene.conflict.substring(0, 80) + '...'
+                : scene.conflict;
+            const renderComp = new Component();
+            renderComp.load();
+            void MarkdownRenderer.render(
+                this.plugin.app, conflictSource, conflictEl, scene.filePath, renderComp
+            ).then(() => {
+                // Strip wrapping <p> to keep it inline-styled
+                const p = conflictEl.querySelector(':scope > p:only-child');
+                if (p) { while (p.firstChild) conflictEl.insertBefore(p.firstChild, p); p.remove(); }
             });
         }
         if (!options?.compact) {
@@ -145,6 +153,18 @@ export class SceneCardComponent {
                 }
             }
         }
+
+        // Intercept internal-link clicks before card-level handlers
+        card.addEventListener('click', (e) => {
+            const target = e.target as HTMLElement;
+            const link = target.closest('a.internal-link') as HTMLAnchorElement | null;
+            if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+                const href = link.getAttribute('data-href') || link.getAttribute('href');
+                if (href) this.plugin.app.workspace.openLinkText(href, scene.filePath, true);
+            }
+        }, true);
 
         // Wire up event listeners
         if (options?.onSelect) {

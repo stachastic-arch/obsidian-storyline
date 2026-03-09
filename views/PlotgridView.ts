@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, Menu, Modal, TFile, Notice } from 'obsidian';
+import { ItemView, WorkspaceLeaf, Menu, Modal, TFile, Notice, MarkdownRenderer, Component } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { CellData, ColumnMeta, RowMeta, PlotGridData } from '../models/PlotGridData';
 import { LocationManager } from '../services/LocationManager';
@@ -936,10 +936,12 @@ export class PlotgridView extends ItemView {
                 if (cell.italic) cellEl.style.fontStyle = 'italic';
                 cellEl.style.textAlign = cell.align;
 
-                const contentEl = cellEl.createDiv();
-                contentEl.textContent = cell.content || '';
+                const contentEl = cellEl.createDiv({ cls: 'markdown-rendered' });
                 contentEl.style.flex = '1 1 auto';
-                contentEl.style.pointerEvents = 'none';
+                if (cell.content) {
+                    const cellComp = new Component(); cellComp.load();
+                    void MarkdownRenderer.render(this.app, cell.content, contentEl, '', cellComp);
+                }
 
                 // linked scene: render mini card or badge
                 if (cell.linkedSceneId) {
@@ -981,9 +983,10 @@ export class PlotgridView extends ItemView {
                             }
 
                             // Render note content directly in the cell
-                            const noteBody = cellEl.createDiv('pg-cell-note-body');
+                            const noteBody = cellEl.createDiv('pg-cell-note-body markdown-rendered');
                             if (scene.body && scene.body.trim()) {
-                                noteBody.textContent = scene.body.trim();
+                                const noteComp = new Component(); noteComp.load();
+                                void MarkdownRenderer.render(this.app, scene.body.trim(), noteBody, scene.filePath, noteComp);
                             }
                         } else {
                         // Render mini scene card inside the cell
@@ -998,14 +1001,16 @@ export class PlotgridView extends ItemView {
                         titleRow.createSpan({ cls: 'pg-mini-title', text: scene.title || 'Untitled' });
 
                         // Meta row: description snippet
-                        const metaRow = miniCard.createDiv('pg-mini-meta');
+                        const metaRow = miniCard.createDiv('pg-mini-meta markdown-rendered');
                         if (scene.body && scene.body.trim()) {
                             const snippet = scene.body.trim().length > 120
                                 ? scene.body.trim().substring(0, 120) + '…'
                                 : scene.body.trim();
-                            metaRow.createSpan({ cls: 'pg-mini-desc', text: snippet });
+                            const metaComp = new Component(); metaComp.load();
+                            void MarkdownRenderer.render(this.app, snippet, metaRow, scene.filePath, metaComp);
                         } else if (scene.conflict) {
-                            metaRow.createSpan({ cls: 'pg-mini-desc', text: scene.conflict });
+                            const metaComp = new Component(); metaComp.load();
+                            void MarkdownRenderer.render(this.app, scene.conflict, metaRow, scene.filePath, metaComp);
                         }
 
                         // Keep cell content below if there's text
@@ -1043,6 +1048,21 @@ export class PlotgridView extends ItemView {
                     ev.stopPropagation();
                     this.enterEditMode(cellEl, cell, contentEl);
                 });
+
+                // Intercept internal-link clicks before cell-level handlers
+                cellEl.addEventListener('click', (ev) => {
+                    const target = ev.target as HTMLElement;
+                    const link = target.closest('a.internal-link') as HTMLAnchorElement | null;
+                    if (link) {
+                        ev.preventDefault();
+                        ev.stopPropagation();
+                        const href = link.getAttribute('data-href') || link.getAttribute('href');
+                        if (href) {
+                            const sourcePath = cell.linkedSceneId || '';
+                            this.app.workspace.openLinkText(href, sourcePath, true);
+                        }
+                    }
+                }, true);
 
                 cellEl.addEventListener('click', () => {
                     this.selectCell(cellEl);
