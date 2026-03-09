@@ -245,6 +245,149 @@ export const RELATION_BASE_TYPE_BY_CATEGORY: Record<CharacterRelationCategory, '
     custom: 'other',
 };
 
+// ── Reciprocal relation support ────────────────────────
+
+/**
+ * Maps a relation type to its inverse.  Symmetric types map to themselves.
+ * Types not listed here are treated as symmetric (mirrored as-is).
+ */
+const INVERSE_RELATIONS: Record<string, string> = {
+    // Family
+    'parent': 'child',
+    'child': 'parent',
+    'step-parent': 'step-child',
+    'step-child': 'step-parent',
+    'adoptive-parent': 'adopted-child',
+    'adopted-child': 'adoptive-parent',
+    'guardian': 'ward',
+    'ward': 'guardian',
+    'grandparent': 'grandchild',
+    'grandchild': 'grandparent',
+    'aunt/uncle': 'niece/nephew',
+    'niece/nephew': 'aunt/uncle',
+    // Symmetric family
+    'sibling': 'sibling',
+    'half-sibling': 'half-sibling',
+    'twin': 'twin',
+    'cousin': 'cousin',
+    'in-law': 'in-law',
+    // Romantic (symmetric)
+    'partner': 'partner',
+    'spouse': 'spouse',
+    'ex-partner': 'ex-partner',
+    // Social (symmetric)
+    'ally': 'ally',
+    'friend': 'friend',
+    'best-friend': 'best-friend',
+    'confidant': 'confidant',
+    'acquaintance': 'acquaintance',
+    // Conflict (symmetric)
+    'enemy': 'enemy',
+    'rival': 'rival',
+    'betrayer': 'betrayer',
+    'avenger': 'avenger',
+    // Guidance / hierarchy
+    'mentor': 'mentee',
+    'mentee': 'mentor',
+    'leader': 'follower',
+    'follower': 'leader',
+    'boss': 'subordinate',
+    'subordinate': 'boss',
+    'commander': 'second-in-command',
+    'second-in-command': 'commander',
+    'master': 'apprentice',
+    'apprentice': 'master',
+    // Professional (symmetric)
+    'colleague': 'colleague',
+    'business-partner': 'business-partner',
+    'client': 'client',
+    'handler': 'asset',
+    'asset': 'handler',
+    // Story dynamics
+    'protector': 'dependent',
+    'dependent': 'protector',
+    'owes-debt-to': 'owes-debt-to',
+    'sworn-to': 'sworn-to',
+    'bound-by-oath': 'bound-by-oath',
+    'idolizes': 'idolizes',
+    'fears': 'fears',
+    'obsessed-with': 'obsessed-with',
+};
+
+/**
+ * Return the inverse of a relation type.  Unknown / custom types
+ * are treated as symmetric (the same type is returned).
+ */
+export function getInverseRelationType(type: string): string {
+    return INVERSE_RELATIONS[type] ?? type;
+}
+
+/**
+ * Infer the category for a given relation type by scanning all built-in categories.
+ */
+export function inferCategoryForType(type: string): CharacterRelationCategory {
+    for (const cat of RELATION_CATEGORIES) {
+        if (RELATION_TYPES_BY_CATEGORY[cat.value].includes(type)) return cat.value;
+    }
+    return 'custom';
+}
+
+/** Describes a single reciprocal update to be applied to a target character. */
+export interface ReciprocalUpdate {
+    action: 'add' | 'remove';
+    targetName: string;
+    relation: CharacterRelation;
+}
+
+/**
+ * Diff old and new relation arrays for a given source character name
+ * and return the reciprocal updates that need to be applied to target characters.
+ */
+export function computeReciprocalUpdates(
+    sourceName: string,
+    oldRelations: CharacterRelation[],
+    newRelations: CharacterRelation[],
+): ReciprocalUpdate[] {
+    const key = (r: CharacterRelation) => `${r.type}|${r.target.toLowerCase()}`;
+    const oldSet = new Map(oldRelations.map(r => [key(r), r]));
+    const newSet = new Map(newRelations.map(r => [key(r), r]));
+    const updates: ReciprocalUpdate[] = [];
+
+    // Added relations (in new but not in old)
+    for (const [k, rel] of newSet) {
+        if (!oldSet.has(k) && rel.target.trim()) {
+            const invType = getInverseRelationType(rel.type);
+            updates.push({
+                action: 'add',
+                targetName: rel.target,
+                relation: {
+                    category: inferCategoryForType(invType),
+                    type: invType,
+                    target: sourceName,
+                },
+            });
+        }
+    }
+
+    // Removed relations (in old but not in new)
+    for (const [k, rel] of oldSet) {
+        if (!newSet.has(k) && rel.target.trim()) {
+            const invType = getInverseRelationType(rel.type);
+            updates.push({
+                action: 'remove',
+                targetName: rel.target,
+                relation: {
+                    category: inferCategoryForType(invType),
+                    type: invType,
+                    target: sourceName,
+                },
+            });
+        }
+    }
+
+    return updates;
+}
+
 /**
  * All character field categories with their placeholder descriptions.
  * These define the UI layout and hint text.

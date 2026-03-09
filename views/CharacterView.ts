@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting, requestUrl } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { Scene, STATUS_CONFIG } from '../models/Scene';
-import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_CATEGORIES, CHARACTER_ROLES, CharacterFieldDef, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags, extractAllCharacterTags, normalizeCharacterRelations, TagType } from '../models/Character';
+import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_CATEGORIES, CHARACTER_ROLES, CharacterFieldDef, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags, extractAllCharacterTags, normalizeCharacterRelations, TagType, computeReciprocalUpdates } from '../models/Character';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
@@ -49,6 +49,10 @@ export class CharacterView extends ItemView {
     private storyGraph: StoryGraph | null = null;
     /** Original name when the detail view was opened — used for cascade rename detection */
     private originalCharacterName: string | null = null;
+    /** Last-saved relations snapshot — used to diff for reciprocal sync */
+    private _lastSavedRelations: CharacterRelation[] = [];
+    /** Flag to prevent reciprocal sync from re-triggering itself */
+    private _skipReciprocalSync = false;
     /** Current search/filter text for overview grid */
     private searchText: string = '';
     /** Current sort mode for the overview grid */
@@ -699,6 +703,8 @@ export class CharacterView extends ItemView {
         this.undoSnapshot = { ...character, custom: { ...(character.custom || {}) }, universalFields: { ...(character.universalFields || {}) } };
         // Track original name for cascade rename detection
         this.originalCharacterName = character.name;
+        // Snapshot relations for reciprocal sync diffing
+        this._lastSavedRelations = normalizeCharacterRelations(character.relations).map(r => ({ ...r }));
 
         // Back button + character name header
         const header = container.createDiv('character-detail-header');
@@ -1886,10 +1892,76 @@ export class CharacterView extends ItemView {
                 this._lastSaveTime = Date.now();
                 await this.characterManager.saveCharacter(draft);
                 this.pendingSaveDraft = null;
+
+                // ── Reciprocal relation sync ──
+                if (!this._skipReciprocalSync) {
+                    await this.syncReciprocalRelations(draft);
+                }
             } catch (e) {
                 console.error('StoryLine: failed to save character', e);
             }
         }, 600);
+    }
+
+    /**
+     * Compute relation diffs and apply reciprocal updates to target characters.
+     */
+    private async syncReciprocalRelations(draft: Character): Promise<void> {
+        const currentRelations = normalizeCharacterRelations(draft.relations);
+        const updates = computeReciprocalUpdates(
+            draft.name,
+            this._lastSavedRelations,
+            currentRelations,
+        );
+
+        // Update snapshot for next diff
+        this._lastSavedRelations = currentRelations.map(r => ({ ...r }));
+
+        if (updates.length === 0) return;
+
+        // Group updates by target
+        const byTarget = new Map<string, typeof updates>();
+        for (const u of updates) {
+            const key = u.targetName.toLowerCase();
+            if (!byTarget.has(key)) byTarget.set(key, []);
+            byTarget.get(key)!.push(u);
+        }
+
+        for (const [, targetUpdates] of byTarget) {
+            const targetName = targetUpdates[0].targetName;
+            const targetChar = this.characterManager.findByName(targetName);
+            if (!targetChar) continue;
+
+            let relations = normalizeCharacterRelations(targetChar.relations);
+            let changed = false;
+
+            for (const u of targetUpdates) {
+                const matchKey = `${u.relation.type}|${u.relation.target.toLowerCase()}`;
+                const existingIdx = relations.findIndex(
+                    r => `${r.type}|${r.target.toLowerCase()}` === matchKey
+                );
+
+                if (u.action === 'add' && existingIdx === -1) {
+                    relations.push(u.relation);
+                    changed = true;
+                } else if (u.action === 'remove' && existingIdx !== -1) {
+                    relations.splice(existingIdx, 1);
+                    changed = true;
+                }
+            }
+
+            if (changed) {
+                targetChar.relations = normalizeCharacterRelations(relations);
+                try {
+                    this._skipReciprocalSync = true;
+                    await this.characterManager.saveCharacter(targetChar);
+                } catch (e) {
+                    console.error(`StoryLine: failed to sync reciprocal relations to "${targetName}"`, e);
+                } finally {
+                    this._skipReciprocalSync = false;
+                }
+            }
+        }
     }
 
     /**
