@@ -672,6 +672,20 @@ export class BoardView extends ItemView {
         });
 
         preview.addEventListener('click', (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            const link = target.closest('a');
+            if (link) {
+                const href = link.getAttribute('data-href') || link.getAttribute('href');
+                if (href && link.hasClass('internal-link')) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    this.app.workspace.openLinkText(href, scene.filePath, true);
+                    return;
+                }
+                if (href && !href.startsWith('#')) {
+                    return; // let external links behave normally
+                }
+            }
             setEditing(true, { x: event.clientX, y: event.clientY });
         });
 
