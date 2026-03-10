@@ -8,7 +8,7 @@ import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { FiltersComponent } from '../components/Filters';
 import type SceneCardsPlugin from '../main';
 import { MANUSCRIPT_VIEW_TYPE } from '../constants';
-import { applyMobileClass, isMobile, isPhone } from '../components/MobileAdapter';
+import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/MobileAdapter';
 
 /**
  * Manuscript View — Scrivenings-style continuous document view.
@@ -320,9 +320,9 @@ export class ManuscriptView extends ItemView {
 
         container.empty(); // Remove "Loading…" placeholder
 
-        // On phones, embedded WorkspaceSplit editors don't render reliably.
-        // Fall back to static rendered markdown (read-only).
-        if (isPhone) {
+        // On mobile (phone + tablet), embedded WorkspaceSplit editors
+        // don't render reliably. Fall back to static rendered markdown.
+        if (isPhone || isTablet) {
             this.mountingPaths.delete(filePath);
             await this.mountReadOnlyPreview(container, filePath);
             return;
@@ -334,6 +334,10 @@ export class ManuscriptView extends ItemView {
             const splitEl: HTMLElement = (split as any).containerEl;
             container.appendChild(splitEl);
             splitEl.classList.add('sl-manuscript-embedded-split');
+
+            // Give the split an initial height so the absolute-positioned
+            // workspace-leaf chain has a viewport for CM6 to render into.
+            splitEl.style.height = '300px';
 
             const leaf = this.app.workspace.createLeafInParent(split, 0);
 
@@ -353,13 +357,18 @@ export class ManuscriptView extends ItemView {
             // and set splitEl to that pixel height.
             let rafPending = false;
             const syncHeight = () => {
-                // Measure the inner content precisely (cm-sizer holds the
-                // actual content without scroll-past-end padding)
+                // Measure the inner content height.
+                // cm-sizer holds the actual content; cm-scroller's scrollHeight
+                // captures full content even when clipped by overflow:hidden.
                 const sizer = splitEl.querySelector('.cm-sizer') as HTMLElement | null;
+                const scroller = splitEl.querySelector('.cm-scroller') as HTMLElement | null;
                 const cmEl = splitEl.querySelector('.cm-editor') as HTMLElement | null;
                 const el = sizer || cmEl;
                 if (!el) return;
-                const h = el.getBoundingClientRect().height;
+                const rect = el.getBoundingClientRect().height;
+                const offset = el.offsetHeight;
+                const scroll = scroller ? scroller.scrollHeight : 0;
+                const h = Math.max(rect, offset, scroll);
                 if (h > 0) {
                     const px = Math.ceil(h) + 'px';
                     splitEl.style.height = px;
@@ -378,34 +387,44 @@ export class ManuscriptView extends ItemView {
             };
 
             // CM6 may render lazily; sync across multiple frames.
-            // On tablets (iPadOS) the editor can take longer to layout,
-            // so we retry at increasing intervals.
             requestAnimationFrame(() => {
                 syncHeight();
                 requestAnimationFrame(() => {
                     syncHeight();
                     setTimeout(syncHeight, 300);
-                    setTimeout(syncHeight, 800);
-                    if (isMobile) setTimeout(syncHeight, 1500);
                 });
             });
 
-            // Keep height synced as user edits (content grows/shrinks)
+            // On tablet, poll until height stabilises (CM6 can take
+            // a long time to lay out content on mobile browsers).
+            if (isMobile) {
+                let lastH = 0;
+                let stableCount = 0;
+                const poll = setInterval(() => {
+                    syncHeight();
+                    const sizer = splitEl.querySelector('.cm-sizer') as HTMLElement | null;
+                    const h = sizer ? Math.max(sizer.getBoundingClientRect().height, sizer.offsetHeight) : 0;
+                    if (h > 0 && Math.abs(h - lastH) < 2) {
+                        stableCount++;
+                        if (stableCount >= 3) clearInterval(poll);
+                    } else {
+                        stableCount = 0;
+                        lastH = h;
+                    }
+                }, 250);
+                setTimeout(() => clearInterval(poll), 10000);
+            }
+
+            // Keep height synced as user edits (content grows/shrinks).
+            // Observe both .cm-editor and .cm-content — on mobile the
+            // inner content node may resize independently.
             const cmEl = splitEl.querySelector('.cm-editor') as HTMLElement | null;
+            const cmContent = splitEl.querySelector('.cm-content') as HTMLElement | null;
             if (cmEl) {
                 const ro = new ResizeObserver(() => debouncedSync());
                 ro.observe(cmEl);
+                if (cmContent && cmContent !== cmEl) ro.observe(cmContent);
                 this.editorResizeObservers.set(filePath, ro);
-            }
-
-            // On mobile, also watch for child list changes (CM6 may add
-            // content nodes later than desktop). This catches cases where
-            // ResizeObserver misses the initial layout.
-            if (isMobile) {
-                const mo = new MutationObserver(() => debouncedSync());
-                mo.observe(splitEl, { childList: true, subtree: true });
-                // Auto-disconnect after content has stabilised
-                setTimeout(() => mo.disconnect(), 5000);
             }
         } catch (err) {
             this.mountingPaths.delete(filePath);

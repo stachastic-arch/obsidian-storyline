@@ -8721,16 +8721,3 @@ body.theme-dark {
 .sl-manuscript-preview {
     line-height: 1.6;
 }
-
-/* On mobile, don't clip the embedded split — let content flow naturally.
-   Desktop uses overflow:hidden to prevent scrollbar leaks, but mobile
-   needs visible overflow so the height sync can catch up. */
-.sl-mobile .sl-manuscript-embedded-split {
-    overflow: visible !important;
-}
-
-/* Ensure the workspace-leaf inside the split doesn't collapse on tablet */
-.sl-mobile .sl-manuscript-embedded-split .workspace-leaf {
-    position: relative !important;
-    min-height: 2em;
-}
