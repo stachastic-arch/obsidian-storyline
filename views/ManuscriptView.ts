@@ -192,13 +192,17 @@ export class ManuscriptView extends ItemView {
 
         // For manuscript view, always sort by act → chapter → sequence
         // so scenes are grouped properly under their act/chapter dividers.
+        // Only compare act/chapter when both scenes have the field defined;
+        // if one or both are missing, fall through to sequence.
         scenes.sort((a, b) => {
-            const actA = Number(a.act ?? 0);
-            const actB = Number(b.act ?? 0);
-            if (actA !== actB) return actA - actB;
-            const chA = Number(a.chapter ?? 0);
-            const chB = Number(b.chapter ?? 0);
-            if (chA !== chB) return chA - chB;
+            if (a.act != null && b.act != null) {
+                const actCmp = Number(a.act) - Number(b.act);
+                if (actCmp !== 0) return actCmp;
+            }
+            if (a.chapter != null && b.chapter != null) {
+                const chCmp = Number(a.chapter) - Number(b.chapter);
+                if (chCmp !== 0) return chCmp;
+            }
             return (a.sequence ?? 9999) - (b.sequence ?? 9999);
         });
 
