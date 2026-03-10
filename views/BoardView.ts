@@ -15,6 +15,7 @@ import { isMobile, applyMobileClass, enableTouchDrag } from '../components/Mobil
 import { BOARD_VIEW_TYPE } from '../constants';
 import { resolveStickyNoteColors } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
+import { resolveImagePath } from '../components/ImagePicker';
 import type SceneCardsPlugin from '../main';
 
 type BoardMode = 'kanban' | 'corkboard';
@@ -37,7 +38,7 @@ export class BoardView extends ItemView {
     private bulkBarEl: HTMLElement | null = null;
     private rootContainer: HTMLElement | null = null;
     private boardMode: BoardMode = 'corkboard';
-    private corkboardPositions: Map<string, { x: number; y: number; z: number }> = new Map();
+    private corkboardPositions: Map<string, { x: number; y: number; z: number; h?: number }> = new Map();
     private corkboardJustDragged: Set<string> = new Set();
     private corkboardPersistTimer: ReturnType<typeof setTimeout> | null = null;
     private corkboardLoadedProjectFile: string | null = null;
@@ -227,13 +228,13 @@ export class BoardView extends ItemView {
         corkboardBtn.addEventListener('click', () => {
             if (this.boardMode !== 'corkboard') {
                 this.boardMode = 'corkboard';
-                this.refresh();
+                if (this.rootContainer) this.renderView(this.rootContainer);
             }
         });
         kanbanBtn.addEventListener('click', () => {
             if (this.boardMode !== 'kanban') {
                 this.boardMode = 'kanban';
-                this.refresh();
+                if (this.rootContainer) this.renderView(this.rootContainer);
             }
         });
 
@@ -276,42 +277,58 @@ export class BoardView extends ItemView {
             }
         });
 
+        // Add image note button (corkboard only)
+        if (this.boardMode === 'corkboard') {
+            const imgBtn = controls.createEl('button', {
+                cls: 'clickable-icon',
+            });
+            obsidian.setIcon(imgBtn, 'image-plus');
+            attachTooltip(imgBtn, 'New Image Note');
+            imgBtn.addEventListener('click', () => {
+                void this.openImageNotePicker();
+            });
+        }
+
         // Icon button group
         const iconGroup = controls.createDiv('story-line-icon-group');
 
-        // Add acts/chapters button
-        const structBtn = iconGroup.createEl('button', {
-            cls: 'clickable-icon',
-        });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(structBtn, 'columns-3');
-        } else {
-            console.error('obsidian.setIcon is not defined when setting structBtn');
-        }
-        attachTooltip(structBtn, 'Add acts or chapters');
-        structBtn.addEventListener('click', () => this.openStructureModal());
-
-        // Resequence button
-        const reseqBtn = iconGroup.createEl('button', {
-            cls: 'clickable-icon',
-        });
-        if (typeof obsidian.setIcon === 'function') {
-            obsidian.setIcon(reseqBtn, 'list-ordered');
-        } else {
-            console.error('obsidian.setIcon is not defined when setting reseqBtn');
-        }
-        attachTooltip(reseqBtn, 'Resequence all scenes');
-        reseqBtn.addEventListener('click', async () => {
-            const scenes = this.sceneManager.getFilteredScenes(
-                undefined,
-                { field: 'sequence', direction: 'asc' }
-            );
-            for (let i = 0; i < scenes.length; i++) {
-                await this.sceneManager.updateScene(scenes[i].filePath, { sequence: i + 1 });
+        // Add acts/chapters button (kanban only)
+        if (this.boardMode !== 'corkboard') {
+            const structBtn = iconGroup.createEl('button', {
+                cls: 'clickable-icon',
+            });
+            if (typeof obsidian.setIcon === 'function') {
+                obsidian.setIcon(structBtn, 'columns-3');
+            } else {
+                console.error('obsidian.setIcon is not defined when setting structBtn');
             }
-            await this.sceneManager.initialize();
-            this.refreshBoard();
-        });
+            attachTooltip(structBtn, 'Add acts or chapters');
+            structBtn.addEventListener('click', () => this.openStructureModal());
+        }
+
+        // Resequence button (kanban only)
+        if (this.boardMode !== 'corkboard') {
+            const reseqBtn = iconGroup.createEl('button', {
+                cls: 'clickable-icon',
+            });
+            if (typeof obsidian.setIcon === 'function') {
+                obsidian.setIcon(reseqBtn, 'list-ordered');
+            } else {
+                console.error('obsidian.setIcon is not defined when setting reseqBtn');
+            }
+            attachTooltip(reseqBtn, 'Resequence all scenes');
+            reseqBtn.addEventListener('click', async () => {
+                const scenes = this.sceneManager.getFilteredScenes(
+                    undefined,
+                    { field: 'sequence', direction: 'asc' }
+                );
+                for (let i = 0; i < scenes.length; i++) {
+                    await this.sceneManager.updateScene(scenes[i].filePath, { sequence: i + 1 });
+                }
+                await this.sceneManager.initialize();
+                this.refreshBoard();
+            });
+        }
 
         // Undo button
         const undoBtn = iconGroup.createEl('button', {
@@ -465,6 +482,9 @@ export class BoardView extends ItemView {
         this.corkboardInteractionCleanup = this.enableCorkboardCameraInteraction(viewport, canvas);
         this.applyCorkboardCamera(canvas);
 
+        // ── Drag-and-drop images onto the corkboard ──
+        this.attachCorkboardImageDrop(viewport);
+
         scenes.forEach((scene, index) => {
             const existing = this.corkboardPositions.get(scene.filePath);
             const col = index % 4;
@@ -517,6 +537,11 @@ export class BoardView extends ItemView {
                 cardEl.addClass('selected');
             }
 
+            // Restore persisted height from layout data
+            if (pos.h && pos.h > 0) {
+                cardEl.style.height = `${pos.h}px`;
+            }
+
             this.attachCorkboardNoteEditor(cardEl, scene);
 
             this.attachCorkboardDrag(node, scene.filePath);
@@ -529,6 +554,13 @@ export class BoardView extends ItemView {
 
         cardEl.addClass('story-line-corkboard-note-card');
         this.applyCorkboardNoteColor(cardEl, scene);
+
+        // ── Image note rendering ───────────────────────────
+        if (scene.corkboardNoteImage) {
+            cardEl.addClass('story-line-corkboard-image-note');
+            this.renderImageNoteContent(cardEl, scene);
+            return;
+        }
 
         const editorWrap = cardEl.createDiv('story-line-corkboard-note-editor');
 
@@ -713,17 +745,26 @@ export class BoardView extends ItemView {
             e.stopPropagation();
 
             const startY = e.clientY;
-            const startHeight = cardEl.getBoundingClientRect().height;
+            const zoom = this.corkboardCamera.zoom || 1;
+            const startHeight = cardEl.getBoundingClientRect().height / zoom;
             const minHeight = 220;
 
             const onMove = (moveEvent: PointerEvent) => {
-                const nextHeight = Math.max(minHeight, startHeight + (moveEvent.clientY - startY));
+                const nextHeight = Math.max(minHeight, startHeight + (moveEvent.clientY - startY) / zoom);
                 cardEl.style.height = `${nextHeight}px`;
             };
 
             const onUp = () => {
                 window.removeEventListener('pointermove', onMove);
                 window.removeEventListener('pointerup', onUp);
+                const finalHeight = parseFloat(cardEl.style.height);
+                if (finalHeight > 0) {
+                    const pos = this.corkboardPositions.get(scene.filePath);
+                    if (pos) {
+                        pos.h = finalHeight;
+                        this.schedulePersistCorkboardLayout();
+                    }
+                }
             };
 
             window.addEventListener('pointermove', onMove);
@@ -849,8 +890,8 @@ export class BoardView extends ItemView {
             if (e.button !== 0) return;
 
             const target = e.target as HTMLElement;
-            if (target.closest('button, a, input, textarea, select')) return;
-            if (target.closest('.story-line-corkboard-note-preview')) return;
+            if (target.closest('button, a, input, textarea, select, img')) return;
+            if (target.closest('.story-line-corkboard-note-preview, .story-line-corkboard-note-caption, .story-line-corkboard-note-caption-empty')) return;
 
             const noteCard = target.closest('.story-line-corkboard-note-card') as HTMLElement | null;
             if (noteCard) {
@@ -1159,7 +1200,8 @@ export class BoardView extends ItemView {
             const y = Number(pos?.y);
             const z = Number(pos?.z);
             if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-            this.corkboardPositions.set(path, { x, y, z: Number.isFinite(z) ? z : 1 });
+            const h = Number(pos?.h);
+            this.corkboardPositions.set(path, { x, y, z: Number.isFinite(z) ? z : 1, ...(Number.isFinite(h) && h > 0 ? { h } : {}) });
         }
     }
 
@@ -1174,9 +1216,9 @@ export class BoardView extends ItemView {
     }
 
     private async persistCorkboardLayout(): Promise<void> {
-        const payload: Record<string, { x: number; y: number; z?: number }> = {};
+        const payload: Record<string, { x: number; y: number; z?: number; h?: number }> = {};
         for (const [path, pos] of this.corkboardPositions.entries()) {
-            payload[path] = { x: pos.x, y: pos.y, z: pos.z };
+            payload[path] = { x: pos.x, y: pos.y, z: pos.z, ...(pos.h ? { h: pos.h } : {}) };
         }
         await this.sceneManager.setCorkboardPositions(payload);
     }
@@ -1231,6 +1273,32 @@ export class BoardView extends ItemView {
             .setIcon('copy')
             .onClick(() => { void this.duplicateCorkboardNote(scene); }));
 
+        // Image note controls
+        menu.addSeparator();
+        if (scene.corkboardNoteImage) {
+            menu.addItem(item => item
+                .setTitle('Change Image…')
+                .setIcon('image')
+                .onClick(() => { void this.changeNoteImage(scene); }));
+            menu.addItem(item => item
+                .setTitle('Remove Image')
+                .setIcon('image-off')
+                .onClick(async () => {
+                    await this.sceneManager.updateScene(scene.filePath, {
+                        corkboardNoteImage: undefined,
+                        corkboardNoteCaption: undefined,
+                    });
+                    scene.corkboardNoteImage = undefined;
+                    scene.corkboardNoteCaption = undefined;
+                    this.refreshBoard();
+                }));
+        } else {
+            menu.addItem(item => item
+                .setTitle('Set Image…')
+                .setIcon('image-plus')
+                .onClick(() => { void this.changeNoteImage(scene); }));
+        }
+
         menu.addItem(item => item
             .setTitle('Delete Note')
             .setIcon('trash')
@@ -1238,11 +1306,13 @@ export class BoardView extends ItemView {
                 await this.deleteScene(scene);
             }));
 
-        menu.addSeparator();
-        menu.addItem(item => item
-            .setTitle('Convert to Scene')
-            .setIcon('clapperboard')
-            .onClick(() => { void this.convertCorkboardNoteToScene(scene); }));
+        if (!scene.corkboardNoteImage) {
+            menu.addSeparator();
+            menu.addItem(item => item
+                .setTitle('Convert to Scene')
+                .setIcon('clapperboard')
+                .onClick(() => { void this.convertCorkboardNoteToScene(scene); }));
+        }
 
         menu.showAtMouseEvent(event);
     }
@@ -2658,10 +2728,18 @@ export class BoardView extends ItemView {
         if (this.rootContainer) {
             const prevSelectedPath = this.selectedScene?.filePath ?? null;
             const inspectorWasVisible = this.inspectorComponent?.isVisible() ?? false;
-            this.saveColumnScrollPositions();
-            this.renderView(this.rootContainer);
-            requestAnimationFrame(() => this.restoreColumnScrollPositions());
-            // Restore scene selection & inspector after full re-render
+
+            // If the board is already rendered, do a lightweight refresh
+            // instead of rebuilding toolbar/filters from scratch.
+            if (this.boardEl) {
+                this.refreshBoard();
+            } else {
+                this.saveColumnScrollPositions();
+                this.renderView(this.rootContainer);
+                requestAnimationFrame(() => this.restoreColumnScrollPositions());
+            }
+
+            // Restore scene selection & inspector after re-render
             // (only re-show inspector if it was already visible)
             if (prevSelectedPath) {
                 const updated = this.sceneManager.getScene(prevSelectedPath);
@@ -2710,6 +2788,365 @@ export class BoardView extends ItemView {
         this.schedulePersistCorkboardLayout();
 
         this.refreshBoard();
+    }
+
+    // ── Image sticky note helpers ────────────────────────
+
+    /**
+     * Render the content for an image sticky note (image + caption + footer).
+     */
+    private renderImageNoteContent(cardEl: HTMLElement, scene: Scene): void {
+        const editorWrap = cardEl.createDiv('story-line-corkboard-note-editor story-line-corkboard-image-editor');
+
+        // Image element
+        const imgSrc = resolveImagePath(this.app, scene.corkboardNoteImage!);
+        const imgEl = editorWrap.createEl('img', {
+            cls: 'story-line-corkboard-note-img',
+            attr: { src: imgSrc, alt: scene.corkboardNoteCaption || 'Image note' },
+        });
+
+        // Click image → open lightbox
+        imgEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.openImageLightbox(imgSrc, scene.corkboardNoteCaption);
+        });
+
+        // Caption (editable, supports markdown/wikilinks)
+        const caption = scene.corkboardNoteCaption ?? '';
+        const captionPreview = editorWrap.createDiv('story-line-corkboard-note-caption markdown-rendered');
+        const captionInput = editorWrap.createEl('textarea', {
+            cls: 'story-line-corkboard-note-caption-input',
+            attr: { placeholder: 'Add a caption…', rows: '2' },
+        });
+        captionInput.value = caption;
+        captionInput.style.display = 'none';
+
+        const renderCaptionPreview = async () => {
+            captionPreview.empty();
+            const text = captionInput.value.trim();
+            if (!text) {
+                captionPreview.createSpan({ cls: 'story-line-corkboard-note-caption-empty', text: 'Add a caption…' });
+                return;
+            }
+            await MarkdownRenderer.render(this.app, text, captionPreview, scene.filePath, this);
+        };
+
+        const saveCaptionAndClose = async () => {
+            const next = captionInput.value;
+            if ((scene.corkboardNoteCaption || '') !== next) {
+                await this.sceneManager.updateScene(scene.filePath, { corkboardNoteCaption: next });
+                scene.corkboardNoteCaption = next;
+            }
+            captionInput.style.display = 'none';
+            captionPreview.style.display = 'block';
+            await renderCaptionPreview();
+        };
+
+        captionPreview.addEventListener('click', (e) => {
+            // Allow internal links to work
+            const link = (e.target as HTMLElement).closest('a');
+            if (link) {
+                const href = link.getAttribute('data-href') || link.getAttribute('href');
+                if (href && link.hasClass('internal-link')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.app.workspace.openLinkText(href, scene.filePath, true);
+                    return;
+                }
+                if (href && !href.startsWith('#')) return;
+            }
+            captionPreview.style.display = 'none';
+            captionInput.style.display = 'block';
+            captionInput.focus();
+
+            // Listen for clicks outside the caption to close the editor
+            const outsideHandler = (pe: PointerEvent) => {
+                const target = pe.target as Node | null;
+                if (target && editorWrap.contains(target)) return;
+                document.removeEventListener('pointerdown', outsideHandler, true);
+                void saveCaptionAndClose();
+            };
+            window.setTimeout(() => {
+                document.addEventListener('pointerdown', outsideHandler, true);
+            }, 0);
+        });
+
+        captionInput.addEventListener('blur', () => { void saveCaptionAndClose(); });
+        captionInput.addEventListener('keydown', (e: KeyboardEvent) => {
+            if (e.key === 'Escape') { e.preventDefault(); void saveCaptionAndClose(); }
+        });
+
+        void renderCaptionPreview();
+
+        // Resize handle
+        const resizeHandle = cardEl.createDiv('story-line-corkboard-note-resize-handle');
+        resizeHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            const startY = e.clientY;
+            const zoom = this.corkboardCamera.zoom || 1;
+            const startHeight = cardEl.getBoundingClientRect().height / zoom;
+            const minHeight = 180;
+            const onMove = (me: PointerEvent) => {
+                cardEl.style.height = `${Math.max(minHeight, startHeight + (me.clientY - startY) / zoom)}px`;
+            };
+            const onUp = () => {
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
+                const finalHeight = parseFloat(cardEl.style.height);
+                if (finalHeight > 0) {
+                    const pos = this.corkboardPositions.get(scene.filePath);
+                    if (pos) {
+                        pos.h = finalHeight;
+                        this.schedulePersistCorkboardLayout();
+                    }
+                }
+            };
+            window.addEventListener('pointermove', onMove);
+            window.addEventListener('pointerup', onUp);
+        });
+    }
+
+    /**
+     * Open a floating, draggable, resizable lightbox — same style as Location/Codex galleries.
+     */
+    private openImageLightbox(src: string, caption?: string): void {
+        // Close any existing lightbox
+        document.querySelector('.gallery-lightbox-window')?.remove();
+
+        const winWidth = Math.min(600, window.innerWidth - 40);
+        const winHeight = Math.round(winWidth * 3 / 4) + 36 + 28;
+
+        const win = document.body.createDiv('gallery-lightbox-window');
+        win.style.width = `${winWidth}px`;
+        win.style.height = `${winHeight}px`;
+
+        // Titlebar
+        const titlebar = win.createDiv('gallery-lightbox-titlebar');
+        titlebar.createSpan({ cls: 'gallery-lightbox-title', text: caption || 'Image' });
+        const closeBtn = titlebar.createEl('button', { cls: 'gallery-lightbox-close', attr: { title: 'Close' } });
+        obsidian.setIcon(closeBtn, 'x');
+        closeBtn.addEventListener('click', () => { cleanup(); win.remove(); });
+
+        // Image content
+        const contentRow = win.createDiv('gallery-lightbox-content-row');
+        const imgContainer = contentRow.createDiv('gallery-lightbox-content');
+        if (src) {
+            const img = imgContainer.createEl('img', { attr: { src, alt: caption || 'Image note' } });
+            img.style.transformOrigin = 'center center';
+        }
+
+        // Caption
+        if (caption) {
+            const captionEl = win.createDiv('gallery-lightbox-caption');
+            captionEl.textContent = caption;
+        }
+
+        // Resize handle
+        const resizeHandle = win.createDiv('gallery-lightbox-resize-handle');
+
+        // Scroll to zoom
+        let zoom = 1;
+        imgContainer.addEventListener('wheel', (e: WheelEvent) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoom = Math.max(0.5, Math.min(5, zoom + delta));
+            const img = imgContainer.querySelector('img');
+            if (img) img.style.transform = `scale(${zoom})`;
+        }, { passive: false });
+
+        // Drag titlebar
+        let isDragging = false;
+        let dragOffsetX = 0;
+        let dragOffsetY = 0;
+        titlebar.addEventListener('pointerdown', (e: PointerEvent) => {
+            if ((e.target as HTMLElement).closest('.gallery-lightbox-close')) return;
+            isDragging = true;
+            const rect = win.getBoundingClientRect();
+            dragOffsetX = e.clientX - rect.left;
+            dragOffsetY = e.clientY - rect.top;
+            win.style.left = `${rect.left}px`;
+            win.style.top = `${rect.top}px`;
+            win.style.transform = 'none';
+            titlebar.setPointerCapture(e.pointerId);
+            e.preventDefault();
+        });
+        titlebar.addEventListener('pointermove', (e: PointerEvent) => {
+            if (!isDragging) return;
+            win.style.left = `${e.clientX - dragOffsetX}px`;
+            win.style.top = `${e.clientY - dragOffsetY}px`;
+        });
+        titlebar.addEventListener('pointerup', () => { isDragging = false; });
+        titlebar.addEventListener('lostpointercapture', () => { isDragging = false; });
+
+        // Resize handle
+        let isResizing = false;
+        let resizeStartX = 0, resizeStartY = 0, startW = 0, startH = 0;
+        resizeHandle.addEventListener('pointerdown', (e: PointerEvent) => {
+            isResizing = true;
+            resizeStartX = e.clientX; resizeStartY = e.clientY;
+            startW = win.offsetWidth; startH = win.offsetHeight;
+            resizeHandle.setPointerCapture(e.pointerId);
+            e.preventDefault(); e.stopPropagation();
+        });
+        resizeHandle.addEventListener('pointermove', (e: PointerEvent) => {
+            if (!isResizing) return;
+            win.style.width = `${Math.max(200, startW + (e.clientX - resizeStartX))}px`;
+            win.style.height = `${Math.max(150, startH + (e.clientY - resizeStartY))}px`;
+        });
+        resizeHandle.addEventListener('pointerup', () => { isResizing = false; });
+        resizeHandle.addEventListener('lostpointercapture', () => { isResizing = false; });
+
+        // Escape to close
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { cleanup(); win.remove(); } };
+        document.addEventListener('keydown', onKey);
+        const cleanup = () => { document.removeEventListener('keydown', onKey); };
+    }
+
+    /**
+     * Open ImagePicker and create a new image sticky note with the selected image.
+     */
+    private async openImageNotePicker(): Promise<void> {
+        const sceneFolder = this.sceneManager.sceneFolder ?? '';
+        const { pickImage } = await import('../components/ImagePicker');
+        const imagePath = await pickImage(this.app, sceneFolder);
+        if (!imagePath) return;
+
+        this.selectedScene = null;
+        this.selectedScenes.clear();
+        this.inspectorComponent?.hide();
+
+        const file = await this.sceneManager.createScene({
+            status: 'idea',
+            corkboardNote: true,
+            corkboardNoteImage: imagePath,
+        });
+
+        const pos = this.getNextQuickNotePosition();
+        this.corkboardPositions.set(file.path, pos);
+        this.schedulePersistCorkboardLayout();
+        this.refreshBoard();
+    }
+
+    /**
+     * Open ImagePicker to set or change the image on an existing sticky note.
+     */
+    private async changeNoteImage(scene: Scene): Promise<void> {
+        const sceneFolder = this.sceneManager.sceneFolder ?? '';
+        const { pickImage } = await import('../components/ImagePicker');
+        const imagePath = await pickImage(this.app, sceneFolder, scene.corkboardNoteImage);
+        if (!imagePath) return;
+
+        await this.sceneManager.updateScene(scene.filePath, {
+            corkboardNoteImage: imagePath,
+        });
+        scene.corkboardNoteImage = imagePath;
+        this.refreshBoard();
+    }
+
+    /**
+     * Create an image note from a vault path at given corkboard coordinates.
+     */
+    private async createImageNoteAtPosition(imagePath: string, worldX: number, worldY: number): Promise<void> {
+        const file = await this.sceneManager.createScene({
+            status: 'idea',
+            corkboardNote: true,
+            corkboardNoteImage: imagePath,
+        });
+
+        this.corkboardPositions.set(file.path, {
+            x: worldX,
+            y: worldY,
+            z: this.getCurrentMaxCorkboardZ() + 1,
+        });
+        this.schedulePersistCorkboardLayout();
+        this.refreshBoard();
+    }
+
+    /**
+     * Import a file dropped from outside the vault into Images/ and create an image note.
+     */
+    private async importExternalImageAndCreate(file: File, worldX: number, worldY: number): Promise<void> {
+        const sceneFolder = this.sceneManager.sceneFolder ?? '';
+        const projectRoot = sceneFolder.replace(/\\/g, '/').replace(/\/Scenes\/?$/, '');
+        const imagesFolder = `${projectRoot}/Images`;
+
+        if (!(await this.app.vault.adapter.exists(imagesFolder))) {
+            await this.app.vault.createFolder(imagesFolder);
+        }
+
+        const buffer = await file.arrayBuffer();
+        let fileName = file.name;
+        let targetPath = `${imagesFolder}/${fileName}`;
+        let counter = 1;
+        while (await this.app.vault.adapter.exists(targetPath)) {
+            const ext = fileName.lastIndexOf('.') >= 0 ? fileName.slice(fileName.lastIndexOf('.')) : '';
+            const base = fileName.lastIndexOf('.') >= 0 ? fileName.slice(0, fileName.lastIndexOf('.')) : fileName;
+            targetPath = `${imagesFolder}/${base}-${counter}${ext}`;
+            counter++;
+        }
+
+        await this.app.vault.createBinary(targetPath, buffer);
+        new Notice(`Image imported: ${targetPath.split('/').pop()}`);
+        await this.createImageNoteAtPosition(targetPath, worldX, worldY);
+    }
+
+    /**
+     * Attach dragover / drop listeners so images can be dropped onto the corkboard.
+     * Handles both vault-internal drags (Obsidian TFile) and external file drops.
+     */
+    private attachCorkboardImageDrop(viewport: HTMLElement): void {
+        const IMAGE_EXTENSIONS = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+
+        viewport.addEventListener('dragover', (e: DragEvent) => {
+            if (!e.dataTransfer) return;
+
+            // Accept vault file drags (Obsidian sets text/plain to the path)
+            const plain = e.dataTransfer.getData('text/plain');
+            if (plain && IMAGE_EXTENSIONS.test(plain)) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+                return;
+            }
+
+            // Accept external files
+            if (e.dataTransfer.types.includes('Files')) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            }
+        });
+
+        viewport.addEventListener('drop', (e: DragEvent) => {
+            if (!e.dataTransfer) return;
+
+            const rect = viewport.getBoundingClientRect();
+            const zoom = this.corkboardCamera.zoom || 1;
+            const worldX = (e.clientX - rect.left - this.corkboardCamera.x) / zoom;
+            const worldY = (e.clientY - rect.top - this.corkboardCamera.y) / zoom;
+
+            // 1. Try vault-internal drag (Obsidian internal drag sets text/plain)
+            const plain = e.dataTransfer.getData('text/plain');
+            if (plain && IMAGE_EXTENSIONS.test(plain)) {
+                e.preventDefault();
+                const file = this.app.vault.getAbstractFileByPath(plain);
+                if (file instanceof TFile) {
+                    void this.createImageNoteAtPosition(file.path, worldX, worldY);
+                    return;
+                }
+            }
+
+            // 2. Try external file drop
+            const files = e.dataTransfer.files;
+            if (files && files.length > 0) {
+                for (let i = 0; i < files.length; i++) {
+                    const f = files[i];
+                    if (IMAGE_EXTENSIONS.test(f.name)) {
+                        e.preventDefault();
+                        void this.importExternalImageAndCreate(f, worldX + i * 30, worldY + i * 30);
+                    }
+                }
+            }
+        });
     }
 
     /**

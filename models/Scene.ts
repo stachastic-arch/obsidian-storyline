@@ -128,6 +128,10 @@ export interface Scene {
     corkboardNote?: boolean;
     /** Optional custom corkboard note color (hex, e.g. #F7E27A) */
     corkboardNoteColor?: string;
+    /** Vault-relative path to an image displayed on the corkboard note */
+    corkboardNoteImage?: string;
+    /** Optional caption shown below the image (supports markdown / wikilinks) */
+    corkboardNoteCaption?: string;
     /** Plot-grid origin label (e.g. "Act 1 / Romance") — informational, stripped on convert-to-scene */
     plotgridOrigin?: string;
     /** Timeline handling mode (linear, flashback, dream, parallel, etc.) */

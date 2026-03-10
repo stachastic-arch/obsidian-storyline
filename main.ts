@@ -13,6 +13,7 @@ import {
     NAVIGATOR_VIEW_TYPE,
     CODEX_VIEW_TYPE,
     SCENE_INSPECTOR_VIEW_TYPE,
+    MANUSCRIPT_VIEW_TYPE,
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
@@ -26,6 +27,7 @@ import { HelpView } from './views/HelpView';
 import { NavigatorView } from './views/NavigatorView';
 import { CodexView } from './views/CodexView';
 import { SceneInspectorView } from './views/SceneInspectorView';
+import { ManuscriptView } from './views/ManuscriptView';
 import { LocationManager } from './services/LocationManager';
 import { CharacterManager } from './services/CharacterManager';
 import { CodexManager } from './services/CodexManager';
@@ -145,6 +147,9 @@ export default class SceneCardsPlugin extends Plugin {
         );
         this.registerView(SCENE_INSPECTOR_VIEW_TYPE, (leaf) =>
             new SceneInspectorView(leaf, this, this.sceneManager)
+        );
+        this.registerView(MANUSCRIPT_VIEW_TYPE, (leaf) =>
+            new ManuscriptView(leaf, this, this.sceneManager)
         );
 
         // Wait for the workspace layout to be ready, then bootstrap projects
@@ -1027,6 +1032,7 @@ export default class SceneCardsPlugin extends Plugin {
             CODEX_VIEW_TYPE,
             STATS_VIEW_TYPE,
             NAVIGATOR_VIEW_TYPE,
+            MANUSCRIPT_VIEW_TYPE,
         ];
 
         for (const viewType of viewTypes) {

@@ -877,6 +877,75 @@ body.theme-dark {
     filter: none !important;
 }
 
+/* ── Image Sticky Notes ── */
+
+.story-line-corkboard-image-note {
+    overflow: hidden;
+    height: 280px;
+}
+
+.story-line-corkboard-image-editor {
+    padding-top: 4px;
+    gap: 0;
+}
+
+.story-line-corkboard-note-img {
+    width: 100%;
+    flex: 1;
+    min-height: 80px;
+    object-fit: cover;
+    border-radius: 4px;
+    cursor: zoom-in;
+    display: block;
+}
+
+.story-line-corkboard-note-caption {
+    padding: 6px 10px 2px;
+    font-size: 0.85em;
+    line-height: 1.35;
+    color: var(--sl-note-accent-strong, #3b3520) !important;
+    cursor: text;
+    min-height: 1.5em;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+}
+
+.story-line-corkboard-note-caption * {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    color: inherit;
+}
+
+.story-line-corkboard-note-caption-empty {
+    color: var(--sl-note-accent, var(--text-muted)) !important;
+    opacity: 0.5;
+    font-style: italic;
+}
+
+.story-line-corkboard-note-caption-input {
+    width: 100%;
+    resize: none;
+    border: none;
+    border-radius: 0;
+    padding: 6px 10px 2px;
+    font-size: 0.85em;
+    line-height: 1.35;
+    background: var(--sl-note-bg) !important;
+    color: var(--sl-note-accent-strong, #3b3520) !important;
+    box-sizing: border-box;
+    overflow: hidden;
+    box-shadow: none;
+}
+
+.story-line-corkboard-note-caption-input:focus {
+    outline: none;
+    border: none;
+    background: var(--sl-note-bg) !important;
+    box-shadow: none;
+}
+
+
+
 .story-line-note-color-modal-row {
     display: flex;
     align-items: center;
@@ -4900,6 +4969,300 @@ body.theme-dark {
     margin-top: 4px;
 }
 
+/* ── Collapsible sections ── */
+.stats-collapsible {
+    margin-bottom: 16px;
+    border: 1px solid var(--sc-card-border);
+    border-radius: var(--sc-radius, 8px);
+    overflow: hidden;
+}
+
+.stats-collapsible-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    font-weight: 600;
+    font-size: 0.95em;
+    cursor: pointer;
+    background: var(--background-secondary);
+    user-select: none;
+    list-style: none;
+}
+
+.stats-collapsible-summary::-webkit-details-marker { display: none; }
+
+.stats-collapsible-summary::before {
+    content: '▸';
+    display: inline-block;
+    transition: transform 0.15s;
+    font-size: 0.8em;
+    color: var(--sc-text-muted);
+}
+
+.stats-collapsible[open] > .stats-collapsible-summary::before {
+    transform: rotate(90deg);
+}
+
+.stats-collapsible-icon {
+    display: flex;
+    color: var(--sc-accent);
+}
+
+.stats-collapsible-icon svg { width: 16px; height: 16px; }
+
+.stats-collapsible-body {
+    padding: 12px 14px;
+}
+
+/* ── Subsection titles inside collapsibles ── */
+.stats-subsection {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.stats-subsection:last-child { border-bottom: none; margin-bottom: 0; }
+
+.stats-subsection-title {
+    margin: 0 0 8px;
+    font-size: 0.88em;
+    font-weight: 600;
+    color: var(--sc-text);
+}
+
+/* ── Pace projection ── */
+.stats-pace-projection {
+    font-size: 0.82em;
+    color: var(--sc-text-muted);
+    margin-top: 6px;
+    font-style: italic;
+}
+
+/* ── Writing History ── */
+.stats-history-range-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.stats-range-btn {
+    padding: 2px 6px;
+    border: none;
+    border-radius: 3px;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.8em;
+    cursor: pointer;
+    transition: color 0.15s ease, background 0.15s ease;
+}
+
+.stats-range-btn:hover {
+    color: var(--sc-text);
+    background: var(--background-modifier-hover);
+}
+
+.stats-range-btn.active {
+    color: var(--sc-accent);
+    background: transparent;
+    font-weight: 600;
+}
+
+.stats-history-chart-wrap {
+    margin-top: 8px;
+}
+
+.stats-history-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 120px;
+    padding: 4px 0;
+    border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.stats-history-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    flex: 1;
+    height: 100%;
+}
+
+.stats-history-bar {
+    width: 100%;
+    max-width: 18px;
+    border-radius: 2px 2px 0 0;
+    min-height: 2px;
+    transition: height 0.3s;
+    cursor: pointer;
+    background: var(--sc-accent);
+}
+
+.stats-history-bar:hover { opacity: 0.8; }
+
+.stats-history-label {
+    font-size: 0.55em;
+    color: var(--sc-text-faint);
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+/* ── Cumulative / line chart ── */
+.stats-line-chart-wrap {
+    margin-top: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+    overflow: hidden;
+    background: var(--background-primary);
+}
+
+.stats-line-chart {
+    width: 100%;
+    height: 120px;
+    display: block;
+}
+
+.stats-goal-line {
+    stroke: var(--sl-warning, #FF9800);
+    stroke-width: 1;
+    stroke-dasharray: 6 3;
+}
+
+.stats-goal-label {
+    fill: var(--sl-warning, #FF9800);
+    font-size: 9px;
+}
+
+.stats-cumulative-line {
+    fill: none;
+    stroke: var(--sc-accent);
+    stroke-width: 2;
+}
+
+.stats-cumulative-area {
+    fill: var(--sc-accent);
+    opacity: 0.12;
+}
+
+/* ── Outlier highlighting ── */
+.stats-outlier {
+    background: rgba(255, 152, 0, 0.08);
+    border-radius: 4px;
+    padding: 2px 4px;
+}
+
+.stats-outlier-item { list-style: none; padding: 4px 0; }
+
+.stats-scene-link {
+    color: var(--sc-accent);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.stats-scene-link:hover { opacity: 0.8; }
+
+/* ── Dialogue / narrative stacked bar ── */
+.stats-stacked-bar {
+    display: flex;
+    overflow: hidden;
+}
+
+.stats-dialogue-fill {
+    background: var(--sc-accent);
+}
+
+.stats-narrative-fill {
+    background: var(--background-modifier-border);
+}
+
+/* ── Prose analysis ── */
+.stats-spinner-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    color: var(--sc-text-muted);
+    font-size: 0.9em;
+}
+
+.stats-spinner svg {
+    animation: sl-spin 1s linear infinite;
+}
+
+@keyframes sl-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.stats-word-freq-row {
+    gap: 8px;
+}
+
+.stats-word-freq-word {
+    min-width: 100px;
+    font-weight: 600;
+    font-size: 0.88em;
+}
+
+.stats-word-freq-count {
+    min-width: 110px;
+    font-size: 0.8em;
+    color: var(--sc-text-muted);
+    text-align: right;
+}
+
+.stats-overused-title {
+    color: var(--sl-warning, #FF9800);
+}
+
+.stats-overused-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.stats-overused-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 0.8em;
+    border-radius: 12px;
+    background: rgba(255, 152, 0, 0.15);
+    color: var(--sl-warning, #FF9800);
+    font-weight: 600;
+}
+
+/* ── Misc stats helpers ── */
+.stats-hint {
+    font-size: 0.82em;
+    color: var(--sc-text-muted);
+    font-style: italic;
+    margin: 4px 0 8px;
+}
+
+.stats-empty {
+    color: var(--sc-text-muted);
+    font-style: italic;
+    font-size: 0.9em;
+}
+
+.stats-show-more-btn {
+    margin-top: 6px;
+    padding: 4px 10px;
+    border: 1px solid var(--sc-card-border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--sc-accent);
+    font-size: 0.8em;
+    cursor: pointer;
+}
+
+.stats-show-more-btn:hover {
+    background: var(--sc-accent);
+    color: var(--background-primary);
+}
+
 /* --- Responsive / Mobile --- */
 @media (max-width: 768px) {
     .story-line-board {
@@ -8034,4 +8397,310 @@ body.theme-dark {
     padding: 24px 16px;
     color: var(--text-muted);
     text-align: center;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Manuscript View
+   ═══════════════════════════════════════════════════════════ */
+
+.story-line-manuscript-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.sl-manuscript-scroll {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 24px 48px 64px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Act divider */
+.sl-manuscript-act-divider {
+    text-align: center;
+    margin: 48px 0 24px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.sl-manuscript-act-divider:first-child {
+    margin-top: 8px;
+}
+
+.sl-manuscript-act-label {
+    font-size: 1.3em;
+    font-weight: 700;
+    color: var(--text-normal);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+/* Chapter divider */
+.sl-manuscript-chapter-divider {
+    text-align: center;
+    margin: 32px 0 16px;
+}
+
+.sl-manuscript-chapter-label {
+    font-size: 1.1em;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+/* Scene block */
+.sl-manuscript-scene-block {
+    margin-bottom: 32px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--background-modifier-border-hover);
+}
+
+.sl-manuscript-scene-block:last-child {
+    border-bottom: none;
+}
+
+/* Scene header */
+.sl-manuscript-scene-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.sl-manuscript-scene-title {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: color 0.15s;
+}
+
+.sl-manuscript-scene-title:hover {
+    color: var(--text-accent);
+    text-decoration: underline;
+}
+
+/* Status badge */
+.sl-manuscript-status {
+    font-size: 0.7em;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    background: var(--background-modifier-hover);
+    color: var(--text-muted);
+}
+
+.sl-manuscript-status.sl-status-idea       { background: #e8d5f5; color: #6b3fa0; }
+.sl-manuscript-status.sl-status-outlined   { background: #d5e8f5; color: #2b6cb0; }
+.sl-manuscript-status.sl-status-draft      { background: #fef3cd; color: #856404; }
+.sl-manuscript-status.sl-status-written    { background: #d4edda; color: #155724; }
+.sl-manuscript-status.sl-status-revised    { background: #cce5ff; color: #004085; }
+.sl-manuscript-status.sl-status-final      { background: #d1ecf1; color: #0c5460; }
+
+/* Scene body */
+.sl-manuscript-editor-wrap {
+    min-height: 3em;
+}
+
+.sl-manuscript-loading {
+    color: var(--text-faint);
+    font-style: italic;
+    padding: 8px 0;
+}
+
+/* ── Embedded editor chrome removal ────────────────────── */
+
+/*
+ * The splitEl gets an explicit pixel height set via JS (syncHeight).
+ * Obsidian's workspace children use position:absolute inside it, so
+ * we just need relative positioning on the container and to hide chrome.
+ */
+.sl-manuscript-embedded-split {
+    position: relative !important;
+    overflow: hidden !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Hide the file-name header bar */
+.sl-manuscript-embedded-split .view-header {
+    display: none !important;
+}
+
+/* Hide the view-actions / navigation buttons */
+.sl-manuscript-embedded-split .view-actions,
+.sl-manuscript-embedded-split .view-header-nav-buttons {
+    display: none !important;
+}
+
+/* Hide frontmatter / properties */
+.sl-manuscript-embedded-split .metadata-container {
+    display: none !important;
+}
+
+/* Remove background from inner containers */
+.sl-manuscript-embedded-split .workspace-tabs,
+.sl-manuscript-embedded-split .workspace-tab-container,
+.sl-manuscript-embedded-split .workspace-leaf,
+.sl-manuscript-embedded-split .workspace-leaf-content,
+.sl-manuscript-embedded-split .view-content,
+.sl-manuscript-embedded-split .markdown-source-view {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* CodeMirror transparent background */
+.sl-manuscript-embedded-split .cm-editor {
+    background: transparent !important;
+    border: none !important;
+}
+
+/* Remove inner scrollbar — all scrolling via manuscript scroll area */
+.sl-manuscript-embedded-split .cm-scroller {
+    overflow: visible !important;
+}
+
+/* Remove CM6 scroll-past-end / bottom padding that creates extra space */
+.sl-manuscript-embedded-split .cm-content {
+    padding-bottom: 0 !important;
+}
+.sl-manuscript-embedded-split .cm-sizer {
+    min-height: 0 !important;
+    padding-bottom: 0 !important;
+}
+
+/* Remove view-content padding */
+.sl-manuscript-embedded-split .view-content {
+    padding: 0 !important;
+}
+
+/* Remove markdown-source-view internal padding */
+.sl-manuscript-embedded-split .markdown-source-view {
+    padding: 0 !important;
+}
+.sl-manuscript-embedded-split .markdown-source-view .cm-contentContainer {
+    padding-bottom: 0 !important;
+}
+
+/* Hide gutters (line numbers etc.) */
+.sl-manuscript-embedded-split .cm-gutters {
+    display: none !important;
+}
+
+/* Remove the resize handle between leaves */
+.sl-manuscript-embedded-split .workspace-leaf-resize-handle {
+    display: none !important;
+}
+
+/* Remove tab headers if present */
+.sl-manuscript-embedded-split .workspace-tab-header-container {
+    display: none !important;
+}
+
+.sl-manuscript-scene-empty {
+    font-style: italic;
+    color: var(--text-faint);
+}
+
+/* Empty state */
+.sl-manuscript-empty {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 64px 24px;
+    font-size: 1.1em;
+}
+
+/* Footer */
+.sl-manuscript-footer {
+    flex: 0 0 auto;
+    padding: 8px 16px;
+    text-align: center;
+    font-size: 0.8em;
+    color: var(--text-muted);
+    border-top: 1px solid var(--background-modifier-border);
+    background: var(--background-primary);
+}
+
+/* Dark theme adjustments for status badges */
+.theme-dark .sl-manuscript-status.sl-status-idea       { background: #3b2552; color: #d4b5f0; }
+.theme-dark .sl-manuscript-status.sl-status-outlined   { background: #1e3a5f; color: #a3c9f0; }
+.theme-dark .sl-manuscript-status.sl-status-draft      { background: #4a3d1a; color: #f0d98c; }
+.theme-dark .sl-manuscript-status.sl-status-written    { background: #1a3d25; color: #8fd4a8; }
+.theme-dark .sl-manuscript-status.sl-status-revised    { background: #1a2d4a; color: #8cb3e0; }
+.theme-dark .sl-manuscript-status.sl-status-final      { background: #1a3a40; color: #80c8d4; }
+
+/* ── Plain-text mode: hide link/tag decorations ────────── */
+
+/* Wiki-links: remove link styling, make them look like normal text */
+.sl-manuscript-plain .cm-hmd-internal-link,
+.sl-manuscript-plain .cm-hmd-internal-link .cm-underline,
+.sl-manuscript-plain .internal-link,
+.sl-manuscript-plain .cm-link,
+.sl-manuscript-plain .cm-url,
+.sl-manuscript-plain a.internal-link,
+.sl-manuscript-plain .cm-hmd-internal-link.cm-link-alias,
+.sl-manuscript-plain .cm-hmd-internal-link.cm-link-alias .cm-underline,
+.sl-manuscript-plain .is-live-preview .internal-link,
+.sl-manuscript-plain .markdown-rendered .internal-link {
+    color: inherit !important;
+    text-decoration: none !important;
+    text-decoration-line: none !important;
+    border-bottom: none !important;
+    box-shadow: none !important;
+    cursor: text !important;
+    pointer-events: none !important;
+}
+
+/* Wikilink brackets [[]] — hide in Live Preview */
+.sl-manuscript-plain .cm-formatting-link,
+.sl-manuscript-plain .cm-formatting-link-string {
+    display: none !important;
+}
+
+/* Tags: hide the # prefix and remove tag styling */
+.sl-manuscript-plain .cm-hashtag,
+.sl-manuscript-plain .cm-tag,
+.sl-manuscript-plain a.tag {
+    color: inherit !important;
+    text-decoration: none !important;
+    background: none !important;
+    cursor: text !important;
+    pointer-events: none !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: inherit !important;
+}
+
+/* Hide the # character in tags (Live Preview renders it as a separate span) */
+.sl-manuscript-plain .cm-hashtag-begin::first-letter,
+.sl-manuscript-plain .cm-formatting-hashtag {
+    font-size: 0 !important;
+}
+
+/* Tags in reading/preview mode */
+.sl-manuscript-plain a.tag::before {
+    content: '' !important;
+}
+.sl-manuscript-plain a.tag {
+    font-variant: normal !important;
+}
+
+/* External links: plain text */
+.sl-manuscript-plain .cm-url {
+    display: none !important;
+}
+.sl-manuscript-plain .external-link {
+    color: inherit !important;
+    text-decoration: none !important;
+    background: none !important;
+    cursor: text !important;
+    pointer-events: none !important;
 }

@@ -189,7 +189,8 @@ export class LinkScanner {
     // ── Internal ───────────────────────────────────────
 
     private performScan(scene: Scene): LinkScanResult {
-        const body = scene.body || '';
+        // Include image note caption in the scannable text
+        const body = (scene.body || '') + (scene.corkboardNoteCaption ? '\n' + scene.corkboardNoteCaption : '');
         const rawLinks = this.extractWikilinks(body);
 
         // Ensure lookups are built (cheap if already done)

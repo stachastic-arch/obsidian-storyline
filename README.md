@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.5.5** · By Jan Sandström
+**Version 1.6.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
@@ -18,7 +18,7 @@ StoryLine transforms your Obsidian vault into a complete book planning and writi
 
 ### Corkboard View
 
-A freeform spatial canvas inside the Board view. Use sticky notes to brainstorm and capture your first ideas — then convert them into full scenes when they're ready. Notes support markdown and can be styled with different colors. Pin scene cards and notes anywhere on the board and drag to rearrange. Toggle between the standard Kanban columns and corkboard mode with a single click. Positions are saved per project.
+A freeform spatial canvas inside the Board view. Use sticky notes to brainstorm and capture your first ideas — then convert them into full scenes when they're ready. Notes support markdown and can be styled with different colors. **Image sticky notes** let you pin reference art, maps, and charts directly on the board — drag images from the vault or desktop, add captions with `[[wikilinks]]`, and click to open a fullscreen lightbox. Pin scene cards and notes anywhere on the board and drag to rearrange. Toggle between the standard Kanban columns and corkboard mode with a single click. Positions are saved per project.
 
 ![Corkboard View](screenshots/corkboard.jpg)
 
@@ -61,6 +61,20 @@ Track plotlines across your scenes with two view modes: a transit-style **subway
 ![Plotlines — Subway Map](screenshots/05.Plotlines-subway.jpg)
 
 ![Plotlines — List View](screenshots/05.Plotlines.jpg)
+
+---
+
+### Manuscript View
+
+Scrivenings-style continuous document view. Every scene is rendered as an embedded Live Preview editor, ordered by act → chapter → sequence, so you can read and edit your entire story in one scrollable page without switching files.
+
+Act and chapter dividers appear automatically between sections. Each scene block has a header with the scene title and a color-coded status badge. Click the title to open the file in a new tab. Supports the same shared filters as other views. A word count footer shows scene count and total words.
+
+**Plain Text** — toggle on to hide wiki-link styling, tag prefixes, and external-link URLs so the text reads like clean prose.
+
+**Lock Links** — toggle on to make internal links and tags non-editable. The cursor skips over link text, preventing accidental changes while you write around them.
+
+Both toggles default to ON and appear in the filter bar.
 
 ---
 
@@ -108,7 +122,7 @@ A standalone sidebar panel that displays the full Inspector for the currently ac
 
 ### Stats View
 
-Dashboard with word counts, writing progress, pacing analysis (average scene length by act, word count distribution), plot hole detection, and a built-in writing sprint timer.
+Statistics dashboard with eight collapsible sections: project overview with goal tracking and reading time estimate, writing sprint timer with daily goal and streak, writing history with daily bar charts (7d/30d/90d/All), progress breakdown by status/chapter/act, character & world coverage analysis, pacing & tension with dialogue ratio and tension curve, prose analysis with readability scores and word frequency, and automated plot hole warnings.
 
 ![Stats — Overview](screenshots/12.Stats.jpg)
 
@@ -131,8 +145,9 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 ## Key Features
 
 - **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages.
+- **Manuscript View** — Scrivenings-style continuous document with embedded Live Preview editors. Read and edit your whole story in one scrollable page. Plain Text and Lock Links toggles for distraction-free writing.
 - **Scene Management** — Full metadata, six-stage status pipeline, drag-and-drop, multi-select bulk edits, notes, snapshots, and reusable templates.
-- **Corkboard Mode** — Freeform spatial canvas with sticky notes for brainstorming. Convert notes into scenes when ready.
+- **Corkboard Mode** — Freeform spatial canvas with text and image sticky notes for brainstorming. Drag images from vault or desktop, add captions with wikilinks, open lightbox previews. Convert notes into scenes when ready.
 - **DOCX / PDF / HTML Export** — Export manuscripts and outlines to Word, PDF, and standalone HTML. DOCX includes configurable page size, margins, and font settings.
 - **Timeline Modes** — Ten non-linear narrative modes: flashback, flash-forward, parallel, frame, simultaneous, time skip, dream, mythic, circular, and linear.
 - **Beat Sheet Templates** — Save the Cat, Three-Act, Hero's Journey — scaffold your acts with named beats.
@@ -196,7 +211,7 @@ Create, switch, and fork projects from the command palette. Each project gets it
 
 ---
 
-*StoryLine v1.5.5 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.5.6 — Transform your vault into a powerful book planning tool.*
 
 ---
 

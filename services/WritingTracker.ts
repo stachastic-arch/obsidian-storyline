@@ -19,8 +19,8 @@ export interface WritingTrackerData {
 }
 
 export class WritingTracker {
-    /** Word count at the moment the session started (or the tracker was reset) */
-    private baselineWords = 0;
+    /** Word count at the moment the session started – null until startSession() is called */
+    private baselineWords: number | null = null;
     /** Timestamp the session started */
     private sessionStart: number = Date.now();
     /** Persisted daily history */
@@ -28,15 +28,34 @@ export class WritingTracker {
 
     /**
      * Start (or restart) a session, capturing the current total word count
-     * as the baseline.
+     * as the baseline.  Also sanitises today's history entry if it looks
+     * corrupted (from earlier 0-baseline bug).
      */
     startSession(currentTotalWords: number): void {
+        // If the project word count isn't available yet, don't start — keep
+        // baseline null so getSessionWords / flushSession remain no-ops.
+        if (currentTotalWords <= 0) return;
+
         this.baselineWords = currentTotalWords;
         this.sessionStart = Date.now();
+
+        // Sanitise: if today's stored value is unreasonably large (≥ 50% of
+        // the entire project), it's almost certainly corrupted from the old
+        // 0-baseline bug.  Clear it.
+        const today = this.todayKey();
+        const stored = this.history[today] || 0;
+        if (stored > 0 && stored >= currentTotalWords * 0.5) {
+            delete this.history[today];
+        }
     }
 
-    /** Words written this session */
+    /** Words written this session (0 if session not started yet) */
     getSessionWords(currentTotalWords: number): number {
+        if (this.baselineWords === null) {
+            // Lazy-start: if the init call had 0 but now we have a real count
+            if (currentTotalWords > 0) this.startSession(currentTotalWords);
+            return 0;
+        }
         return Math.max(0, currentTotalWords - this.baselineWords);
     }
 
@@ -62,6 +81,7 @@ export class WritingTracker {
 
     /** Flush session words into today's daily total and reset baseline */
     flushSession(currentTotalWords: number): void {
+        if (this.baselineWords === null) return;   // session never started
         const sw = this.getSessionWords(currentTotalWords);
         if (sw > 0) {
             this.recordToday(sw);
@@ -104,6 +124,11 @@ export class WritingTracker {
             }
         }
         return streak;
+    }
+
+    /** Return the raw daily history record (date→words) */
+    getFullHistory(): Record<string, number> {
+        return { ...this.history };
     }
 
     // ── Persistence ────────────────────────────────────

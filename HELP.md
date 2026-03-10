@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.5.5** · By Jan Sandström
+**Version 1.6.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -16,6 +16,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
   - [Plotgrid View](#plotgrid-view)
   - [Timeline View](#timeline-view)
   - [Plotlines View](#plotlines-view)
+  - [Manuscript View](#manuscript-view)
   - [Characters View](#characters-view)
   - [Locations View](#locations-view)
   - [Codex Hub](#codex-hub)
@@ -117,6 +118,7 @@ The main workspace — a Kanban-style board that displays your scenes as cards.
 Toggle between the standard Kanban column layout and a freeform **corkboard** canvas using the toggle button in the Board toolbar.
 
 - **Sticky notes** — create color-coded sticky notes to brainstorm and capture your first ideas. Notes support markdown formatting.
+- **Image sticky notes** — pin reference art, maps, and charts on the board. Click **+ New Image Note** in the toolbar, or drag an image from the vault file explorer or your desktop onto the canvas. Each image note has an optional caption that supports markdown and `[[wikilinks]]` — links in captions are included in relationship scanning. Right-click an image note to set, change, or remove the image. Click the image to open a fullscreen lightbox.
 - **Convert to scene** — when an idea is ready, convert a sticky note into a full scene with one click.
 - **Freeform positioning** — drag scene cards and sticky notes anywhere on the spatial canvas.
 - **Positions saved per project** — your corkboard layout is stored in `System/board.json` and syncs across devices.
@@ -175,6 +177,25 @@ Track your story's plotlines (tags) across the narrative. Two view modes are ava
 - **Rename** or **delete** plotlines across all scenes at once.
 - Visualize plotline density and coverage.
 - Scenes default to **book order** (reading order). Toggle to sequence order from the toolbar.
+
+### Manuscript View
+
+A Scrivenings-style continuous document view that presents your entire story as a single scrollable manuscript. Each scene is an embedded Live Preview editor — you can read and edit everything in place without switching files.
+
+- **Embedded editing** — every scene is a fully functional Obsidian Live Preview editor. Click into any scene and start typing.
+- **Continuous reading** — scenes are arranged in reading order (act → chapter → sequence) with no frontmatter visible.
+- **Act & chapter headings** — automatic section dividers appear whenever the act or chapter changes.
+- **Scene dividers** — each scene block shows a subtle header with the scene title and a color-coded status badge (idea, draft, written, etc.).
+- **Clickable titles** — click any scene title to open that scene file in a new tab.
+- **Plain Text toggle** — hides wiki-link styling, tag `#` prefixes, and external-link URLs so the text reads like clean prose. Default: ON.
+- **Lock Links toggle** — makes internal links and tags non-editable. The cursor skips over link and tag text, preventing accidental changes while you write around them. Default: ON.
+- **Filter support** — use the same filter bar as other views to narrow down which scenes appear.
+- **Word count footer** — total scene count and aggregate word count displayed at the bottom.
+- **Lazy loading** — editors are mounted on demand as you scroll, keeping memory usage low even for large projects.
+- **Navigator integration** — clicking a scene in the Navigator scrolls the manuscript to that scene instead of opening a new file.
+- **Inspector tracking** — the Scene Details sidebar automatically follows whichever scene is currently visible in the manuscript.
+
+Access the Manuscript view from the **Manuscript** tab (📖 book-open-text icon) in the view switcher, located between Plotlines and Codex.
 
 ### Characters View
 
@@ -250,17 +271,49 @@ The Codex is a unified hub that brings Characters, Locations, and custom categor
 
 ### Stats View
 
-A statistics dashboard with at-a-glance project health.
+A statistics dashboard organized into eight collapsible sections. Click any section header to expand or collapse it.
 
-- **Word count** progress (actual vs. target).
-- **Scene count** by status (idea → final pipeline).
-- **Status distribution** breakdown.
-- **Tension/intensity curve** — visual graph of your story's emotional arc.
+#### 1. Overview (open by default)
+- **Word count progress** — actual vs. project goal with a progress bar.
+- **Estimated reading time** — calculated from total words.
+- **Pace projection** — words per day needed to hit your goal, with an estimated completion date.
+
+#### 2. Writing Sprint (open by default)
+- **Session stats** — words written this session, duration, words per minute.
+- **Streak** — consecutive days with writing activity.
+- **Daily goal** — today's words vs. your daily target, with a progress bar.
+- **7-day sparkline** — miniature bar chart showing your last seven days of writing.
+
+#### 3. Writing History (collapsible)
+- **Daily bar chart** — words written per day, with a range selector: 7d, 30d, 90d, or All.
+- Hover any bar to see the exact date and word count.
+
+#### 4. Progress Breakdown (collapsible)
+- **By status** — word counts for each status stage (idea → final).
+- **By chapter** — word count per chapter, with outlier highlighting for unusually short or long chapters.
+- **Act balance** — stacked bars showing how evenly your acts are distributed.
+
+#### 5. Characters & World (collapsed by default)
 - **POV distribution** — who gets the most page time.
-- **Act balance** — see if your acts are roughly even.
-- **Plot hole detection** — automated warnings grouped by category (see below).
-- **Pacing Analysis** — see [Pacing Analysis](#pacing-analysis).
-- **Writing Sprint** — see [Writing Sprint](#writing-sprint).
+- **Character scene coverage** — heatmap of how often each character appears.
+- **Location frequency** — bar chart of how often each location is used.
+
+#### 6. Pacing & Tension (collapsed by default)
+- **Average scene length by act** — bar chart.
+- **Word count distribution** — histogram of scene lengths.
+- **Scene length outliers** — flags unusually short or long scenes.
+- **Dialogue vs. narrative ratio** — per-scene breakdown.
+- **Tension curve** — visual graph of your story's emotional arc based on scene intensity values.
+
+#### 7. Prose Analysis (collapsed, lazy-loaded)
+- **Readability scores** — Flesch-Kincaid Grade Level and Flesch Reading Ease.
+- **Average sentence and word length.**
+- **Word frequency** — top 20 most-used words (excluding common stop words), shown as a bar chart.
+- **Overused words** — flags words that appear disproportionately often.
+- This section loads on demand when expanded to avoid slowing down the dashboard.
+
+#### 8. Warnings (open by default)
+- **Plot hole detection** — automated warnings grouped by category (see [Plot Hole Detection](#plot-hole-detection)).
 
 ### Navigator View
 

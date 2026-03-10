@@ -1,5 +1,5 @@
-import { ItemView, WorkspaceLeaf } from 'obsidian';
-import { STATUS_CONFIG, SceneStatus } from '../models/Scene';
+import { ItemView, WorkspaceLeaf, TFile } from 'obsidian';
+import { STATUS_CONFIG, SceneStatus, Scene } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { Validator, PlotWarning, WarningSeverity } from '../services/Validator';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
@@ -17,6 +17,7 @@ export class StatsView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
     private rootContainer: HTMLElement | null = null;
+    private proseCache: { readability: ReadabilityResult; wordFreq: [string, number][] } | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -51,6 +52,10 @@ export class StatsView extends ItemView {
 
     async onClose(): Promise<void> {}
 
+    // ════════════════════════════════════════════════════
+    //  Main render
+    // ════════════════════════════════════════════════════
+
     private renderView(container: HTMLElement): void {
         container.empty();
 
@@ -58,228 +63,436 @@ export class StatsView extends ItemView {
         const toolbar = container.createDiv('story-line-toolbar');
         const titleRow = toolbar.createDiv('story-line-title-row');
         titleRow.createEl('h3', { cls: 'story-line-view-title', text: 'StoryLine' });
-        // project name shown in top-center only; no inline project selector here
 
-        // View switcher tabs
         renderViewSwitcher(toolbar, STATS_VIEW_TYPE, this.plugin, this.leaf);
 
         const content = container.createDiv('story-line-stats-content');
         const stats = this.sceneManager.getStatistics();
-
-        // Total scenes
-        const overviewSection = content.createDiv('stats-section');
-        overviewSection.createEl('h4', { text: 'Overview' });
-        overviewSection.createEl('p', {
-            cls: 'stats-big-number',
-            text: `Total Scenes: ${stats.totalScenes}`
-        });
-
-        // Writing Sprint / Velocity
-        this.renderWritingSprint(content, stats.totalWords);
-
-        // Status breakdown
-        const statusSection = content.createDiv('stats-section');
-        statusSection.createEl('h4', { text: 'Status Breakdown' });
-        const statusList = statusSection.createEl('ul', { cls: 'stats-list' });
-
-        const allStatuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
-        allStatuses.forEach(status => {
-            const count = stats.statusCounts[status] || 0;
-            const percent = stats.totalScenes > 0
-                ? Math.round((count / stats.totalScenes) * 100)
-                : 0;
-            const cfg = STATUS_CONFIG[status];
-            const li = statusList.createEl('li');
-            const liContent = li.createSpan({ cls: 'stats-status-entry' });
-            const iconEl = liContent.createSpan({ cls: 'stats-status-icon' });
-            obsidian.setIcon(iconEl, cfg.icon);
-            liContent.createSpan({ text: ` ${cfg.label}: ${count} (${percent}%)` });
-
-            // Bar
-            const bar = li.createDiv('stats-bar');
-            const fill = bar.createDiv('stats-bar-fill');
-            fill.style.width = `${percent}%`;
-            fill.style.backgroundColor = cfg.color;
-        });
-
-        // Word count
-        const wordSection = content.createDiv('stats-section');
-        wordSection.createEl('h4', { text: 'Word Count' });
-        const totalTarget = this.plugin.settings.projectWordGoal || stats.totalTargetWords || 80000;
-        const wordPercent = Math.round((stats.totalWords / totalTarget) * 100);
-        wordSection.createEl('p', {
-            text: `${stats.totalWords.toLocaleString()} / ${totalTarget.toLocaleString()} (${wordPercent}%)`
-        });
-        const wcBar = wordSection.createDiv('stats-bar stats-bar-wide');
-        const wcFill = wcBar.createDiv('stats-bar-fill');
-        wcFill.style.width = `${Math.min(100, wordPercent)}%`;
-        wcFill.style.backgroundColor = 'var(--sl-success, #4CAF50)';
-
-        // Act balance
-        const actSection = content.createDiv('stats-section');
-        actSection.createEl('h4', { text: 'Act Balance' });
-        const actEntries = Object.entries(stats.actCounts)
-            .sort(([a], [b]) => a.localeCompare(b));
-        actEntries.forEach(([act, count]) => {
-            const percent = stats.totalScenes > 0
-                ? Math.round((count / stats.totalScenes) * 100)
-                : 0;
-            const row = actSection.createDiv('stats-row');
-            row.createSpan({ text: `${act}: ${count} scenes` });
-            const bar = row.createDiv('stats-bar');
-            const fill = bar.createDiv('stats-bar-fill');
-            fill.style.width = `${percent}%`;
-            row.createSpan({ cls: 'stats-percent', text: `${percent}%` });
-        });
-
-        // --- Pacing Analysis ---
-        this.renderPacingAnalysis(content);
-
-        // POV distribution
-        const povSection = content.createDiv('stats-section');
-        povSection.createEl('h4', { text: 'POV Distribution' });
-        const povEntries = Object.entries(stats.povCounts)
-            .sort(([, a], [, b]) => b - a);
-        povEntries.forEach(([pov, count]) => {
-            const percent = stats.totalScenes > 0
-                ? Math.round((count / stats.totalScenes) * 100)
-                : 0;
-            const row = povSection.createDiv('stats-row');
-            row.createSpan({ text: `${pov}: ${count} scenes (${percent}%)` });
-            const bar = row.createDiv('stats-bar');
-            const fill = row.createDiv('stats-bar-fill');
-            fill.style.width = `${percent}%`;
-        });
-
-        // Top locations
-        const locSection = content.createDiv('stats-section');
-        locSection.createEl('h4', { text: 'Top Locations' });
-        const locEntries = Object.entries(stats.locationCounts)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 10);
-        if (locEntries.length > 0) {
-            const locList = locSection.createEl('ul', { cls: 'stats-list' });
-            locEntries.forEach(([loc, count]) => {
-                locList.createEl('li', { text: `${loc}: ${count} scenes` });
-            });
-        } else {
-            locSection.createEl('p', { text: 'No location data' });
-        }
-
-        // Warnings / Plot Hole Detection
-        const warningSection = content.createDiv('stats-section');
-        warningSection.createEl('h4', { text: 'Warnings & Plot Hole Detection' });
-
         const allScenes = this.sceneManager.getAllScenes();
 
-        if (this.plugin.settings.enablePlotHoleDetection && allScenes.length > 0) {
-            const warnings = Validator.validate(allScenes);
+        // 1. Overview (always open)
+        this.renderOverview(content, stats);
 
-            if (warnings.length === 0) {
-                const ok = warningSection.createDiv('stats-ok');
-                const okIcon = ok.createSpan();
-                obsidian.setIcon(okIcon, 'check-circle');
-                ok.createSpan({ text: ' No issues detected' });
-            } else {
-                // Group by category
-                const byCategory = new Map<string, PlotWarning[]>();
-                for (const w of warnings) {
-                    const list = byCategory.get(w.category) || [];
-                    list.push(w);
-                    byCategory.set(w.category, list);
-                }
+        // 2. Writing Sprint (always open)
+        this.renderWritingSprint(content, stats.totalWords);
 
-                // Summary counts
-                const errorCount = warnings.filter(w => w.severity === 'error').length;
-                const warnCount = warnings.filter(w => w.severity === 'warning').length;
-                const infoCount = warnings.filter(w => w.severity === 'info').length;
+        // 3. Writing History (collapsible, default open)
+        this.renderCollapsible(content, 'calendar', 'Writing History', true, body =>
+            this.renderWritingHistory(body));
 
-                const summary = warningSection.createDiv('stats-warning-summary');
-                if (errorCount > 0) summary.createSpan({ cls: 'stats-severity-error', text: `${errorCount} error${errorCount > 1 ? 's' : ''}` });
-                if (warnCount > 0) summary.createSpan({ cls: 'stats-severity-warning', text: `${warnCount} warning${warnCount > 1 ? 's' : ''}` });
-                if (infoCount > 0) summary.createSpan({ cls: 'stats-severity-info', text: `${infoCount} info` });
+        // 4. Progress Breakdown (collapsible, default open)
+        this.renderCollapsible(content, 'list-checks', 'Progress Breakdown', true, body =>
+            this.renderProgressBreakdown(body, stats, allScenes));
 
-                for (const [category, catWarnings] of byCategory) {
-                    const catSection = warningSection.createDiv('stats-warning-category');
-                    catSection.createEl('h5', { text: category });
-                    const list = catSection.createEl('ul', { cls: 'stats-list stats-warning-list' });
-                    for (const w of catWarnings) {
-                        const li = list.createEl('li', { cls: `stats-severity-${w.severity}` });
-                        const icon = li.createSpan({ cls: 'stats-warning-icon' });
-                        switch (w.severity) {
-                            case 'error': obsidian.setIcon(icon, 'x-circle'); break;
-                            case 'warning': obsidian.setIcon(icon, 'alert-triangle'); break;
-                            case 'info': obsidian.setIcon(icon, 'info'); break;
-                        }
-                        li.createSpan({ text: ` ${w.message}` });
-                    }
-                }
+        // 5. Characters & World (collapsible, default collapsed)
+        this.renderCollapsible(content, 'users', 'Characters & World', false, body =>
+            this.renderCharactersWorld(body, stats, allScenes));
+
+        // 6. Pacing & Tension (collapsible, default collapsed)
+        this.renderCollapsible(content, 'activity', 'Pacing & Tension', false, body =>
+            this.renderPacingTension(body, allScenes));
+
+        // 7. Prose Analysis (collapsible, default collapsed — lazy)
+        this.renderCollapsible(content, 'text', 'Prose Analysis', false, body =>
+            this.renderProseAnalysisPlaceholder(body, allScenes));
+
+        // 8. Warnings & Plot Holes (collapsible, default open)
+        this.renderCollapsible(content, 'alert-triangle', 'Warnings & Plot Holes', true, body =>
+            this.renderWarnings(body, allScenes));
+    }
+
+    // ════════════════════════════════════════════════════
+    //  Collapsible section helper
+    // ════════════════════════════════════════════════════
+
+    private renderCollapsible(
+        parent: HTMLElement,
+        icon: string,
+        title: string,
+        defaultOpen: boolean,
+        renderFn: (body: HTMLElement) => void,
+    ): void {
+        const details = parent.createEl('details', { cls: 'stats-collapsible' });
+        if (defaultOpen) details.setAttribute('open', '');
+        const summary = details.createEl('summary', { cls: 'stats-collapsible-summary' });
+        const iconEl = summary.createSpan({ cls: 'stats-collapsible-icon' });
+        obsidian.setIcon(iconEl, icon);
+        summary.createSpan({ text: title });
+        const body = details.createDiv('stats-collapsible-body');
+        renderFn(body);
+    }
+
+    // ════════════════════════════════════════════════════
+    //  1. Overview
+    // ════════════════════════════════════════════════════
+
+    private renderOverview(
+        parent: HTMLElement,
+        stats: ReturnType<SceneManager['getStatistics']>,
+    ): void {
+        const section = parent.createDiv('stats-section');
+        section.createEl('h4', { text: 'Overview' });
+
+        const row = section.createDiv('stats-sprint-row');
+        this.createStatCard(row, 'file-text', 'Scenes', String(stats.totalScenes));
+        this.createStatCard(row, 'pen-tool', 'Words', stats.totalWords.toLocaleString());
+
+        // Estimated reading time (~250 wpm)
+        const readMinutes = Math.round(stats.totalWords / 250);
+        const readH = Math.floor(readMinutes / 60);
+        const readM = readMinutes % 60;
+        this.createStatCard(row, 'book-open', 'Read Time',
+            readH > 0 ? `${readH}h ${readM}m` : `${readMinutes}m`);
+
+        // Word-goal progress bar
+        const totalTarget = this.plugin.settings.projectWordGoal || stats.totalTargetWords || 80000;
+        const wordPct = Math.round((stats.totalWords / totalTarget) * 100);
+        const goalRow = section.createDiv('stats-sprint-goal');
+        goalRow.createSpan({
+            text: `${stats.totalWords.toLocaleString()} / ${totalTarget.toLocaleString()} words (${wordPct}%)`,
+        });
+        const bar = goalRow.createDiv('stats-bar stats-bar-wide');
+        const fill = bar.createDiv('stats-bar-fill');
+        fill.style.width = `${Math.min(100, wordPct)}%`;
+        fill.style.backgroundColor = 'var(--sl-success, #4CAF50)';
+
+        // Pace-to-deadline projection
+        const tracker = this.plugin.writingTracker;
+        const history = tracker.getFullHistory();
+        const activeDays = Object.entries(history).filter(([, w]) => w > 0);
+        if (activeDays.length >= 3) {
+            const totalHistWords = activeDays.reduce((s, [, w]) => s + w, 0);
+            const avgDaily = Math.round(totalHistWords / activeDays.length);
+            const remaining = Math.max(0, totalTarget - stats.totalWords);
+            if (remaining > 0 && avgDaily > 0) {
+                const daysLeft = Math.ceil(remaining / avgDaily);
+                const finishDate = new Date();
+                finishDate.setDate(finishDate.getDate() + daysLeft);
+                const dateStr = finishDate.toLocaleDateString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                });
+                section.createDiv({
+                    cls: 'stats-pace-projection',
+                    text: `${remaining.toLocaleString()} words remaining · ~${daysLeft} days at `
+                        + `${avgDaily.toLocaleString()} words/day · est. ${dateStr}`,
+                });
             }
-        } else if (allScenes.length === 0) {
-            warningSection.createEl('p', { text: 'No scenes to analyze.' });
-        } else {
-            warningSection.createEl('p', {
-                cls: 'stats-ok',
-                text: 'Plot hole detection is disabled. Enable it in Settings → Advanced.'
-            });
-        }
-
-        // Tension curve (if intensity data exists)
-        const scenes = this.sceneManager.getFilteredScenes(
-            undefined,
-            { field: 'sequence', direction: 'asc' }
-        );
-        const intensityScenes = scenes.filter(s => s.intensity !== undefined);
-        if (intensityScenes.length > 2) {
-            this.renderTensionCurve(content, intensityScenes);
         }
     }
 
-    /**
-     * Render pacing analysis — average scene length per act + word-count distribution chart
-     */
-    private renderPacingAnalysis(container: HTMLElement): void {
-        const allScenes = this.sceneManager.getAllScenes();
-        if (allScenes.length === 0) return;
+    // ════════════════════════════════════════════════════
+    //  2. Writing Sprint
+    // ════════════════════════════════════════════════════
 
-        // --- Average scene length per act ---
-        const pacingSection = container.createDiv('stats-section');
-        pacingSection.createEl('h4', { text: 'Pacing Analysis' });
+    private renderWritingSprint(parent: HTMLElement, currentTotalWords: number): void {
+        const tracker = this.plugin.writingTracker;
+        const section = parent.createDiv('stats-section');
+        section.createEl('h4', { text: 'Writing Sprint' });
 
-        // Group scenes by act and compute average word count
-        const actWordMap: Record<string, { total: number; count: number }> = {};
-        for (const scene of allScenes) {
-            const actKey = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
-            if (!actWordMap[actKey]) actWordMap[actKey] = { total: 0, count: 0 };
-            actWordMap[actKey].total += scene.wordcount || 0;
-            actWordMap[actKey].count += 1;
+        const sessionWords = tracker.getSessionWords(currentTotalWords);
+        const wpm = tracker.getWordsPerMinute(currentTotalWords);
+        const minutes = Math.floor(tracker.getSessionDuration() / 60_000);
+        const dailyGoal = this.plugin.settings.dailyWordGoal || 1000;
+        const todayWords = tracker.getTodayWords();
+        const streak = tracker.getStreak();
+
+        const sessionRow = section.createDiv('stats-sprint-row');
+        this.createStatCard(sessionRow, 'pencil', 'Session', `${sessionWords.toLocaleString()} words`);
+        this.createStatCard(sessionRow, 'clock', 'Duration', `${minutes} min`);
+        this.createStatCard(sessionRow, 'zap', 'Speed', `${wpm} wpm`);
+        if (streak > 0) {
+            this.createStatCard(sessionRow, 'flame', 'Streak', `${streak} day${streak > 1 ? 's' : ''}`);
         }
 
+        // Daily goal
+        const goalPct = Math.min(100, Math.round((todayWords / dailyGoal) * 100));
+        const goalRow = section.createDiv('stats-sprint-goal');
+        goalRow.createSpan({ text: `Today: ${todayWords.toLocaleString()} / ${dailyGoal.toLocaleString()} words (${goalPct}%)` });
+        const goalBar = goalRow.createDiv('stats-bar stats-bar-wide');
+        const goalFill = goalBar.createDiv('stats-bar-fill');
+        goalFill.style.width = `${goalPct}%`;
+        goalFill.style.backgroundColor = goalPct >= 100 ? 'var(--sl-success, #4CAF50)' : 'var(--sl-info, #2196F3)';
+
+        // 7-day sparkline
+        const recent = tracker.getRecentDays(7).reverse();
+        const maxDay = Math.max(...recent.map(d => d.words), 1);
+        const sparkSection = section.createDiv('stats-sprint-sparkline');
+        sparkSection.createSpan({ cls: 'stats-sprint-sparkline-label', text: 'Last 7 days:' });
+        const sparkRow = sparkSection.createDiv('stats-sprint-spark-row');
+        for (const day of recent) {
+            const col = sparkRow.createDiv('stats-sprint-spark-col');
+            const hPct = (day.words / maxDay) * 100;
+            const b = col.createDiv('stats-sprint-spark-bar');
+            b.style.height = `${Math.max(2, hPct)}%`;
+            b.setAttribute('title', `${day.date}: ${day.words} words`);
+            col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  3. Writing History
+    // ════════════════════════════════════════════════════
+
+    private renderWritingHistory(parent: HTMLElement): void {
+        const history = this.plugin.writingTracker.getFullHistory();
+        const entries = Object.entries(history)
+            .map(([date, words]) => ({ date, words }))
+            .sort((a, b) => a.date.localeCompare(b.date));
+
+        if (entries.length < 2) {
+            parent.createEl('p', { cls: 'stats-empty', text: 'Not enough history yet. Keep writing!' });
+            return;
+        }
+
+        // Range selector
+        const rangeBar = parent.createDiv('stats-history-range-bar');
+        const ranges = [7, 30, 90, 0];
+        const labels = ['7d', '30d', '90d', 'All'];
+        const defaultRange = entries.length <= 30 ? 0 : 30;
+
+        const renderChart = (days: number) => {
+            parent.querySelector('.stats-history-chart-wrap')?.remove();
+            const sliced = days > 0 ? entries.slice(-days) : entries;
+            const wrap = parent.createDiv('stats-history-chart-wrap');
+
+            // Daily bar chart
+            this.renderHistoryBarChart(wrap, sliced);
+
+
+        };
+
+        ranges.forEach((days, i) => {
+            const btn = rangeBar.createSpan({
+                cls: `stats-range-btn${days === defaultRange ? ' active' : ''}`,
+                text: labels[i],
+            });
+            btn.addEventListener('click', () => {
+                rangeBar.querySelectorAll('.stats-range-btn').forEach(b => b.removeClass('active'));
+                btn.addClass('active');
+                renderChart(days);
+            });
+        });
+
+        renderChart(defaultRange);
+    }
+
+    private renderHistoryBarChart(parent: HTMLElement, data: { date: string; words: number }[]): void {
+        const maxVal = Math.max(...data.map(d => d.words), 1);
+        const chart = parent.createDiv('stats-history-chart');
+        for (const entry of data) {
+            const col = chart.createDiv('stats-history-col');
+            const hPct = (entry.words / maxVal) * 100;
+            const bar = col.createDiv('stats-history-bar');
+            bar.style.height = `${Math.max(2, hPct)}%`;
+            bar.setAttribute('title', `${entry.date}: ${entry.words.toLocaleString()} words`);
+            if (data.length <= 31) {
+                col.createDiv({ cls: 'stats-history-label', text: entry.date.slice(5) });
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  4. Progress Breakdown
+    // ════════════════════════════════════════════════════
+
+    private renderProgressBreakdown(
+        parent: HTMLElement,
+        stats: ReturnType<SceneManager['getStatistics']>,
+        allScenes: Scene[],
+    ): void {
+        // ── Status breakdown ──
+        const statusSec = parent.createDiv('stats-subsection');
+        statusSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Status Breakdown' });
+        const statusList = statusSec.createEl('ul', { cls: 'stats-list' });
+
+        const allStatuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+        for (const status of allStatuses) {
+            const count = stats.statusCounts[status] || 0;
+            const pct = stats.totalScenes > 0 ? Math.round((count / stats.totalScenes) * 100) : 0;
+            const cfg = STATUS_CONFIG[status];
+            const li = statusList.createEl('li');
+            const lic = li.createSpan({ cls: 'stats-status-entry' });
+            const ico = lic.createSpan({ cls: 'stats-status-icon' });
+            obsidian.setIcon(ico, cfg.icon);
+            lic.createSpan({ text: ` ${cfg.label}: ${count} (${pct}%)` });
+            const bar = li.createDiv('stats-bar');
+            const fill = bar.createDiv('stats-bar-fill');
+            fill.style.width = `${pct}%`;
+            fill.style.backgroundColor = cfg.color;
+        }
+
+        // ── Chapter word counts ──
+        const chapterMap: Record<string, { words: number; scenes: number }> = {};
+        for (const s of allScenes) {
+            const aKey = s.act !== undefined ? String(s.act) : '?';
+            const cKey = s.chapter !== undefined ? String(s.chapter) : '?';
+            const key = `Act ${aKey}, Ch ${cKey}`;
+            if (!chapterMap[key]) chapterMap[key] = { words: 0, scenes: 0 };
+            chapterMap[key].words += s.wordcount || 0;
+            chapterMap[key].scenes += 1;
+        }
+
+        const chapEntries = Object.entries(chapterMap)
+            .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }));
+
+        if (chapEntries.length > 1) {
+            const chapSec = parent.createDiv('stats-subsection');
+            chapSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Chapter Word Counts' });
+            const maxCw = Math.max(...chapEntries.map(([, v]) => v.words), 1);
+            const medianCw = this.median(chapEntries.map(([, v]) => v.words));
+            const outlierThresh = medianCw * 1.5;
+
+            const tbl = chapSec.createDiv('pacing-avg-table');
+            for (const [label, data] of chapEntries) {
+                const pct = (data.words / maxCw) * 100;
+                const outlier = data.words > outlierThresh && medianCw > 0;
+                const row = tbl.createDiv(`pacing-avg-row${outlier ? ' stats-outlier' : ''}`);
+                row.createSpan({ cls: 'pacing-avg-label', text: label });
+                row.createSpan({
+                    cls: 'pacing-avg-value',
+                    text: `${data.words.toLocaleString()} words (${data.scenes} scene${data.scenes !== 1 ? 's' : ''})`,
+                });
+                const bar = row.createDiv('stats-bar');
+                const fill = bar.createDiv('stats-bar-fill');
+                fill.style.width = `${pct}%`;
+                fill.style.backgroundColor = outlier ? 'var(--sl-warning, #FF9800)' : 'var(--sl-info, #2196F3)';
+            }
+        }
+
+        // ── Act balance ──
+        const actEntries = Object.entries(stats.actCounts).sort(([a], [b]) => a.localeCompare(b));
+        if (actEntries.length > 0) {
+            const actSec = parent.createDiv('stats-subsection');
+            actSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Act Balance' });
+            for (const [act, count] of actEntries) {
+                const pct = stats.totalScenes > 0 ? Math.round((count / stats.totalScenes) * 100) : 0;
+                const row = actSec.createDiv('stats-row');
+                row.createSpan({ text: `${act}: ${count} scenes` });
+                const bar = row.createDiv('stats-bar');
+                const fill = bar.createDiv('stats-bar-fill');
+                fill.style.width = `${pct}%`;
+                row.createSpan({ cls: 'stats-percent', text: `${pct}%` });
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  5. Characters & World
+    // ════════════════════════════════════════════════════
+
+    private renderCharactersWorld(
+        parent: HTMLElement,
+        stats: ReturnType<SceneManager['getStatistics']>,
+        allScenes: Scene[],
+    ): void {
+        // ── POV distribution ──
+        const povEntries = Object.entries(stats.povCounts).sort(([, a], [, b]) => b - a);
+        if (povEntries.length > 0) {
+            const sec = parent.createDiv('stats-subsection');
+            sec.createEl('h5', { cls: 'stats-subsection-title', text: 'POV Distribution' });
+            const maxPov = Math.max(...povEntries.map(([, c]) => c), 1);
+            for (const [pov, count] of povEntries) {
+                const pct = stats.totalScenes > 0 ? Math.round((count / stats.totalScenes) * 100) : 0;
+                const row = sec.createDiv('stats-row');
+                row.createSpan({ text: `${pov}: ${count} scenes (${pct}%)` });
+                const bar = row.createDiv('stats-bar');
+                bar.createDiv('stats-bar-fill').style.width = `${(count / maxPov) * 100}%`;
+            }
+        }
+
+        // ── Character scene coverage ──
+        const charCounts: Record<string, number> = {};
+        for (const scene of allScenes) {
+            const chars = new Set<string>();
+            if (scene.pov) chars.add(scene.pov);
+            if (scene.characters) scene.characters.forEach(c => chars.add(c));
+            for (const c of chars) charCounts[c] = (charCounts[c] || 0) + 1;
+        }
+        const charEntries = Object.entries(charCounts).sort(([, a], [, b]) => b - a);
+        if (charEntries.length > 0) {
+            const sec = parent.createDiv('stats-subsection');
+            sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Character Scene Coverage' });
+            const maxC = Math.max(...charEntries.map(([, c]) => c), 1);
+            const LIMIT = 15;
+            const renderRows = (entries: [string, number][], container: HTMLElement) => {
+                for (const [name, count] of entries) {
+                    const row = container.createDiv('stats-row');
+                    row.createSpan({ text: `${name}: ${count} scene${count !== 1 ? 's' : ''}` });
+                    const bar = row.createDiv('stats-bar');
+                    bar.createDiv('stats-bar-fill').style.width = `${(count / maxC) * 100}%`;
+                }
+            };
+            renderRows(charEntries.slice(0, LIMIT), sec);
+            if (charEntries.length > LIMIT) {
+                const btn = sec.createEl('button', {
+                    cls: 'stats-show-more-btn',
+                    text: `Show ${charEntries.length - LIMIT} more…`,
+                });
+                btn.addEventListener('click', () => {
+                    btn.remove();
+                    renderRows(charEntries.slice(LIMIT), sec);
+                });
+            }
+        }
+
+        // ── Location frequency ──
+        const locEntries = Object.entries(stats.locationCounts).sort(([, a], [, b]) => b - a);
+        if (locEntries.length > 0) {
+            const sec = parent.createDiv('stats-subsection');
+            sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Location Frequency' });
+            const maxL = Math.max(...locEntries.map(([, c]) => c), 1);
+            for (const [loc, count] of locEntries.slice(0, 15)) {
+                const row = sec.createDiv('stats-row');
+                row.createSpan({ text: `${loc}: ${count} scene${count !== 1 ? 's' : ''}` });
+                const bar = row.createDiv('stats-bar');
+                bar.createDiv('stats-bar-fill').style.width = `${(count / maxL) * 100}%`;
+            }
+        } else {
+            parent.createEl('p', { cls: 'stats-empty', text: 'No location data.' });
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  6. Pacing & Tension
+    // ════════════════════════════════════════════════════
+
+    private renderPacingTension(parent: HTMLElement, allScenes: Scene[]): void {
+        if (allScenes.length === 0) {
+            parent.createEl('p', { cls: 'stats-empty', text: 'No scenes to analyze.' });
+            return;
+        }
+
+        // ── Avg scene length per act ──
+        const avgSec = parent.createDiv('stats-subsection');
+        avgSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Avg Scene Length per Act' });
+
+        const actWordMap: Record<string, { total: number; count: number }> = {};
+        for (const s of allScenes) {
+            const k = s.act !== undefined ? `Act ${s.act}` : 'No Act';
+            if (!actWordMap[k]) actWordMap[k] = { total: 0, count: 0 };
+            actWordMap[k].total += s.wordcount || 0;
+            actWordMap[k].count += 1;
+        }
         const actEntries = Object.entries(actWordMap).sort(([a], [b]) => a.localeCompare(b));
         const maxAvg = Math.max(...actEntries.map(([, v]) => v.count > 0 ? v.total / v.count : 0), 1);
 
-        const avgTable = pacingSection.createDiv('pacing-avg-table');
+        const avgTbl = avgSec.createDiv('pacing-avg-table');
         for (const [act, data] of actEntries) {
             const avg = data.count > 0 ? Math.round(data.total / data.count) : 0;
             const pct = (avg / maxAvg) * 100;
-            const row = avgTable.createDiv('pacing-avg-row');
+            const row = avgTbl.createDiv('pacing-avg-row');
             row.createSpan({ cls: 'pacing-avg-label', text: act });
             row.createSpan({ cls: 'pacing-avg-value', text: `${avg.toLocaleString()} avg words (${data.count} scene${data.count !== 1 ? 's' : ''})` });
             const bar = row.createDiv('stats-bar');
-            const fill = bar.createDiv('stats-bar-fill');
-            fill.style.width = `${pct}%`;
-            fill.style.backgroundColor = 'var(--sl-info, #2196F3)';
+            bar.createDiv('stats-bar-fill').style.cssText = `width:${pct}%;background:var(--sl-info,#2196F3)`;
         }
 
-        // --- Word-count distribution histogram ---
-        const distSection = container.createDiv('stats-section');
-        distSection.createEl('h4', { text: 'Word Count Distribution' });
+        // ── Word-count distribution histogram ──
+        const distSec = parent.createDiv('stats-subsection');
+        distSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Word Count Distribution' });
 
-        // Collect word counts and bucket them
-        const wordCounts = allScenes.map(s => s.wordcount || 0);
-        const maxWc = Math.max(...wordCounts, 1);
-
-        // Choose sensible bucket size
+        const wcs = allScenes.map(s => s.wordcount || 0);
+        const maxWc = Math.max(...wcs, 1);
         let bucketSize: number;
         if (maxWc <= 500) bucketSize = 100;
         else if (maxWc <= 2000) bucketSize = 250;
@@ -291,78 +504,324 @@ export class StatsView extends ItemView {
         for (let i = 0; i < numBuckets; i++) {
             const lo = i * bucketSize;
             const hi = lo + bucketSize;
-            const count = wordCounts.filter(wc => wc >= lo && wc < hi).length;
-            buckets.push({ label: `${lo}–${hi}`, count });
+            buckets.push({ label: `${lo}–${hi}`, count: wcs.filter(w => w >= lo && w < hi).length });
         }
-
-        const maxBucket = Math.max(...buckets.map(b => b.count), 1);
-
-        const chart = distSection.createDiv('pacing-dist-chart');
-        for (const bucket of buckets) {
+        const maxBkt = Math.max(...buckets.map(b => b.count), 1);
+        const chart = distSec.createDiv('pacing-dist-chart');
+        for (const bkt of buckets) {
             const col = chart.createDiv('pacing-dist-col');
-            const heightPct = (bucket.count / maxBucket) * 100;
             const bar = col.createDiv('pacing-dist-bar');
-            bar.style.height = `${Math.max(2, heightPct)}%`;
-            bar.setAttribute('title', `${bucket.label} words: ${bucket.count} scene${bucket.count !== 1 ? 's' : ''}`);
-            const countLabel = col.createDiv('pacing-dist-count');
-            countLabel.textContent = String(bucket.count);
-            const rangeLabel = col.createDiv('pacing-dist-label');
-            rangeLabel.textContent = bucket.label;
+            bar.style.height = `${Math.max(2, (bkt.count / maxBkt) * 100)}%`;
+            bar.setAttribute('title', `${bkt.label} words: ${bkt.count} scene${bkt.count !== 1 ? 's' : ''}`);
+            col.createDiv({ cls: 'pacing-dist-count', text: String(bkt.count) });
+            col.createDiv({ cls: 'pacing-dist-label', text: bkt.label });
+        }
+
+        // ── Scene-length outliers ──
+        const medianWc = this.median(wcs);
+        const meanWc = wcs.reduce((s, w) => s + w, 0) / (wcs.length || 1);
+        const stdDev = Math.sqrt(wcs.reduce((s, w) => s + (w - meanWc) ** 2, 0) / (wcs.length || 1));
+        const loThresh = Math.max(0, medianWc - 2 * stdDev);
+        const hiThresh = medianWc + 2 * stdDev;
+        const outliers = allScenes.filter(s => {
+            const w = s.wordcount || 0;
+            return w < loThresh || w > hiThresh;
+        });
+        if (outliers.length > 0) {
+            const oSec = parent.createDiv('stats-subsection');
+            oSec.createEl('h5', { cls: 'stats-subsection-title', text: `Scene Length Outliers (${outliers.length})` });
+            oSec.createEl('p', {
+                cls: 'stats-hint',
+                text: `Median: ${medianWc.toLocaleString()} words · Flagged outside ${Math.round(loThresh)}–${Math.round(hiThresh)} range`,
+            });
+            const list = oSec.createEl('ul', { cls: 'stats-list' });
+            for (const scene of outliers.sort((a, b) => (b.wordcount || 0) - (a.wordcount || 0))) {
+                const li = list.createEl('li', { cls: 'stats-outlier-item' });
+                const link = li.createEl('a', { text: scene.title || 'Untitled', cls: 'stats-scene-link' });
+                link.addEventListener('click', () => {
+                    this.app.workspace.openLinkText(scene.filePath, '', true);
+                });
+                li.createSpan({ text: ` — ${(scene.wordcount || 0).toLocaleString()} words` });
+            }
+        }
+
+        // ── Dialogue vs narrative ──
+        this.renderDialogueRatio(parent, allScenes);
+
+        // ── Tension curve ──
+        const ordered = this.sceneManager.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
+        const intensityScenes = ordered.filter(s => s.intensity !== undefined);
+        if (intensityScenes.length > 2) {
+            this.renderTensionCurve(parent, intensityScenes);
         }
     }
 
-    /**
-     * Render a Writing Sprint / Velocity section
-     */
-    private renderWritingSprint(container: HTMLElement, currentTotalWords: number): void {
-        const tracker = this.plugin.writingTracker;
-        const section = container.createDiv('stats-section');
-        section.createEl('h4', { text: 'Writing Sprint' });
+    private renderDialogueRatio(parent: HTMLElement, allScenes: Scene[]): void {
+        const withBody = allScenes.filter(s => s.body && s.body.trim().length > 0);
+        if (withBody.length === 0) return;
 
-        const sessionWords = tracker.getSessionWords(currentTotalWords);
-        const wpm = tracker.getWordsPerMinute(currentTotalWords);
-        const durationMs = tracker.getSessionDuration();
-        const minutes = Math.floor(durationMs / 60_000);
-        const dailyGoal = this.plugin.settings.dailyWordGoal || 1000;
-        const todayWords = tracker.getTodayWords() + sessionWords;
-        const streak = tracker.getStreak();
+        const quoteRe = /[""\u201C](.*?)[""\u201D]/gs;
+        let totalDlg = 0;
+        let totalAll = 0;
+        const actDlg: Record<string, { dialogue: number; total: number }> = {};
 
-        // Session stats row
-        const sessionRow = section.createDiv('stats-sprint-row');
-        this.createStatCard(sessionRow, 'pencil', 'Session', `${sessionWords.toLocaleString()} words`);
-        this.createStatCard(sessionRow, 'clock', 'Duration', `${minutes} min`);
-        this.createStatCard(sessionRow, 'zap', 'Speed', `${wpm} wpm`);
-        if (streak > 0) {
-            this.createStatCard(sessionRow, 'flame', 'Streak', `${streak} day${streak > 1 ? 's' : ''}`);
+        for (const scene of withBody) {
+            const body = scene.body!;
+            const total = body.length;
+            let dlg = 0;
+            let m: RegExpExecArray | null;
+            quoteRe.lastIndex = 0;
+            while ((m = quoteRe.exec(body)) !== null) dlg += m[1].length;
+            totalDlg += dlg;
+            totalAll += total;
+            const k = scene.act !== undefined ? `Act ${scene.act}` : 'No Act';
+            if (!actDlg[k]) actDlg[k] = { dialogue: 0, total: 0 };
+            actDlg[k].dialogue += dlg;
+            actDlg[k].total += total;
         }
 
-        // Daily goal progress
-        const goalPercent = Math.min(100, Math.round((todayWords / dailyGoal) * 100));
-        const goalRow = section.createDiv('stats-sprint-goal');
-        goalRow.createSpan({ text: `Today: ${todayWords.toLocaleString()} / ${dailyGoal.toLocaleString()} words (${goalPercent}%)` });
-        const goalBar = goalRow.createDiv('stats-bar stats-bar-wide');
-        const goalFill = goalBar.createDiv('stats-bar-fill');
-        goalFill.style.width = `${goalPercent}%`;
-        goalFill.style.backgroundColor = goalPercent >= 100 ? 'var(--sl-success, #4CAF50)' : 'var(--sl-info, #2196F3)';
+        const overallPct = totalAll > 0 ? Math.round((totalDlg / totalAll) * 100) : 0;
+        const sec = parent.createDiv('stats-subsection');
+        sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Dialogue vs Narrative' });
+        sec.createEl('p', { text: `Overall: ${overallPct}% dialogue, ${100 - overallPct}% narrative` });
 
-        // Weekly sparkline — last 7 days
-        const recent = tracker.getRecentDays(7).reverse(); // oldest first
-        const maxDay = Math.max(...recent.map(d => d.words), 1);
-        const sparkSection = section.createDiv('stats-sprint-sparkline');
-        sparkSection.createSpan({ cls: 'stats-sprint-sparkline-label', text: 'Last 7 days:' });
-        const sparkRow = sparkSection.createDiv('stats-sprint-spark-row');
-        for (const day of recent) {
-            const col = sparkRow.createDiv('stats-sprint-spark-col');
-            const heightPct = (day.words / maxDay) * 100;
-            const bar = col.createDiv('stats-sprint-spark-bar');
-            bar.style.height = `${Math.max(2, heightPct)}%`;
-            bar.setAttribute('title', `${day.date}: ${day.words} words`);
-            const label = col.createDiv('stats-sprint-spark-label');
-            label.textContent = day.date.slice(5); // MM-DD
+        for (const [act, data] of Object.entries(actDlg).sort(([a], [b]) => a.localeCompare(b))) {
+            const pct = data.total > 0 ? Math.round((data.dialogue / data.total) * 100) : 0;
+            const row = sec.createDiv('stats-row');
+            row.createSpan({ text: `${act}: ${pct}% dialogue` });
+            const bar = row.createDiv('stats-bar stats-stacked-bar');
+            const df = bar.createDiv('stats-bar-fill stats-dialogue-fill');
+            df.style.width = `${pct}%`;
+            const nf = bar.createDiv('stats-bar-fill stats-narrative-fill');
+            nf.style.width = `${100 - pct}%`;
         }
     }
 
-    /** Small stat card helper */
+    private renderTensionCurve(parent: HTMLElement, scenes: { title: string; intensity?: number }[]): void {
+        const sec = parent.createDiv('stats-subsection');
+        sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Tension Curve' });
+        const chart = sec.createDiv('tension-chart');
+        for (const scene of scenes) {
+            const col = chart.createDiv('tension-col');
+            const val = scene.intensity || 0;
+            const bar = col.createDiv('tension-bar');
+            bar.style.height = `${(val / 10) * 100}%`;
+            bar.setAttribute('title', `${scene.title || 'Untitled'}: ${val}/10`);
+            col.createDiv({ cls: 'tension-label', text: String(val) });
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  7. Prose Analysis (lazy)
+    // ════════════════════════════════════════════════════
+
+    private renderProseAnalysisPlaceholder(parent: HTMLElement, allScenes: Scene[]): void {
+        const withBody = allScenes.filter(s => s.body && s.body.trim().length > 0);
+        if (withBody.length === 0) {
+            parent.createEl('p', { cls: 'stats-empty', text: 'No scene body text available for analysis.' });
+            return;
+        }
+
+        if (this.proseCache) {
+            this.renderProseResults(parent, this.proseCache);
+            return;
+        }
+
+        const spinner = parent.createDiv('stats-spinner-wrap');
+        const ico = spinner.createSpan({ cls: 'stats-spinner' });
+        obsidian.setIcon(ico, 'loader');
+        spinner.createSpan({ text: ' Analyzing prose…' });
+
+        requestAnimationFrame(() => {
+            const allText = withBody.map(s => s.body!).join('\n\n');
+            this.proseCache = {
+                readability: this.computeReadability(allText),
+                wordFreq: this.computeWordFrequency(allText),
+            };
+            spinner.remove();
+            this.renderProseResults(parent, this.proseCache);
+        });
+    }
+
+    private renderProseResults(
+        parent: HTMLElement,
+        cache: { readability: ReadabilityResult; wordFreq: [string, number][] },
+    ): void {
+        const { readability, wordFreq } = cache;
+
+        // Readability cards
+        const rSec = parent.createDiv('stats-subsection');
+        rSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Readability' });
+        const row = rSec.createDiv('stats-sprint-row');
+        this.createStatCard(row, 'graduation-cap', 'FK Grade', String(readability.fleschKincaidGrade));
+        this.createStatCard(row, 'book', 'Reading Ease', String(readability.fleschReadingEase));
+        this.createStatCard(row, 'align-left', 'Avg Sentence', `${readability.avgSentenceLength} words`);
+        this.createStatCard(row, 'type', 'Avg Word', `${readability.avgWordLength} chars`);
+
+        const ease = readability.fleschReadingEase;
+        const interp = ease >= 80 ? 'Very easy to read — suitable for a wide audience.'
+            : ease >= 60 ? 'Standard fiction level — clear and accessible.'
+            : ease >= 40 ? 'Moderately difficult — literary fiction range.'
+            : 'Difficult — dense or academic prose.';
+        rSec.createEl('p', { cls: 'stats-hint', text: interp });
+
+        // Word frequency — top 20
+        const totalWc = wordFreq.reduce((s, [, c]) => s + c, 0);
+        const fSec = parent.createDiv('stats-subsection');
+        fSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Most Used Words' });
+
+        const top20 = wordFreq.slice(0, 20);
+        const maxF = top20.length > 0 ? top20[0][1] : 1;
+        for (const [word, count] of top20) {
+            const r = fSec.createDiv('stats-row stats-word-freq-row');
+            r.createSpan({ cls: 'stats-word-freq-word', text: word });
+            r.createSpan({ cls: 'stats-word-freq-count', text: `${count.toLocaleString()} (${((count / totalWc) * 100).toFixed(2)}%)` });
+            const bar = r.createDiv('stats-bar');
+            bar.createDiv('stats-bar-fill').style.width = `${(count / maxF) * 100}%`;
+        }
+
+        // Overused words (>0.5% of total)
+        const overused = wordFreq.filter(([, c]) => (c / totalWc) > 0.005);
+        if (overused.length > 0) {
+            const oSec = parent.createDiv('stats-subsection');
+            oSec.createEl('h5', { cls: 'stats-subsection-title stats-overused-title', text: `Overused Words (${overused.length})` });
+            oSec.createEl('p', { cls: 'stats-hint', text: 'Words appearing in more than 0.5% of total text (excluding common words).' });
+            const tags = oSec.createDiv('stats-overused-tags');
+            for (const [word, count] of overused) {
+                tags.createSpan({
+                    cls: 'stats-overused-tag',
+                    text: `${word} (${((count / totalWc) * 100).toFixed(1)}%)`,
+                });
+            }
+        }
+    }
+
+    // ── Readability helpers ────────────────────────────
+
+    private computeReadability(text: string): ReadabilityResult {
+        const clean = text
+            .replace(/^---[\s\S]*?---/gm, '')
+            .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
+            .replace(/[#*_~`>\[\]()!]/g, '')
+            .replace(/\n+/g, ' ')
+            .trim();
+
+        const sentences = clean.split(/[.!?]+/).filter(s => s.trim().length > 0);
+        const words = clean.split(/\s+/).filter(w => w.length > 0);
+        const totalS = Math.max(sentences.length, 1);
+        const totalW = Math.max(words.length, 1);
+
+        let syllables = 0;
+        let charLen = 0;
+        for (const w of words) {
+            syllables += this.countSyllables(w);
+            charLen += w.replace(/[^a-zA-Z]/g, '').length;
+        }
+
+        const avgSL = Math.round((totalW / totalS) * 10) / 10;
+        const avgWL = Math.round((charLen / totalW) * 10) / 10;
+        const spw = syllables / totalW;
+
+        return {
+            fleschKincaidGrade: Math.max(0, Math.round((0.39 * (totalW / totalS) + 11.8 * spw - 15.59) * 10) / 10),
+            fleschReadingEase: Math.max(0, Math.min(100, Math.round(206.835 - 1.015 * (totalW / totalS) - 84.6 * spw))),
+            avgSentenceLength: avgSL,
+            avgWordLength: avgWL,
+        };
+    }
+
+    private countSyllables(word: string): number {
+        const w = word.toLowerCase().replace(/[^a-z]/g, '');
+        if (w.length <= 2) return 1;
+        const matches = w.replace(/e$/, '').match(/[aeiouy]+/g);
+        return Math.max(1, matches ? matches.length : 1);
+    }
+
+    private computeWordFrequency(text: string): [string, number][] {
+        const clean = text
+            .replace(/^---[\s\S]*?---/gm, '')
+            .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
+            .replace(/[#*_~`>\[\]()!]/g, '')
+            .toLowerCase();
+
+        const words = clean.split(/\s+/)
+            .map(w => w.replace(/^[^a-z]+|[^a-z]+$/g, ''))
+            .filter(w => w.length > 2);
+
+        const stop = new Set([
+            'the','and','was','for','that','with','his','her','had','not','but','you','are',
+            'from','they','she','been','have','him','has','this','were','said','each','its',
+            'who','which','their','will','would','could','than','them','then','into','more',
+            'some','when','what','there','about','just','like','all','out','did','one','over',
+            'how','back','down','only','very','after','before','even','also','other','our',
+            'own','still','being','your','too','here','those','both','does','where','most',
+            'much','through','while','now','way','may','any','well','between','another',
+            'because','such','never',
+        ]);
+
+        const freq: Record<string, number> = {};
+        for (const w of words) if (!stop.has(w)) freq[w] = (freq[w] || 0) + 1;
+        return Object.entries(freq).sort(([, a], [, b]) => b - a);
+    }
+
+    // ════════════════════════════════════════════════════
+    //  8. Warnings & Plot Holes
+    // ════════════════════════════════════════════════════
+
+    private renderWarnings(parent: HTMLElement, allScenes: Scene[]): void {
+        if (this.plugin.settings.enablePlotHoleDetection && allScenes.length > 0) {
+            const warnings = Validator.validate(allScenes);
+            if (warnings.length === 0) {
+                const ok = parent.createDiv('stats-ok');
+                const ic = ok.createSpan();
+                obsidian.setIcon(ic, 'check-circle');
+                ok.createSpan({ text: ' No issues detected' });
+            } else {
+                const byCategory = new Map<string, PlotWarning[]>();
+                for (const w of warnings) {
+                    const arr = byCategory.get(w.category) || [];
+                    arr.push(w);
+                    byCategory.set(w.category, arr);
+                }
+                const errs = warnings.filter(w => w.severity === 'error').length;
+                const warns = warnings.filter(w => w.severity === 'warning').length;
+                const infos = warnings.filter(w => w.severity === 'info').length;
+
+                const summary = parent.createDiv('stats-warning-summary');
+                if (errs > 0) summary.createSpan({ cls: 'stats-severity-error', text: `${errs} error${errs > 1 ? 's' : ''}` });
+                if (warns > 0) summary.createSpan({ cls: 'stats-severity-warning', text: `${warns} warning${warns > 1 ? 's' : ''}` });
+                if (infos > 0) summary.createSpan({ cls: 'stats-severity-info', text: `${infos} info` });
+
+                for (const [cat, cw] of byCategory) {
+                    const catSec = parent.createDiv('stats-warning-category');
+                    catSec.createEl('h5', { text: cat });
+                    const list = catSec.createEl('ul', { cls: 'stats-list stats-warning-list' });
+                    for (const w of cw) {
+                        const li = list.createEl('li', { cls: `stats-severity-${w.severity}` });
+                        const ic = li.createSpan({ cls: 'stats-warning-icon' });
+                        switch (w.severity) {
+                            case 'error': obsidian.setIcon(ic, 'x-circle'); break;
+                            case 'warning': obsidian.setIcon(ic, 'alert-triangle'); break;
+                            case 'info': obsidian.setIcon(ic, 'info'); break;
+                        }
+                        li.createSpan({ text: ` ${w.message}` });
+                    }
+                }
+            }
+        } else if (allScenes.length === 0) {
+            parent.createEl('p', { text: 'No scenes to analyze.' });
+        } else {
+            parent.createEl('p', {
+                cls: 'stats-ok',
+                text: 'Plot hole detection is disabled. Enable it in Settings → Advanced.',
+            });
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  Shared helpers
+    // ════════════════════════════════════════════════════
+
     private createStatCard(parent: HTMLElement, icon: string, label: string, value: string): void {
         const card = parent.createDiv('stats-sprint-card');
         const iconEl = card.createSpan({ cls: 'stats-sprint-card-icon' });
@@ -371,38 +830,29 @@ export class StatsView extends ItemView {
         card.createDiv({ cls: 'stats-sprint-card-label', text: label });
     }
 
-    /**
-     * Render a simple ASCII-like tension curve using div bars
-     */
-    private renderTensionCurve(container: HTMLElement, scenes: { title: string; intensity?: number; act?: number | string }[]): void {
-        const section = container.createDiv('stats-section');
-        section.createEl('h4', { text: 'Tension Curve' });
-
-        const chart = section.createDiv('tension-chart');
-        const maxIntensity = 10;
-
-        scenes.forEach(scene => {
-            const col = chart.createDiv('tension-col');
-            const intensity = scene.intensity || 0;
-            const heightPercent = (intensity / maxIntensity) * 100;
-
-            const bar = col.createDiv('tension-bar');
-            bar.style.height = `${heightPercent}%`;
-            bar.setAttribute('title', `${scene.title || 'Untitled'}: ${intensity}/10`);
-
-            col.createDiv({
-                cls: 'tension-label',
-                text: String(intensity),
-            });
-        });
+    private median(values: number[]): number {
+        if (values.length === 0) return 0;
+        const sorted = [...values].sort((a, b) => a - b);
+        const mid = Math.floor(sorted.length / 2);
+        return sorted.length % 2 !== 0
+            ? sorted[mid]
+            : Math.round((sorted[mid - 1] + sorted[mid]) / 2);
     }
 
     /**
      * Public refresh called by the plugin on file changes
      */
     refresh(): void {
+        this.proseCache = null;
         if (this.rootContainer) {
             this.renderView(this.rootContainer);
         }
     }
+}
+
+interface ReadabilityResult {
+    fleschKincaidGrade: number;
+    fleschReadingEase: number;
+    avgSentenceLength: number;
+    avgWordLength: number;
 }

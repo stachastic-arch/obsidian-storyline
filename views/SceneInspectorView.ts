@@ -85,6 +85,17 @@ export class SceneInspectorView extends ItemView {
             })
         );
 
+        // Listen for Manuscript view focused-scene changes
+        this.registerEvent(
+            (this.app.workspace as any).on('storyline:manuscript-focus', (filePath: string) => {
+                const scene = this.sceneManager.getScene(filePath);
+                if (scene) {
+                    if (this.emptyEl) this.emptyEl.style.display = 'none';
+                    this.inspectorComponent?.show(scene);
+                }
+            })
+        );
+
         // Initial update
         this.updateForActiveFile();
     }

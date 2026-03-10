@@ -2,9 +2,34 @@
 
 ---
 
-## Version 1.5.5
+## Version 1.6.0
 
 ### New Features
+
+- **Stats View Rewrite** — The Stats dashboard has been completely rebuilt with eight collapsible sections for a cleaner, more organized layout. Click any section header to expand or collapse it.
+
+  - **Overview** — Project word count with goal progress bar, estimated reading time, pace-to-deadline projection, and estimated completion date.
+  - **Writing Sprint** — Session word count, duration, speed (wpm), streak, daily goal progress bar, and a 7-day sparkline.
+  - **Writing History** — Daily bar chart with range selector (7d / 30d / 90d / All) showing words written per day.
+  - **Progress Breakdown** — Word counts by status, by chapter (with outlier highlighting), and act balance stacked bars.
+  - **Characters & World** — POV distribution, character scene coverage heatmap, and location frequency chart.
+  - **Pacing & Tension** — Average scene length by act, word count distribution histogram, scene length outlier detection, dialogue vs. narrative ratio per scene, and tension curve.
+  - **Prose Analysis** — Lazy-loaded section with Flesch-Kincaid readability scores, average sentence/word length, top 20 word frequency chart, and overused word warnings.
+  - **Warnings** — Plot hole detection and validation warnings (unchanged).
+
+- **Image Sticky Notes** — Corkboard notes can now hold images (maps, charts, reference art) instead of text. Click the **+ New Image Note** button in the corkboard toolbar, or drag an image from the vault file explorer or your desktop directly onto the canvas. Each image note supports an optional caption with full markdown and `[[wikilink]]` support — captions are included in link scanning. Right-click an image note to set, change, or remove the image. Click the image to open a fullscreen lightbox. Image notes can be resized and repositioned like regular sticky notes.
+
+### Bug Fixes
+
+- **Writing Tracker accuracy** — Fixed a bug where the "Today" word counter and "Session" counter could show the entire project word count instead of actual words written. The root cause was the tracker recording project totals as session words when the baseline wasn't properly initialized. The tracker now uses a null baseline that only activates after explicit initialization, includes lazy self-healing, and sanitizes corrupted daily history entries on startup.
+
+- **Range button styling** — The 7d/30d/90d/All range buttons in Writing History are now styled as text links with hover effects instead of bordered buttons, matching the rest of the UI.
+
+- **Manuscript View** — A Scrivenings-style continuous document view that displays all scenes as a single scrollable manuscript in reading order (act → chapter → sequence). Each scene is an embedded Live Preview editor — full editing with all Obsidian formatting (bold, italic, links, etc.) works inline. Scenes are separated by subtle dividers with title and status badge. Includes act and chapter headings, filter support, word count footer, and clickable scene titles to open individual files. Access via the new Manuscript tab (📖) in the view switcher between Plotlines and Codex.
+
+- **Manuscript: Plain Text toggle** — A toolbar toggle that hides wiki-link underlines/colors, tag `#` prefixes, and other markup decorations so the manuscript reads like clean prose. Both links and tags appear as ordinary text while the toggle is active.
+
+- **Manuscript: Lock Links toggle** — A toolbar toggle that makes wiki-links and tags non-editable (atomic). The cursor skips over link/tag text so you can't accidentally break link targets while editing. Both toggles are on by default.
 
 - **Scene Details Sidebar** — A standalone sidebar panel that shows the full Inspector for the currently active scene file. Open it from the **Scene Details** button in the Navigator, or via the command palette (`Open Scene Details Sidebar`). Auto-updates when you switch between scene files in the editor, so you can view and edit metadata side-by-side with your writing.
 

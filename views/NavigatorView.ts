@@ -2,7 +2,8 @@ import { ItemView, WorkspaceLeaf, Menu, TFile, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { Scene, SceneStatus, STATUS_CONFIG } from '../models/Scene';
-import { NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE } from '../constants';
+import { NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE, MANUSCRIPT_VIEW_TYPE } from '../constants';
+import { ManuscriptView } from './ManuscriptView';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 
@@ -356,8 +357,17 @@ export class NavigatorView extends ItemView {
                 : `${scene.wordcount}`;
         }
 
-        // Click to open the scene file
+        // Click to open the scene file (or scroll in Manuscript view)
         row.addEventListener('click', async () => {
+            // Check if the active main view is the Manuscript view
+            const manuscriptLeaves = this.app.workspace.getLeavesOfType(MANUSCRIPT_VIEW_TYPE);
+            const manuscriptView = manuscriptLeaves.length > 0
+                ? manuscriptLeaves[0].view as ManuscriptView
+                : null;
+            if (manuscriptView) {
+                manuscriptView.scrollToScene(scene.filePath);
+                return;
+            }
             const file = this.app.vault.getAbstractFileByPath(scene.filePath);
             if (file instanceof TFile) {
                 await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });

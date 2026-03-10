@@ -1,9 +1,9 @@
 {
   "id": "storyline",
   "name": "StoryLine",
-  "version": "1.5.5",
+  "version": "1.6.0",
   "minAppVersion": "1.0.0",
-  "description": "Transform your vault into a powerful book planning tool. Board view, timeline, character tracking, and more.",
+  "description": "Transform your vault into a powerful book planning and writing tool. Corkboard,KanbanBoard view, timeline, plotlines,character tracking, and more.",
   "author": "Jan Sandström",
   "authorUrl": "https://github.com/PixeroJan",
   "isDesktopOnly": false
