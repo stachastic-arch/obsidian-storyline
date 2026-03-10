@@ -127,6 +127,31 @@ export class CodexManager {
         }
     }
 
+    // ── External file ingestion ────────────────────────
+
+    /**
+     * Try to add a single file from an external folder scan.
+     * Tests against all enabled codex categories.
+     * Returns true if the file matched any category.
+     */
+    addFile(content: string, filePath: string): boolean {
+        for (const [catId, catDef] of this.categoryDefs) {
+            const entry = this.parseEntry(content, filePath, catDef);
+            if (entry) {
+                let catMap = this.entriesByCategory.get(catId);
+                if (!catMap) {
+                    catMap = new Map();
+                    this.entriesByCategory.set(catId, catMap);
+                }
+                if (!catMap.has(filePath)) {
+                    catMap.set(filePath, entry);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     // ── Query ──────────────────────────────────────────
 
     /** All entries for a category, sorted by name. */

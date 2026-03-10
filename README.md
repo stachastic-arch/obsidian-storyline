@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.5.0** · By Jan Sandström
+**Version 1.5.5** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
@@ -94,9 +94,15 @@ Locations are now part of the **Codex** hub in version 1.5.0.
 
 ### Navigator View
 
-A compact sidebar panel for quick scene navigation. Search, sort, and filter your scenes without leaving your current view. Includes plotline filtering with color-coded dots and scene counts, five sort modes (sequence, status, recent, words, title), act grouping with collapsible sections, pinned scenes for quick access, and a progress bar. Opens automatically when a project loads (configurable) or via the command palette.
+A compact sidebar panel for quick scene navigation. Search, sort, and filter your scenes without leaving your current view. Includes plotline filtering with color-coded dots and scene counts, five sort modes (sequence, status, recent, words, title), act grouping with collapsible sections, pinned scenes for quick access, and a progress bar. Opens automatically when a project loads (configurable) or via the command palette. A **Scene Details** button opens the Inspector sidebar for the active scene.
 
 ![Navigator View](screenshots/StoryLine_Navigator.jpg)
+
+---
+
+### Scene Details Sidebar
+
+A standalone sidebar panel that displays the full Inspector for the currently active scene file. View and edit all scene metadata — title, status, POV, characters, location, tags, conflict, notes, and more — side-by-side with your writing. The panel auto-updates when you switch between files in the editor. Open it from the Navigator's **Scene Details** button or the command palette.
 
 ---
 
@@ -139,7 +145,9 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Plot Hole Detection** — Automated validation across six categories.
 - **Pacing Analysis** — Bar charts and histograms for scene length and distribution.
 - **Writing Sprint** — Built-in countdown timer for focused writing sessions.
-- **Story Navigator** — Compact sidebar panel with search, sort, plotline filter, act grouping, pinned scenes, and progress bar. Auto-opens on project load.
+- **Story Navigator** — Compact sidebar panel with search, sort, plotline filter, act grouping, pinned scenes, progress bar, and a **Scene Details** button. Auto-opens on project load.
+- **Scene Details Sidebar** — Standalone Inspector panel that follows the active editor file. Edit scene metadata side-by-side with your writing.
+- **Additional Source Folders** *(Experimental)* — Point StoryLine at any vault folder and it will scan all `.md` files, routing each to the correct manager by its frontmatter `type:` field. Supports any folder structure.
 - **Color Coding** — Color by status, POV, emotion, act, or tag. **16 built-in color schemes** (4 Catppuccin + 12 mood-based palettes) or custom. Per-tag overrides from Plotlines view or Settings. HSL fine-tuning sliders for plotline and sticky note palettes. Dark/light mode aware.
 - **Per-Project Colors** — Optionally save color scheme, HSL adjustments, and sticky note theme per project so each book can have its own look.
 - **Sticky Note Themes** — Six built-in sticky note color themes (Classic, Pastel, Earth, Jewel, Neon, Mono) with per-note overrides and HSL sliders.
@@ -188,7 +196,7 @@ Create, switch, and fork projects from the command palette. Each project gets it
 
 ---
 
-*StoryLine v1.5.0 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.5.5 — Transform your vault into a powerful book planning tool.*
 
 ---
 

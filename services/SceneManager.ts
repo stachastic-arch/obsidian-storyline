@@ -390,6 +390,20 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
+     * Add a single file from an external folder scan.
+     * Returns true if the file was recognised as a scene.
+     */
+    addFile(content: string, filePath: string): boolean {
+        if (this.scenes.has(filePath)) return false;
+        const scene = MetadataParser.parseContent(content, filePath);
+        if (scene) {
+            this.scenes.set(filePath, scene);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Recursively scan a folder for scene files using the adapter API
      */
     private async scanFolderAdapter(folderPath: string): Promise<void> {

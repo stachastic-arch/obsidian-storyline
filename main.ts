@@ -1,4 +1,4 @@
-import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting } from 'obsidian';
+import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
 import {
@@ -12,6 +12,7 @@ import {
     HELP_VIEW_TYPE,
     NAVIGATOR_VIEW_TYPE,
     CODEX_VIEW_TYPE,
+    SCENE_INSPECTOR_VIEW_TYPE,
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
@@ -24,6 +25,7 @@ import { LocationView } from './views/LocationView';
 import { HelpView } from './views/HelpView';
 import { NavigatorView } from './views/NavigatorView';
 import { CodexView } from './views/CodexView';
+import { SceneInspectorView } from './views/SceneInspectorView';
 import { LocationManager } from './services/LocationManager';
 import { CharacterManager } from './services/CharacterManager';
 import { CodexManager } from './services/CodexManager';
@@ -141,6 +143,9 @@ export default class SceneCardsPlugin extends Plugin {
         this.registerView(CODEX_VIEW_TYPE, (leaf) =>
             new CodexView(leaf, this, this.sceneManager)
         );
+        this.registerView(SCENE_INSPECTOR_VIEW_TYPE, (leaf) =>
+            new SceneInspectorView(leaf, this, this.sceneManager)
+        );
 
         // Wait for the workspace layout to be ready, then bootstrap projects
         this.app.workspace.onLayoutReady(async () => {
@@ -165,6 +170,10 @@ export default class SceneCardsPlugin extends Plugin {
                 if (locFolder) await this.locationManager.loadAll(locFolder);
                 const charFolder = this.sceneManager.getCharacterFolder();
                 if (charFolder) await this.characterManager.loadCharacters(charFolder);
+            } catch { /* not set yet */ }
+            // Scan extra source folders and route by frontmatter type
+            try {
+                await this.scanExtraFolders();
             } catch { /* not set yet */ }
             // Scan scene bodies for wikilinks after entities are loaded
             this.linkScanner.rebuildLookups(this.settings.characterAliases);
@@ -303,6 +312,12 @@ export default class SceneCardsPlugin extends Plugin {
             id: 'open-navigator',
             name: 'Open StoryLine Navigator',
             callback: () => this.openNavigator(),
+        });
+
+        this.addCommand({
+            id: 'open-scene-inspector',
+            name: 'Open Scene Details Sidebar',
+            callback: () => this.openSceneInspector(),
         });
 
         // Settings tab
@@ -867,6 +882,24 @@ export default class SceneCardsPlugin extends Plugin {
     }
 
     /**
+     * Open the Scene Details inspector in the right sidebar.
+     * If already open, just reveal it.
+     */
+    async openSceneInspector(): Promise<void> {
+        const { workspace } = this.app;
+        const existing = workspace.getLeavesOfType(SCENE_INSPECTOR_VIEW_TYPE);
+        if (existing.length > 0) {
+            workspace.revealLeaf(existing[0]);
+            return;
+        }
+        const leaf = workspace.getRightLeaf(false);
+        if (leaf) {
+            await leaf.setViewState({ type: SCENE_INSPECTOR_VIEW_TYPE, active: true });
+            workspace.revealLeaf(leaf);
+        }
+    }
+
+    /**
      * Switch the current StoryLine leaf in-place to a different view type.
      * Kept as a utility; the ViewSwitcher now uses the leaf reference directly.
      */
@@ -897,6 +930,68 @@ export default class SceneCardsPlugin extends Plugin {
     }
 
     /**
+     * Recursively scan user-configured extra folders and route each .md
+     * file to the appropriate manager based on its frontmatter type: field.
+     */
+    async scanExtraFolders(): Promise<void> {
+        const folders = this.settings.extraFolders;
+        if (!folders || folders.length === 0) return;
+
+        const adapter = this.app.vault.adapter;
+        const scan = async (folderPath: string): Promise<void> => {
+            if (!await adapter.exists(folderPath)) return;
+            const listing = await adapter.list(folderPath);
+            for (const f of listing.files) {
+                if (!f.endsWith('.md')) continue;
+                try {
+                    const fp = normalizePath(f);
+                    const content = await adapter.read(fp);
+                    const type = this.extractFrontmatterType(content);
+                    if (!type) continue;
+                    switch (type) {
+                        case 'scene':
+                            this.sceneManager.addFile(content, fp);
+                            break;
+                        case 'character':
+                            this.characterManager.addFile(content, fp);
+                            break;
+                        case 'location':
+                        case 'world':
+                            this.locationManager.addFile(content, fp);
+                            break;
+                        default:
+                            // Try codex categories (items, creatures, custom, etc.)
+                            this.codexManager.addFile(content, fp);
+                            break;
+                    }
+                } catch { /* skip unreadable */ }
+            }
+            for (const sub of listing.folders) {
+                await scan(normalizePath(sub));
+            }
+        };
+
+        for (const folder of folders) {
+            if (folder) await scan(folder);
+        }
+    }
+
+    /**
+     * Quick extraction of the type: field from frontmatter.
+     */
+    private extractFrontmatterType(content: string): string | null {
+        const clean = content.replace(/[\u200B-\u200F\u2028-\u202F\uFEFF]/g, '');
+        const match = clean.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+        if (!match) return null;
+        try {
+            const fm = parseYaml(match[1]);
+            return fm?.type ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
      * Refresh all open Scene Cards views
      */
     refreshOpenViews(): void {
@@ -906,6 +1001,7 @@ export default class SceneCardsPlugin extends Plugin {
             if (locFolder) this.locationManager.loadAll(locFolder);
             const charFolder = this.sceneManager.getCharacterFolder();
             if (charFolder) this.characterManager.loadCharacters(charFolder);
+            this.scanExtraFolders();
             const codexFolder = this.sceneManager.getCodexFolder();
             if (codexFolder) {
                 const customDefs = (this.settings.codexCustomCategories || []).map(

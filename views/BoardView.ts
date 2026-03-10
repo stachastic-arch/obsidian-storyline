@@ -783,6 +783,7 @@ export class BoardView extends ItemView {
         let dragRaf: number | null = null;
         let pendingX = 0;
         let pendingY = 0;
+        let lastClickTime = 0;
 
         const applyDragPosition = () => {
             dragRaf = null;
@@ -832,7 +833,14 @@ export class BoardView extends ItemView {
             } else {
                 const scene = this.sceneManager.getScene(scenePath);
                 if (scene && !this.isCorkboardNoteScene(scene)) {
-                    this.selectScene(scene, e);
+                    const now = Date.now();
+                    if (now - lastClickTime < 400) {
+                        this.openScene(scene);
+                        lastClickTime = 0;
+                    } else {
+                        lastClickTime = now;
+                        this.selectScene(scene, e);
+                    }
                 }
             }
         };
@@ -1544,26 +1552,33 @@ export class BoardView extends ItemView {
                 break;
         }
 
-        // Compute new sequence based on target position
-        const targetSeq = targetScene.sequence ?? 0;
-        if (insertBefore) {
-            updates.sequence = targetSeq;
-        } else {
-            updates.sequence = targetSeq + 1;
-        }
-
-        await this.sceneManager.updateScene(draggedPath, updates);
-
-        // Resequence siblings to make room
+        // Build the desired order: take column scenes without the dragged one,
+        // then splice the dragged scene in at the target position.
         const siblings = columnScenes
             .filter(s => s.filePath !== draggedPath)
             .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+
+        const targetIdx = siblings.findIndex(s => s.filePath === targetScene.filePath);
+        const insertIdx = targetIdx === -1
+            ? siblings.length
+            : insertBefore ? targetIdx : targetIdx + 1;
+
+        // Assign sequences 1..N in the new order
         let seq = 1;
-        for (const s of siblings) {
-            if (seq === updates.sequence) seq++;
-            await this.sceneManager.updateScene(s.filePath, { sequence: seq });
+        for (let i = 0; i < siblings.length; i++) {
+            if (i === insertIdx) {
+                updates.sequence = seq;
+                seq++;
+            }
+            await this.sceneManager.updateScene(siblings[i].filePath, { sequence: seq });
             seq++;
         }
+        // Dragged scene goes at end if insertIdx === siblings.length
+        if (updates.sequence === undefined) {
+            updates.sequence = seq;
+        }
+
+        await this.sceneManager.updateScene(draggedPath, updates);
 
         this.refreshBoard();
     }

@@ -33,6 +33,20 @@ export class LocationManager {
         await this.scanFolderAdapter(folderPath);
     }
 
+    /**
+     * Add a single file from an external folder scan.
+     * Returns true if the file was recognised as a world or location.
+     */
+    addFile(content: string, filePath: string): boolean {
+        const fm = this.extractFrontmatter(content);
+        if (!fm) return false;
+        if (fm.type === 'world' || fm.type === 'location') {
+            this.parseAndStoreContent(content, filePath);
+            return true;
+        }
+        return false;
+    }
+
     private async scanFolderAdapter(folderPath: string): Promise<void> {
         const adapter = this.app.vault.adapter;
         if (!await adapter.exists(folderPath)) return;

@@ -6854,6 +6854,46 @@ body.theme-dark {
     font-size: 13px;
 }
 
+/* ── Scene Details button ── */
+.sl-nav-details-row {
+    display: flex;
+    flex-shrink: 0;
+    padding: 4px 8px 0;
+}
+
+.sl-nav-details-btn {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    padding: 4px 0 4px 34px;
+    cursor: pointer;
+    color: var(--text-muted);
+    font-size: 12px;
+    border: none;
+    background: transparent;
+}
+
+.sl-nav-details-btn:hover {
+    color: var(--text-normal);
+    background: var(--background-modifier-hover);
+    border-radius: 4px;
+}
+
+.sl-nav-details-icon {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    margin-left: auto;
+}
+
+.sl-nav-details-label {
+    white-space: nowrap;
+    margin-right: 10px;
+}
+
 /* ── Toolbar ── */
 .sl-nav-toolbar {
     display: flex;
@@ -7979,4 +8019,19 @@ body.theme-dark {
     z-index: 10000;
     box-shadow: 0 2px 8px rgba(0,0,0,0.18);
     border: 1px solid var(--background-modifier-border);
+}
+
+/* ── Scene Inspector Sidebar ── */
+.sl-scene-inspector-sidebar .story-line-inspector-panel.sl-sidebar-inspector {
+    position: static;
+    width: 100%;
+    border-left: none;
+    box-shadow: none;
+    z-index: auto;
+}
+
+.sl-scene-inspector-empty {
+    padding: 24px 16px;
+    color: var(--text-muted);
+    text-align: center;
 }

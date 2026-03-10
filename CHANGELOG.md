@@ -2,6 +2,28 @@
 
 ---
 
+## Version 1.5.5
+
+### New Features
+
+- **Scene Details Sidebar** — A standalone sidebar panel that shows the full Inspector for the currently active scene file. Open it from the **Scene Details** button in the Navigator, or via the command palette (`Open Scene Details Sidebar`). Auto-updates when you switch between scene files in the editor, so you can view and edit metadata side-by-side with your writing.
+
+- **Additional Source Folders (Experimental)** — Point StoryLine at any folder in your vault and it will recursively scan all `.md` files, automatically routing each one to the correct manager based on its frontmatter `type:` field (scene, character, location, world, or any codex category). Supports any folder structure — no need to organize files by entity type. Configure under **Settings → Advanced → Additional Source Folders** with a folder browser and autocomplete. ⚠ Experimental — back up your files before linking external folders.
+
+### Improvements
+
+- **Internal links in scene cards** — `[[wikilinks]]` in scene card conflict fields and Plotgrid cells now render as clickable links instead of plain text. Click to open the linked note.
+
+- **Navigator "Scene Details" button** — A new button in the Navigator sidebar opens the Scene Details panel in the right sidebar with one click.
+
+### Bug Fixes
+
+- **Sequence renumbering on drag-reorder** — Fixed a bug where dragging a scene card to a new position in the Board view could produce inconsistent sequence numbers (e.g., 02-01, 02-02, 02-06). The algorithm now builds the correct insertion order first, then assigns clean 1..N sequences.
+
+- **Corkboard double-click** — Fixed an issue where double-clicking a scene card on the corkboard did not open the scene file. The pointer capture used for drag was suppressing native click events.
+
+---
+
 ## Version 1.5.0
 
 ### New Features

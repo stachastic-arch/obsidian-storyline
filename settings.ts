@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, Setting, Modal, TextAreaComponent } from 'obsidian';
+import { App, PluginSettingTab, Setting, Modal, TextAreaComponent, AbstractInputSuggest, TFolder, normalizePath } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { ColorCodingMode, SceneStatus, ViewType, SceneTemplate, BUILTIN_SCENE_TEMPLATES } from './models/Scene';
 import type SceneCardsPlugin from './main';
@@ -612,6 +612,8 @@ export interface SceneCardsSettings {
     series: string;
     /** Optional vault-relative path to a shared codex folder for series */
     sharedCodex: string;
+    /** Extra vault-relative folder paths to scan for StoryLine entities */
+    extraFolders: string[];
 }
 
 /**
@@ -683,6 +685,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     codexCustomCategories: [],
     series: '',
     sharedCodex: '',
+    extraFolders: [],
 };
 
 /**
@@ -993,6 +996,78 @@ export class SceneCardsSettingTab extends PluginSettingTab {
 
         // --- Advanced ---
         containerEl.createEl('h2', { text: 'Advanced' });
+
+        // --- Extra source folders (collapsible, experimental) ---
+        const extraDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
+        extraDetails.createEl('summary', { text: 'Additional Source Folders (Experimental)' });
+        const extraBody = extraDetails.createDiv();
+        extraBody.style.padding = '8px 0';
+
+        const extraWarn = extraBody.createDiv({ cls: 'setting-item-description' });
+        extraWarn.style.color = 'var(--text-warning, orange)';
+        extraWarn.style.marginBottom = '12px';
+        extraWarn.setText('⚠ Experimental — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine.');
+
+        const extraDesc = extraBody.createDiv({ cls: 'setting-item-description' });
+        extraDesc.style.marginBottom = '12px';
+        extraDesc.setText('Point StoryLine to any folder in your vault. All .md files inside will be scanned and automatically sorted by their frontmatter type: field.');
+
+        // Render the current list of folders
+        const listContainer = extraBody.createDiv();
+        const renderFolderList = () => {
+            listContainer.empty();
+            const folders = this.plugin.settings.extraFolders || [];
+            for (let i = 0; i < folders.length; i++) {
+                const row = listContainer.createDiv();
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '6px';
+                row.style.marginBottom = '4px';
+
+                const label = row.createSpan({ text: folders[i] });
+                label.style.flex = '1';
+                label.style.fontFamily = 'var(--font-monospace)';
+                label.style.fontSize = '12px';
+
+                const removeBtn = row.createEl('button', { text: '×', cls: 'clickable-icon' });
+                removeBtn.style.color = 'var(--text-error)';
+                removeBtn.style.fontSize = '16px';
+                removeBtn.addEventListener('click', async () => {
+                    this.plugin.settings.extraFolders.splice(i, 1);
+                    await this.plugin.saveSettings();
+                    renderFolderList();
+                });
+            }
+        };
+        renderFolderList();
+
+        // Add-folder row with folder suggest
+        const addRow = extraBody.createDiv();
+        addRow.style.display = 'flex';
+        addRow.style.alignItems = 'center';
+        addRow.style.gap = '6px';
+        addRow.style.marginTop = '8px';
+
+        const folderInput = addRow.createEl('input', { type: 'text', placeholder: 'Type or browse for a folder...' });
+        folderInput.style.flex = '1';
+        folderInput.addClass('sl-folder-suggest-input');
+
+        // Attach folder autocomplete
+        new FolderSuggest(this.app, folderInput);
+
+        const addBtn = addRow.createEl('button', { text: 'Add', cls: 'mod-cta' });
+        addBtn.style.flexShrink = '0';
+        addBtn.addEventListener('click', async () => {
+            const val = folderInput.value.trim();
+            if (!val) return;
+            if (!this.plugin.settings.extraFolders) this.plugin.settings.extraFolders = [];
+            if (!this.plugin.settings.extraFolders.includes(val)) {
+                this.plugin.settings.extraFolders.push(val);
+                await this.plugin.saveSettings();
+            }
+            folderInput.value = '';
+            renderFolderList();
+        });
 
         new Setting(containerEl)
             .setName('Enable plot hole detection')
@@ -2157,5 +2232,38 @@ class TemplateEditorModal extends Modal {
 
     onClose(): void {
         this.contentEl.empty();
+    }
+}
+
+/**
+ * Folder-path autocomplete for text inputs.
+ * Lists all vault folders and filters as you type.
+ */
+class FolderSuggest extends AbstractInputSuggest<TFolder> {
+    getSuggestions(query: string): TFolder[] {
+        const lower = query.toLowerCase();
+        const folders: TFolder[] = [];
+        const root = this.app.vault.getRoot();
+        const walk = (folder: TFolder) => {
+            if (folder.path && folder.path !== '/') {
+                if (folder.path.toLowerCase().contains(lower)) {
+                    folders.push(folder);
+                }
+            }
+            for (const child of folder.children) {
+                if (child instanceof TFolder) walk(child);
+            }
+        };
+        walk(root);
+        return folders.sort((a, b) => a.path.localeCompare(b.path));
+    }
+
+    renderSuggestion(folder: TFolder, el: HTMLElement): void {
+        el.setText(folder.path);
+    }
+
+    selectSuggestion(folder: TFolder): void {
+        this.setValue(folder.path);
+        this.close();
     }
 }

@@ -41,6 +41,20 @@ export class CharacterManager {
     }
 
     /**
+     * Add a single file from an external folder scan.
+     * Returns true if the file was recognised as a character.
+     */
+    addFile(content: string, filePath: string): boolean {
+        if (this.characters.has(filePath)) return false;
+        const character = this.parseCharacterContent(content, filePath);
+        if (character) {
+            this.characters.set(filePath, character);
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Get all loaded characters sorted by name.
      */
     getAllCharacters(): Character[] {

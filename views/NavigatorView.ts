@@ -2,7 +2,7 @@ import { ItemView, WorkspaceLeaf, Menu, TFile, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { Scene, SceneStatus, STATUS_CONFIG } from '../models/Scene';
-import { NAVIGATOR_VIEW_TYPE } from '../constants';
+import { NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE } from '../constants';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 
@@ -77,6 +77,16 @@ export class NavigatorView extends ItemView {
         const container = this.containerEl.children[1] as HTMLElement;
         container.empty();
         container.addClass('sl-navigator');
+
+        // ── Scene Details button (right-aligned above sort) ──
+        const detailsRow = container.createDiv('sl-nav-details-row');
+        const detailsBtn = detailsRow.createDiv('sl-nav-details-btn');
+        detailsBtn.createSpan({ text: 'Scene Details', cls: 'sl-nav-details-label' });
+        const detailsIcon = detailsBtn.createSpan('sl-nav-details-icon');
+        setIcon(detailsIcon, 'panel-right');
+        detailsBtn.addEventListener('click', () => {
+            this.plugin.openSceneInspector();
+        });
 
         // ── Toolbar row: search + sort ──
         const toolbar = container.createDiv('sl-nav-toolbar');

@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.5.0** · By Jan Sandström
+**Version 1.5.5** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -21,6 +21,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
   - [Codex Hub](#codex-hub)
   - [Stats View](#stats-view)
   - [Navigator View](#navigator-view)
+  - [Scene Details Sidebar](#scene-details-sidebar)
 - [Scene Cards](#scene-cards)
 - [Inspector Panel](#inspector-panel)
 - [Filtering & Presets](#filtering--presets)
@@ -48,6 +49,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Export](#export)
 - [Custom Field Templates](#custom-field-templates)
 - [Image Galleries](#image-galleries)
+- [Additional Source Folders](#additional-source-folders)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Settings](#settings)
 - [Project Management](#project-management)
@@ -267,6 +269,7 @@ A compact sidebar panel for quick scene navigation without leaving your current 
 #### Toolbar
 - **Search** — type to filter scenes by title.
 - **Sort** — five modes: Sequence (default), Status, Recently Modified, Word Count, and Title (A–Z).
+- **Scene Details** — a button that opens the Scene Details Sidebar in the right panel (see below).
 
 #### Plotline Filter
 - Collapsible section listing all plotline tags in the project.
@@ -285,6 +288,25 @@ A compact sidebar panel for quick scene navigation without leaving your current 
 #### Auto-Open
 - The Navigator opens automatically when a project loads (configurable via **Settings → Auto-open Navigator**).
 - You can also open it manually via the command palette: **Open StoryLine Navigator**.
+
+### Scene Details Sidebar
+
+A standalone sidebar panel that shows the full Inspector for the currently active scene file. Use it to view and edit scene metadata side-by-side with your writing.
+
+#### How It Works
+
+1. Open the Scene Details Sidebar from the **Scene Details** button in the Navigator, or via the command palette (**Open Scene Details Sidebar**).
+2. The panel automatically detects the active file in the editor.
+3. If the active file is a scene (has `type: scene` in frontmatter), the full Inspector is displayed — title, status, POV, characters, location, tags, conflict, notes, setup/payoff links, and more.
+4. When you switch to a different file, the panel updates automatically.
+5. If the active file is not a scene, an empty state message is shown.
+
+#### Features
+
+- **Auto-update** — follows the active editor file. Switch between scene files and the sidebar updates instantly.
+- **Full Inspector** — all the same fields and editing capabilities as the main Inspector panel.
+- **Refresh on save** — when you modify a scene file in the editor, the sidebar refreshes to reflect changes (with a short delay to avoid conflicts).
+- **Non-intrusive** — lives in the right sidebar and doesn’t interfere with your main views.
 
 ---
 
@@ -969,6 +991,38 @@ Images are saved into the `<Project>/Images/` folder, with automatic deduplicati
 
 ---
 
+## Additional Source Folders
+
+By default, StoryLine only scans files inside your project's folder structure (Scenes, Codex/Characters, Codex/Locations, etc.). The **Additional Source Folders** feature lets you point StoryLine at any other folder in your vault so it can pick up entities stored elsewhere.
+
+### How It Works
+
+1. Open **Settings → Advanced**.
+2. Expand the **Additional Source Folders (Experimental)** section.
+3. Type or browse for a vault folder and click **Add**.
+4. StoryLine recursively scans the folder and every `.md` file inside. Each file is automatically routed to the correct manager based on its frontmatter `type:` field:
+
+| `type:` value | Routed to |
+|---|---|
+| `scene` | Scene Manager |
+| `character` | Character Manager |
+| `location` | Location Manager |
+| `world` | Location Manager (as a world) |
+| Any codex category id | Codex Manager |
+
+5. Entities from additional folders appear alongside your project’s own entities in all views.
+
+### Important Notes
+
+- ⚠ **Experimental** — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine views.
+- Works with **any folder structure** — files don’t need to be organized by type. StoryLine reads the `type:` field in each file’s frontmatter to determine what it is.
+- Folder paths are **vault-relative** (e.g., `Shared Universe/Characters` or `Book 2/Scenes`).
+- The folder browser provides **autocomplete** — start typing and it suggests matching vault folders.
+- Remove a folder by clicking the × button next to it in the settings.
+- Additional source folders are scanned after the main project folders, so project files take priority when there are duplicates.
+
+---
+
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -1008,6 +1062,7 @@ Open **Settings → StoryLine** to configure:
 | Compact Card View | Smaller cards with less detail | Off |
 | Plot Hole Detection | Enable the Validator engine | On |
 | Scene Templates | Custom scene templates for quick scene creation | — |
+| Additional Source Folders | Extra vault folders to scan for entities (experimental) | None |
 
 ---
 
@@ -1099,4 +1154,4 @@ MIT
 
 ---
 
-*StoryLine v1.5.0 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.5.5 — Transform your vault into a powerful book planning tool.*

@@ -14,3 +14,4 @@ export const LOCATION_VIEW_TYPE = 'story-line-location';
 export const HELP_VIEW_TYPE = 'story-line-help';
 export const NAVIGATOR_VIEW_TYPE = 'story-line-navigator';
 export const CODEX_VIEW_TYPE = 'story-line-codex';
+export const SCENE_INSPECTOR_VIEW_TYPE = 'story-line-scene-inspector';
