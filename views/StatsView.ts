@@ -385,8 +385,20 @@ export class StatsView extends ItemView {
         stats: ReturnType<SceneManager['getStatistics']>,
         allScenes: Scene[],
     ): void {
-        // ── POV distribution ──
-        const povEntries = Object.entries(stats.povCounts).sort(([, a], [, b]) => b - a);
+        // Build alias map so "Flora" and "Flora Blomkvist" merge into one entry
+        const aliasMap = this.plugin.characterManager.buildAliasMap(
+            this.plugin.settings?.characterAliases,
+        );
+        const resolve = (name: string): string =>
+            aliasMap.get(name.toLowerCase()) || name;
+
+        // ── POV distribution (merge aliases) ──
+        const mergedPov: Record<string, number> = {};
+        for (const [pov, count] of Object.entries(stats.povCounts)) {
+            const canon = resolve(pov);
+            mergedPov[canon] = (mergedPov[canon] || 0) + count;
+        }
+        const povEntries = Object.entries(mergedPov).sort(([, a], [, b]) => b - a);
         if (povEntries.length > 0) {
             const sec = parent.createDiv('stats-subsection');
             sec.createEl('h5', { cls: 'stats-subsection-title', text: 'POV Distribution' });
@@ -400,12 +412,12 @@ export class StatsView extends ItemView {
             }
         }
 
-        // ── Character scene coverage ──
+        // ── Character scene coverage (merge aliases) ──
         const charCounts: Record<string, number> = {};
         for (const scene of allScenes) {
             const chars = new Set<string>();
-            if (scene.pov) chars.add(scene.pov);
-            if (scene.characters) scene.characters.forEach(c => chars.add(c));
+            if (scene.pov) chars.add(resolve(scene.pov));
+            if (scene.characters) scene.characters.forEach(c => chars.add(resolve(c)));
             for (const c of chars) charCounts[c] = (charCounts[c] || 0) + 1;
         }
         const charEntries = Object.entries(charCounts).sort(([, a], [, b]) => b - a);
