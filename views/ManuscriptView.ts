@@ -8,7 +8,7 @@ import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { FiltersComponent } from '../components/Filters';
 import type SceneCardsPlugin from '../main';
 import { MANUSCRIPT_VIEW_TYPE } from '../constants';
-import { applyMobileClass } from '../components/MobileAdapter';
+import { applyMobileClass, isMobile, isPhone } from '../components/MobileAdapter';
 
 /**
  * Manuscript View — Scrivenings-style continuous document view.
@@ -320,6 +320,14 @@ export class ManuscriptView extends ItemView {
 
         container.empty(); // Remove "Loading…" placeholder
 
+        // On phones, embedded WorkspaceSplit editors don't render reliably.
+        // Fall back to static rendered markdown (read-only).
+        if (isPhone) {
+            this.mountingPaths.delete(filePath);
+            await this.mountReadOnlyPreview(container, filePath);
+            return;
+        }
+
         try {
             // Create a detached WorkspaceSplit to host the embedded leaf
             const split = new (WorkspaceSplit as any)(this.app.workspace, 'vertical');
@@ -369,12 +377,16 @@ export class ManuscriptView extends ItemView {
                 });
             };
 
-            // CM6 may render lazily; sync across multiple frames
+            // CM6 may render lazily; sync across multiple frames.
+            // On tablets (iPadOS) the editor can take longer to layout,
+            // so we retry at increasing intervals.
             requestAnimationFrame(() => {
                 syncHeight();
                 requestAnimationFrame(() => {
                     syncHeight();
-                    setTimeout(syncHeight, 500);
+                    setTimeout(syncHeight, 300);
+                    setTimeout(syncHeight, 800);
+                    if (isMobile) setTimeout(syncHeight, 1500);
                 });
             });
 
@@ -385,16 +397,35 @@ export class ManuscriptView extends ItemView {
                 ro.observe(cmEl);
                 this.editorResizeObservers.set(filePath, ro);
             }
+
+            // On mobile, also watch for child list changes (CM6 may add
+            // content nodes later than desktop). This catches cases where
+            // ResizeObserver misses the initial layout.
+            if (isMobile) {
+                const mo = new MutationObserver(() => debouncedSync());
+                mo.observe(splitEl, { childList: true, subtree: true });
+                // Auto-disconnect after content has stabilised
+                setTimeout(() => mo.disconnect(), 5000);
+            }
         } catch (err) {
             this.mountingPaths.delete(filePath);
             console.warn('StoryLine: embedded editor failed, falling back to preview', err);
-            const scene = this.sceneManager.getScene(filePath);
-            const text = (scene?.body ?? '').trim();
-            if (text) {
-                await MarkdownRenderer.render(this.app, text, container, filePath, this);
-            } else {
-                container.createDiv({ cls: 'sl-manuscript-scene-empty', text: 'Empty scene' });
-            }
+            await this.mountReadOnlyPreview(container, filePath);
+        }
+    }
+
+    /** Render scene body as static markdown (read-only fallback for mobile) */
+    private async mountReadOnlyPreview(
+        container: HTMLElement,
+        filePath: string,
+    ): Promise<void> {
+        const scene = this.sceneManager.getScene(filePath);
+        const text = (scene?.body ?? '').trim();
+        if (text) {
+            const previewEl = container.createDiv('sl-manuscript-preview');
+            await MarkdownRenderer.render(this.app, text, previewEl, filePath, this);
+        } else {
+            container.createDiv({ cls: 'sl-manuscript-scene-empty', text: 'Empty scene' });
         }
     }
 
