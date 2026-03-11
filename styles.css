@@ -6839,26 +6839,39 @@ body.theme-dark {
     user-select: none;
     -webkit-touch-callout: none;
     overflow: hidden;
+    flex: 0 0 auto;
 }
 
-/* Clamp conflict / summary text on mobile to prevent overflow */
+/* Clamp conflict / summary text on mobile */
 .sl-mobile .scene-card-conflict {
-    display: -webkit-box;
-    line-clamp: 2;
-    -webkit-line-clamp: 2;
+    display: -webkit-box !important;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-height: 3.9em;  /* 3 lines fallback: 3 × 1.3 line-height */
+}
+.sl-phone .scene-card-conflict {
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    max-height: 2.6em;  /* 2 lines fallback */
 }
 
 /* Clamp title on mobile too, in case it's very long */
 .sl-mobile .scene-card-title {
-    display: -webkit-box;
-    line-clamp: 2;
-    -webkit-line-clamp: 2;
+    display: -webkit-box !important;
+    line-clamp: 3;
+    -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-height: 3.9em;  /* 3 lines fallback */
+}
+.sl-phone .scene-card-title {
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    max-height: 2.6em;  /* 2 lines fallback */
 }
 
 .sl-mobile .scene-card.touch-dragging {

@@ -1553,7 +1553,7 @@ export class BoardView extends ItemView {
         // Use VirtualScroller for large columns to avoid DOM bloat
         const scroller = new VirtualScroller<Scene>({
             container: body,
-            itemHeight: this.plugin.settings.compactCardView ? 60 : 110,
+            itemHeight: this.plugin.settings.compactCardView ? 60 : (isMobile ? 140 : 110),
             items: scenes,
             renderItem: renderSceneCard,
             overscan: 5,
