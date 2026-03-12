@@ -969,6 +969,40 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
+        // --- Project Management ---
+        containerEl.createEl('h2', { text: 'Project Management' });
+
+        const activeProject = this.plugin.sceneManager.activeProject;
+
+        new Setting(containerEl)
+            .setName('Rename book')
+            .setDesc(activeProject ? `Current: "${activeProject.title}"` : 'No active project')
+            .addButton(btn => btn
+                .setButtonText('Rename…')
+                .setDisabled(!activeProject)
+                .onClick(() => {
+                    (this.plugin.app as any).commands.executeCommandById('storyline:rename-project');
+                }));
+
+        new Setting(containerEl)
+            .setName('Create series from this book')
+            .setDesc(activeProject?.seriesId ? 'This book already belongs to a series.' : 'Wrap the current book in a new series.')
+            .addButton(btn => btn
+                .setButtonText('Create Series…')
+                .setDisabled(!activeProject || !!activeProject.seriesId)
+                .onClick(() => {
+                    (this.plugin.app as any).commands.executeCommandById('storyline:create-series');
+                }));
+
+        new Setting(containerEl)
+            .setName('Manage series')
+            .setDesc('View, rename, and reorder books in your series.')
+            .addButton(btn => btn
+                .setButtonText('Manage Series…')
+                .onClick(() => {
+                    (this.plugin as any).openSeriesManagementModal();
+                }));
+
         // --- Writing Goals ---
         containerEl.createEl('h2', { text: 'Writing Goals' });
 

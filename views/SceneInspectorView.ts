@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, TFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, TFile, MarkdownView } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
 import { InspectorComponent } from '../components/Inspector';
@@ -15,6 +15,9 @@ export class SceneInspectorView extends ItemView {
     private sceneManager: SceneManager;
     private inspectorComponent: InspectorComponent | null = null;
     private emptyEl: HTMLElement | null = null;
+    /** Timestamp (ms) of last user-initiated edit inside the inspector.
+     *  Used to suppress competing refresh triggers for a short window. */
+    private lastEditTime = 0;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -60,34 +63,55 @@ export class SceneInspectorView extends ItemView {
                 },
                 onDelete: async (scene) => {
                     await this.sceneManager.deleteScene(scene.filePath);
-                    this.updateForActiveFile();
+                    this.inspectorComponent?.hide();
+                    if (this.emptyEl) this.emptyEl.style.display = 'block';
                 },
-                onRefresh: () => this.updateForActiveFile(),
+                onRefresh: () => {
+                    this.lastEditTime = Date.now();
+                    this.refreshCurrentScene();
+                },
                 onStatusChange: async (scene, status) => {
+                    this.lastEditTime = Date.now();
                     await this.sceneManager.updateScene(scene.filePath, { status });
-                    this.updateForActiveFile();
+                    this.refreshCurrentScene();
                 },
             }
         );
 
-        // Listen for active file changes
+        // Listen for active file changes — only switch/hide when user
+        // navigates to a real editor showing a different file.
         this.registerEvent(
-            this.app.workspace.on('active-leaf-change', () => {
+            this.app.workspace.on('active-leaf-change', (leaf) => {
+                if (!leaf) return;
+                // Ignore if the new active leaf is this inspector itself
+                if (leaf === this.leaf) return;
+                // Only react when the user activates a MarkdownView (an actual file editor).
+                // StoryLine views (Manuscript, Board, etc.) don't own files, so
+                // switching to them should NOT hide the inspector — the Manuscript
+                // focus observer handles scene changes via events instead.
+                if (!(leaf.view instanceof MarkdownView)) return;
                 this.updateForActiveFile();
             })
         );
 
-        // Also refresh when files are modified (metadata changes)
+        // Refresh scene data when files are modified (e.g. frontmatter
+        // updated by inspector itself). Never hide — just re-show the
+        // current scene with fresh data.  Skip if we just edited
+        // (the callback already refreshed synchronously).
         this.registerEvent(
             this.app.vault.on('modify', () => {
-                // Debounced via the plugin's existing pipeline; just re-check
-                setTimeout(() => this.updateForActiveFile(), 600);
+                if (!this.inspectorComponent?.isVisible()) return;
+                if (Date.now() - this.lastEditTime < 2000) return;
+                setTimeout(() => this.refreshCurrentScene(), 600);
             })
         );
 
-        // Listen for Manuscript view focused-scene changes
+        // Listen for Manuscript view focused-scene changes.
+        // Suppress during the cooldown window after an edit so the
+        // Manuscript rebuild doesn't clobber the inspector mid-interaction.
         this.registerEvent(
             (this.app.workspace as any).on('storyline:manuscript-focus', (filePath: string) => {
+                if (Date.now() - this.lastEditTime < 2000) return;
                 const scene = this.sceneManager.getScene(filePath);
                 if (scene) {
                     if (this.emptyEl) this.emptyEl.style.display = 'none';
@@ -114,8 +138,22 @@ export class SceneInspectorView extends ItemView {
                 return;
             }
         }
-        // No scene found — show empty state
+        // Active file is not a scene — show empty state
         this.inspectorComponent?.hide();
         if (this.emptyEl) this.emptyEl.style.display = 'block';
+    }
+
+    /**
+     * Re-show the currently displayed scene with refreshed data.
+     * Used after file modifications to pick up frontmatter changes
+     * without risking hiding the panel.
+     */
+    private refreshCurrentScene(): void {
+        const currentScene = this.inspectorComponent?.getCurrentScene?.();
+        if (!currentScene) return;
+        const fresh = this.sceneManager.getScene(currentScene.filePath);
+        if (fresh) {
+            this.inspectorComponent?.show(fresh);
+        }
     }
 }

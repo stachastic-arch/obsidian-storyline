@@ -799,6 +799,12 @@ export const CHARACTER_ROLES = [
     'Sidekick',
     'Love Interest',
     'Foil',
+    'Narrator',
+    'Confidant',
+    'Suspect',
+    'Victim',
+    'Rival',
+    'Catalyst',
     'Supporting',
     'Minor',
 ];

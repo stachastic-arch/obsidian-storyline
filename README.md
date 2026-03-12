@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.6.0** · By Jan Sandström
+**Version 1.7.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
@@ -162,6 +162,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Writing Sprint** — Built-in countdown timer for focused writing sessions.
 - **Story Navigator** — Compact sidebar panel with search, sort, plotline filter, act grouping, pinned scenes, progress bar, and a **Scene Details** button. Auto-opens on project load.
 - **Scene Details Sidebar** — Standalone Inspector panel that follows the active editor file. Edit scene metadata side-by-side with your writing.
+- **Series Mode** — Group multiple books into a series with a shared Codex. Characters, locations, and custom categories are stored once and shared across all books.
 - **Additional Source Folders** *(Experimental)* — Point StoryLine at any vault folder and it will scan all `.md` files, routing each to the correct manager by its frontmatter `type:` field. Supports any folder structure.
 - **Color Coding** — Color by status, POV, emotion, act, or tag. **16 built-in color schemes** (4 Catppuccin + 12 mood-based palettes) or custom. Per-tag overrides from Plotlines view or Settings. HSL fine-tuning sliders for plotline and sticky note palettes. Dark/light mode aware.
 - **Per-Project Colors** — Optionally save color scheme, HSL adjustments, and sticky note theme per project so each book can have its own look.
@@ -201,6 +202,19 @@ StoryLine/
     Exports/               ← Exported files
 ```
 
+Series projects use a shared Codex at the series level:
+
+```
+StoryLine/
+  My Series/
+    series.json            ← Series manifest
+    Codex/                 ← Shared Codex (Characters, Locations, custom)
+    Book One.md
+    Book One/
+      Scenes/
+      System/
+```
+
 All files are standard Markdown with YAML frontmatter. Edit them directly in Obsidian or through StoryLine's UI.
 
 ---
@@ -211,7 +225,40 @@ Create, switch, and fork projects from the command palette. Each project gets it
 
 ---
 
-*StoryLine v1.5.6 — Transform your vault into a powerful book planning tool.*
+## Series Mode
+
+Group multiple book projects into a **series** with a shared Codex. Characters, locations, and custom categories are stored once at the series level and available in every book — no duplication.
+
+- **Create Series** — Command palette → **Create Series from Current Project**, or **Settings → Project Management → Create Series**. Your book moves into a new series folder with a shared Codex.
+- **Add to Series** — Command palette → **Add Current Project to Series**. Pick an existing series; your book and its Codex entries are migrated in.
+- **Remove from Series** — Command palette → **Remove Current Project from Series**. The shared Codex is copied back into a local Codex and the book moves out.
+- **Rename Book** — **Settings → Project Management → Rename book**. Renames the project file, folder, and updates frontmatter and series manifest.
+- **Manage Series** — **Settings → Project Management → Manage Series**, or the "Manage Series…" button in the Open Project modal. View, rename, reorder, add, or remove books.
+
+When a project belongs to a series, the project selector shows a series badge. All views (Characters, Locations, Codex) automatically use the shared series Codex — your workflow stays the same.
+
+> **Required Obsidian setting:** Before creating or joining a series, make sure **Settings → Files & Links → "Automatically update internal links"** is turned **ON**. StoryLine checks this before migration and will block the operation if it's off — otherwise `[[wikilinks]]` would break when files move.
+
+```
+StoryLine/
+  My Series/
+    series.json
+    Codex/
+      Characters/
+      Locations/
+    Book One.md
+    Book One/
+      Scenes/
+      System/
+    Book Two.md
+    Book Two/
+      Scenes/
+      System/
+```
+
+---
+
+*StoryLine v1.7.0 — Transform your vault into a powerful book planning tool.*
 
 ---
 

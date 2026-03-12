@@ -1,4 +1,4 @@
-import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath } from 'obsidian';
+import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
 import {
@@ -17,6 +17,7 @@ import {
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
+import type { SeriesMetadata } from './models/StoryLineProject';
 import { BoardView } from './views/BoardView';
 import { TimelineView } from './views/TimelineView';
 import { StorylineView } from './views/StorylineView';
@@ -39,6 +40,7 @@ import { SnapshotManager } from './services/SnapshotManager';
 import { LinkScanner } from './services/LinkScanner';
 import { CascadeRenameService } from './services/CascadeRenameService';
 import { FieldTemplateService } from './services/FieldTemplateService';
+import { SeriesManager } from './services/SeriesManager';
 
 /**
  * StoryLine Plugin for Obsidian
@@ -62,6 +64,7 @@ export default class SceneCardsPlugin extends Plugin {
     linkScanner: LinkScanner;
     cascadeRename: CascadeRenameService;
     fieldTemplates: FieldTemplateService;
+    seriesManager: SeriesManager;
     /** The leaf currently hosting a StoryLine view */
     storyLeaf: WorkspaceLeaf | null = null;
     /** Removes native browser tooltips (`title`) inside StoryLine UI */
@@ -79,6 +82,7 @@ export default class SceneCardsPlugin extends Plugin {
         this.linkScanner = new LinkScanner(this.characterManager, this.locationManager);
         this.cascadeRename = new CascadeRenameService(this.app, this.sceneManager, this.characterManager, this.locationManager);
         this.fieldTemplates = new FieldTemplateService(this.app, () => this.getProjectSystemFolder());
+        this.seriesManager = new SeriesManager(this.app, this);
 
         // Wire up undo/redo to refresh views + re-index
         this.sceneManager.undoManager.onAfterUndoRedo = async () => {
@@ -323,6 +327,42 @@ export default class SceneCardsPlugin extends Plugin {
             id: 'open-scene-inspector',
             name: 'Open Scene Details Sidebar',
             callback: () => this.openSceneInspector(),
+        });
+
+        this.addCommand({
+            id: 'create-series',
+            name: 'Create New Series from Current Project',
+            callback: () => this.openCreateSeriesModal(),
+        });
+
+        this.addCommand({
+            id: 'add-to-series',
+            name: 'Add Current Project to Existing Series',
+            callback: () => this.openAddToSeriesModal(),
+        });
+
+        this.addCommand({
+            id: 'remove-from-series',
+            name: 'Remove Current Project from Series',
+            callback: async () => {
+                const project = this.sceneManager.activeProject;
+                if (!project?.seriesId) {
+                    new Notice('This project is not part of a series.');
+                    return;
+                }
+                try {
+                    await this.seriesManager.removeProjectFromSeries();
+                    this.refreshOpenViews();
+                } catch (e: any) {
+                    new Notice(e?.message ?? String(e), 10000);
+                }
+            },
+        });
+
+        this.addCommand({
+            id: 'rename-project',
+            name: 'Rename Current Project',
+            callback: () => this.openRenameProjectModal(),
         });
 
         // Settings tab
@@ -1416,10 +1456,34 @@ export default class SceneCardsPlugin extends Plugin {
             modal.titleEl.setText('New StoryLine Project');
             let title = '';
             let customFolder = '';
+            let createAsSeries = false;
+            let seriesName = '';
+
+            // Series toggle at the top
+            const seriesNameSetting = new Setting(modal.contentEl)
+                .setName('Series name')
+                .setDesc('Characters, locations, and codex entries will be shared across all books in this series.')
+                .addText((text: any) => {
+                    text.setPlaceholder('My Trilogy');
+                    text.onChange((v: string) => (seriesName = v));
+                });
+            seriesNameSetting.settingEl.style.display = 'none';
 
             new Setting(modal.contentEl)
-                .setName('Project name')
-                .setDesc('Each project gets its own scene, character and location folders.')
+                .setName('Create as series')
+                .setDesc('Wrap this book in a series folder with a shared Codex.')
+                .addToggle((toggle: any) => {
+                    toggle.setValue(false);
+                    toggle.onChange((v: boolean) => {
+                        createAsSeries = v;
+                        seriesNameSetting.settingEl.style.display = v ? '' : 'none';
+                    });
+                });
+
+            // Book title
+            new Setting(modal.contentEl)
+                .setName('Book title')
+                .setDesc('The title of this book. Each book gets its own scenes folder.')
                 .addText((text: any) => {
                     text.setPlaceholder('My Novel');
                     text.onChange((v: string) => (title = v));
@@ -1437,23 +1501,29 @@ export default class SceneCardsPlugin extends Plugin {
                 .addButton((btn: any) => {
                     btn.setButtonText('Create').setCta().onClick(async () => {
                         if (!title.trim()) return;
+                        if (createAsSeries && !seriesName.trim()) {
+                            new Notice('Please enter a series name.');
+                            return;
+                        }
                         try {
                             const basePath = customFolder || undefined;
                             const project = await this.sceneManager.createProject(title.trim(), '', basePath);
                             await this.sceneManager.setActiveProject(project);
+
+                            if (createAsSeries) {
+                                await this.seriesManager.createSeriesFromProject(seriesName.trim());
+                            }
+
                             this.refreshOpenViews();
                             try { await this.activateView(BOARD_VIEW_TYPE); } catch { /* non-critical */ }
                             modal.close();
                             resolve(project);
-                        } catch (err) {
-                            new Notice('Failed to create project: ' + String(err));
+                        } catch (err: any) {
+                            new Notice(err?.message ?? String(err), 10000);
                             resolve(null);
                         }
                     });
-                });
-
-            // Cancel resolves null
-            new Setting(modal.contentEl)
+                })
                 .addButton((btn: any) => {
                     btn.setButtonText('Cancel').onClick(() => {
                         modal.close();
@@ -1497,6 +1567,148 @@ export default class SceneCardsPlugin extends Plugin {
                     modal.close();
                 });
             });
+        modal.open();
+    }
+
+    // ────────────────────────────────────
+    //  Series modals
+    // ────────────────────────────────────
+
+    private openCreateSeriesModal(): void {
+        const project = this.sceneManager.activeProject;
+        if (!project) {
+            new Notice('No active project');
+            return;
+        }
+        if (project.seriesId) {
+            new Notice('This project is already part of a series.');
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Create New Series');
+        let seriesName = '';
+
+        new Setting(modal.contentEl)
+            .setName('Series name')
+            .setDesc(`"${project.title}" will become the first book in this series. Its codex will be shared.`)
+            .addText((text: any) => {
+                text.setPlaceholder('My Trilogy');
+                text.onChange((v: string) => (seriesName = v));
+                setTimeout(() => text.inputEl.focus(), 50);
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: any) => {
+                btn.setButtonText('Create Series').setCta().onClick(async () => {
+                    if (!seriesName.trim()) {
+                        new Notice('Please enter a series name.');
+                        return;
+                    }
+                    modal.close();
+                    try {
+                        await this.seriesManager.createSeriesFromProject(seriesName.trim());
+                        this.refreshOpenViews();
+                    } catch (e: any) {
+                        new Notice(e?.message ?? String(e), 10000);
+                    }
+                });
+            });
+
+        modal.open();
+    }
+
+    private async openAddToSeriesModal(): Promise<void> {
+        const project = this.sceneManager.activeProject;
+        if (!project) {
+            new Notice('No active project');
+            return;
+        }
+        if (project.seriesId) {
+            new Notice('This project is already part of a series.');
+            return;
+        }
+
+        const seriesList = await this.seriesManager.discoverSeries();
+        if (seriesList.length === 0) {
+            new Notice('No series found. Create one first using "Create New Series from Current Project".');
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Add to Existing Series');
+        let selectedFolder = seriesList[0].folder;
+
+        new Setting(modal.contentEl)
+            .setName('Series')
+            .setDesc(`"${project.title}" will be added to the selected series. Its codex will be merged into the shared series codex.`)
+            .addDropdown((dropdown: any) => {
+                for (const s of seriesList) {
+                    dropdown.addOption(s.folder, `${s.meta.name} (${s.meta.bookOrder.length} books)`);
+                }
+                dropdown.onChange((v: string) => (selectedFolder = v));
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: any) => {
+                btn.setButtonText('Add to Series').setCta().onClick(async () => {
+                    modal.close();
+                    try {
+                        await this.seriesManager.addProjectToSeries(selectedFolder);
+                        this.refreshOpenViews();
+                    } catch (e: any) {
+                        new Notice(e?.message ?? String(e), 10000);
+                    }
+                });
+            });
+
+        modal.open();
+    }
+
+    private openRenameProjectModal(): void {
+        const project = this.sceneManager.activeProject;
+        if (!project) {
+            new Notice('No active project to rename.');
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Rename Project');
+        let newTitle = project.title;
+
+        new Setting(modal.contentEl)
+            .setName('New title')
+            .setDesc('The project file and folder will be renamed. All links are updated automatically.')
+            .addText((text: any) => {
+                text.setValue(project.title);
+                text.onChange((v: string) => (newTitle = v));
+                setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: any) => {
+                btn.setButtonText('Rename').setCta().onClick(async () => {
+                    if (!newTitle.trim() || newTitle.trim() === project.title) {
+                        modal.close();
+                        return;
+                    }
+                    try {
+                        this.seriesManager.checkLinkSettings();
+                        await this.sceneManager.renameProject(project, newTitle.trim());
+                        new Notice(`Project renamed to "${newTitle.trim()}"`);
+                        modal.close();
+                        this.refreshOpenViews();
+                    } catch (e: any) {
+                        new Notice(e?.message ?? String(e), 10000);
+                    }
+                });
+            });
+
+        modal.open();
+    }
+
+    openSeriesManagementModal(): void {
+        const modal = new SeriesManagementModal(this.app, this);
         modal.open();
     }
 }
@@ -1549,6 +1761,10 @@ class ProjectSelectModal extends Modal {
         createBtn.addEventListener('click', async () => {
             // open project creation modal and refresh list if a new project was created
             const created = await this.plugin.openNewProjectModal();
+            if (created) {
+                this.close();
+                return;
+            }
             try {
                 await this.plugin.sceneManager.scanProjects();
                 const projects = this.plugin.sceneManager.getProjects();
@@ -1571,6 +1787,13 @@ class ProjectSelectModal extends Modal {
         const cancel = actions.createEl('button', { text: 'Cancel', cls: 'mod-quiet' });
         cancel.setAttr('type', 'button');
         cancel.addEventListener('click', () => this.close());
+
+        const seriesBtn = actions.createEl('button', { text: 'Manage Series…' });
+        seriesBtn.setAttr('type', 'button');
+        seriesBtn.addEventListener('click', async () => {
+            const seriesModal = new SeriesManagementModal(this.app, this.plugin);
+            seriesModal.open();
+        });
 
         // "Browse" button — manually pick a .md file as a StoryLine project
         const browseBtn = actions.createEl('button', { text: 'Browse for Project…' });
@@ -1696,5 +1919,312 @@ class ProjectSelectModal extends Modal {
                 select.createEl('option', { text: 'Error loading projects' }).setAttribute('disabled', 'true');
             }
         })();
+    }
+}
+
+/**
+ * Modal for managing series — view, rename, reorder books, add/remove books.
+ */
+class SeriesManagementModal extends Modal {
+    plugin: SceneCardsPlugin;
+
+    constructor(app: any, plugin: SceneCardsPlugin) {
+        super(app);
+        this.plugin = plugin;
+        this.titleEl.setText('Manage Series');
+    }
+
+    onOpen() {
+        this.render();
+    }
+
+    private async render() {
+        const { contentEl } = this;
+        contentEl.empty();
+        contentEl.addClass('sl-series-modal');
+
+        const seriesList = await this.plugin.seriesManager.discoverSeries();
+
+        if (seriesList.length === 0) {
+            contentEl.createEl('p', {
+                text: 'No series found. Create a series from the new project modal or use the command palette.',
+                cls: 'sl-series-empty',
+            });
+            return;
+        }
+
+        for (const { folder, meta } of seriesList) {
+            const card = contentEl.createDiv({ cls: 'sl-series-card' });
+
+            // ── Header row: series name + rename button ──
+            const header = card.createDiv({ cls: 'sl-series-header' });
+            const titleEl = header.createSpan({ cls: 'sl-series-title', text: meta.name });
+            const folderHint = header.createSpan({
+                cls: 'sl-series-folder-hint',
+                text: folder.split('/').pop() ?? folder,
+            });
+
+            const renameBtn = header.createEl('button', { cls: 'clickable-icon sl-series-action', attr: { 'aria-label': 'Rename series' } });
+            setIcon(renameBtn, 'pencil');
+            renameBtn.addEventListener('click', () => this.renameSeries(folder, meta));
+
+            // ── Book list ──
+            const bookList = card.createDiv({ cls: 'sl-series-book-list' });
+
+            for (let i = 0; i < meta.bookOrder.length; i++) {
+                const bookName = meta.bookOrder[i];
+                const row = bookList.createDiv({ cls: 'sl-series-book-row' });
+
+                const orderBadge = row.createSpan({ cls: 'sl-series-book-order', text: `${i + 1}` });
+
+                row.createSpan({ cls: 'sl-series-book-name', text: bookName });
+
+                const bookActions = row.createDiv({ cls: 'sl-series-book-actions' });
+
+                // Rename book
+                const renameBookBtn = bookActions.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Rename book' } });
+                setIcon(renameBookBtn, 'pencil');
+                renameBookBtn.addEventListener('click', () => this.renameBook(folder, meta, bookName));
+
+                // Move up
+                if (i > 0) {
+                    const upBtn = bookActions.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Move up' } });
+                    setIcon(upBtn, 'chevron-up');
+                    upBtn.addEventListener('click', () => this.reorderBook(folder, meta, i, i - 1));
+                }
+
+                // Move down
+                if (i < meta.bookOrder.length - 1) {
+                    const downBtn = bookActions.createEl('button', { cls: 'clickable-icon', attr: { 'aria-label': 'Move down' } });
+                    setIcon(downBtn, 'chevron-down');
+                    downBtn.addEventListener('click', () => this.reorderBook(folder, meta, i, i + 1));
+                }
+
+                // Remove from series
+                const removeBtn = bookActions.createEl('button', { cls: 'clickable-icon sl-series-remove', attr: { 'aria-label': 'Remove from series' } });
+                setIcon(removeBtn, 'x');
+                removeBtn.addEventListener('click', () => this.removeBook(folder, meta, bookName));
+            }
+
+            // ── Add book button ──
+            const addRow = card.createDiv({ cls: 'sl-series-add-row' });
+            const addBtn = addRow.createEl('button', { text: 'Add book to this series', cls: 'sl-series-add-btn' });
+            setIcon(addBtn.createSpan({ prepend: true }), 'plus');
+            addBtn.addEventListener('click', () => this.addBookToSeries(folder, meta));
+        }
+    }
+
+    private async renameSeries(folder: string, meta: SeriesMetadata) {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Rename Series');
+        let newName = meta.name;
+
+        new Setting(modal.contentEl)
+            .setName('Series name')
+            .setDesc('The series folder will also be renamed. All links are updated automatically.')
+            .addText((text: any) => {
+                text.setValue(meta.name);
+                text.onChange((v: string) => (newName = v));
+                setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: any) => {
+                btn.setButtonText('Rename').setCta().onClick(async () => {
+                    if (!newName.trim() || newName.trim() === meta.name) {
+                        modal.close();
+                        return;
+                    }
+                    try {
+                        // Pre-flight: ensure auto-update links is on
+                        this.plugin.seriesManager.checkLinkSettings();
+
+                        const safeName = newName.trim().replace(/[\\/:*?"<>|]/g, '-');
+                        const parentPath = folder.substring(0, folder.lastIndexOf('/'));
+                        const newFolder = normalizePath(`${parentPath}/${safeName}`);
+
+                        // Rename folder on disk (updates all vault links)
+                        if (normalizePath(folder) !== newFolder) {
+                            const folderFile = this.app.vault.getAbstractFileByPath(folder);
+                            if (folderFile) {
+                                await this.app.fileManager.renameFile(folderFile, newFolder);
+                            }
+                        }
+
+                        // Update series.json with new name
+                        meta.name = newName.trim();
+                        await this.plugin.seriesManager.saveSeriesMetadata(newFolder, meta);
+
+                        // Update seriesId on all books inside the (now renamed) folder
+                        await this.plugin.sceneManager.scanProjects();
+                        const projects = this.plugin.sceneManager.getProjects();
+                        for (const p of projects) {
+                            if (normalizePath(p.filePath).startsWith(normalizePath(newFolder) + '/')) {
+                                p.seriesId = safeName;
+                                await this.plugin.sceneManager.saveProjectFrontmatter(p);
+                            }
+                        }
+
+                        new Notice(`Series renamed to "${newName.trim()}"`);
+                        modal.close();
+                        this.plugin.refreshOpenViews();
+                        this.render();
+                    } catch (e: any) {
+                        new Notice(e?.message ?? String(e), 10000);
+                    }
+                });
+            });
+
+        modal.open();
+    }
+
+    private async reorderBook(folder: string, meta: SeriesMetadata, fromIndex: number, toIndex: number) {
+        const [book] = meta.bookOrder.splice(fromIndex, 1);
+        meta.bookOrder.splice(toIndex, 0, book);
+        await this.plugin.seriesManager.saveSeriesMetadata(folder, meta);
+        this.render();
+    }
+
+    private async removeBook(folder: string, meta: SeriesMetadata, bookName: string) {
+        // Find the project for this book and activate it so removeProjectFromSeries works
+        const projects = this.plugin.sceneManager.getProjects();
+        const bookProject = projects.find(p => {
+            const fp = normalizePath(p.filePath);
+            return fp.startsWith(normalizePath(folder) + '/') && p.title === bookName;
+        });
+
+        if (!bookProject) {
+            new Notice(`Could not find project "${bookName}" — it may have been moved or deleted.`);
+            return;
+        }
+
+        // Confirm
+        const confirm = await new Promise<boolean>((resolve) => {
+            const m = new Modal(this.app);
+            m.titleEl.setText('Remove from Series');
+            m.contentEl.createEl('p', {
+                text: `Remove "${bookName}" from "${meta.name}"? The shared codex will be copied into the book's local folder.`,
+            });
+            new Setting(m.contentEl)
+                .addButton((btn: any) => btn.setButtonText('Remove').setWarning().onClick(() => { m.close(); resolve(true); }))
+                .addButton((btn: any) => btn.setButtonText('Cancel').onClick(() => { m.close(); resolve(false); }));
+            m.open();
+        });
+        if (!confirm) return;
+
+        const previousActive = this.plugin.sceneManager.activeProject;
+        await this.plugin.sceneManager.setActiveProject(bookProject);
+        try {
+            await this.plugin.seriesManager.removeProjectFromSeries();
+        } catch (e: any) {
+            new Notice(e?.message ?? String(e), 10000);
+        }
+        // Restore previous active project if it wasn't the removed one
+        if (previousActive && previousActive.filePath !== bookProject.filePath) {
+            const refreshed = this.plugin.sceneManager.getProjects().find(p => p.filePath === previousActive.filePath);
+            if (refreshed) await this.plugin.sceneManager.setActiveProject(refreshed);
+        }
+        this.plugin.refreshOpenViews();
+        this.render();
+    }
+
+    private async renameBook(folder: string, meta: SeriesMetadata, bookName: string) {
+        const projects = this.plugin.sceneManager.getProjects();
+        const bookProject = projects.find(p => {
+            const fp = normalizePath(p.filePath);
+            return fp.startsWith(normalizePath(folder) + '/') && p.title === bookName;
+        });
+
+        if (!bookProject) {
+            new Notice(`Could not find project "${bookName}".`);
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Rename Book');
+        let newTitle = bookProject.title;
+
+        new Setting(modal.contentEl)
+            .setName('New title')
+            .setDesc('The book folder and project file will be renamed. All links are updated automatically.')
+            .addText((text: any) => {
+                text.setValue(bookProject.title);
+                text.onChange((v: string) => (newTitle = v));
+                setTimeout(() => { text.inputEl.focus(); text.inputEl.select(); }, 50);
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: any) => {
+                btn.setButtonText('Rename').setCta().onClick(async () => {
+                    if (!newTitle.trim() || newTitle.trim() === bookProject.title) {
+                        modal.close();
+                        return;
+                    }
+                    try {
+                        this.plugin.seriesManager.checkLinkSettings();
+                        await this.plugin.sceneManager.renameProject(bookProject, newTitle.trim());
+                        new Notice(`Book renamed to "${newTitle.trim()}"`);
+                        modal.close();
+                        this.plugin.refreshOpenViews();
+                        this.render();
+                    } catch (e: any) {
+                        new Notice(e?.message ?? String(e), 10000);
+                    }
+                });
+            });
+
+        modal.open();
+    }
+
+    private async addBookToSeries(folder: string, meta: SeriesMetadata) {
+        // Show a dropdown of projects not already in any series
+        const projects = this.plugin.sceneManager.getProjects().filter(p => !p.seriesId);
+
+        if (projects.length === 0) {
+            new Notice('No standalone projects found to add. Create a new project first.');
+            return;
+        }
+
+        const modal = new Modal(this.app);
+        modal.titleEl.setText(`Add book to "${meta.name}"`);
+        let selectedPath = projects[0].filePath;
+
+        new Setting(modal.contentEl)
+            .setName('Project')
+            .setDesc('Select a standalone project to add to this series.')
+            .addDropdown((dropdown: any) => {
+                for (const p of projects) {
+                    dropdown.addOption(p.filePath, p.title);
+                }
+                dropdown.onChange((v: string) => (selectedPath = v));
+            });
+
+        new Setting(modal.contentEl)
+            .addButton((btn: any) => {
+                btn.setButtonText('Add to Series').setCta().onClick(async () => {
+                    const bookProject = projects.find(p => p.filePath === selectedPath);
+                    if (!bookProject) return;
+                    modal.close();
+
+                    const previousActive = this.plugin.sceneManager.activeProject;
+                    await this.plugin.sceneManager.setActiveProject(bookProject);
+                    try {
+                        await this.plugin.seriesManager.addProjectToSeries(folder);
+                    } catch (e: any) {
+                        new Notice(e?.message ?? String(e), 10000);
+                        return;
+                    }
+                    // Restore previous active project
+                    if (previousActive && previousActive.filePath !== bookProject.filePath) {
+                        await this.plugin.sceneManager.scanProjects();
+                        const refreshed = this.plugin.sceneManager.getProjects().find(p => p.filePath === previousActive.filePath);
+                        if (refreshed) await this.plugin.sceneManager.setActiveProject(refreshed);
+                    }
+                    this.plugin.refreshOpenViews();
+                    this.render();
+                });
+            });
+
+        modal.open();
     }
 }

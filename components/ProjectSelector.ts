@@ -5,6 +5,7 @@ import type { StoryLineProject } from '../models/StoryLineProject';
 /**
  * Renders a project selector dropdown into a toolbar container.
  * Shows the active project title and allows switching between projects.
+ * If the active project belongs to a series, shows a series indicator.
  */
 export function renderProjectSelector(
     container: HTMLElement,
@@ -15,6 +16,15 @@ export function renderProjectSelector(
 
     const projects = plugin.sceneManager.getProjects();
     const active = plugin.sceneManager.activeProject;
+
+    // Series indicator — show series name above/before the project selector
+    if (active?.seriesId) {
+        const seriesBadge = wrapper.createSpan({
+            cls: 'project-selector-series-badge',
+            text: active.seriesId,
+        });
+        obsidian.setIcon(seriesBadge.createSpan({ cls: 'project-selector-series-icon', prepend: true }), 'library');
+    }
 
     if (projects.length <= 1 && active) {
         // Only one project – just show the name, no dropdown

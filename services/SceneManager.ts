@@ -58,25 +58,59 @@ export class SceneManager implements ISceneStore {
         return `${root}/Scenes`;
     }
 
-    /** Computed character folder for the active project */
+    /** Computed character folder for the active project (series-aware) */
     getCharacterFolder(): string {
+        if (this._activeProject?.seriesId) {
+            return normalizePath(`${this.getSeriesCodexFolder()}/Characters`);
+        }
         if (this._activeProject) return this._activeProject.characterFolder;
         const root = this.plugin.settings.storyLineRoot;
         return `${root}/Characters`;
     }
 
-    /** Computed location folder for the active project */
+    /** Computed location folder for the active project (series-aware) */
     getLocationFolder(): string {
+        if (this._activeProject?.seriesId) {
+            return normalizePath(`${this.getSeriesCodexFolder()}/Locations`);
+        }
         if (this._activeProject) return this._activeProject.locationFolder;
         const root = this.plugin.settings.storyLineRoot;
         return `${root}/Locations`;
     }
 
-    /** Computed codex folder for the active project (generic codex categories) */
+    /** Computed codex folder for the active project (series-aware) */
     getCodexFolder(): string {
+        if (this._activeProject?.seriesId) {
+            return this.getSeriesCodexFolder();
+        }
         if (this._activeProject) return this._activeProject.codexFolder;
         const root = this.plugin.settings.storyLineRoot;
         return `${root}/Codex`;
+    }
+
+    /**
+     * Return the series-level Codex folder (parent of book folder + `/Codex`).
+     * Only meaningful when the active project has a seriesId.
+     */
+    getSeriesCodexFolder(): string {
+        if (this._activeProject) {
+            const base = deriveProjectFoldersFromFilePath(this._activeProject.filePath).baseFolder;
+            const parentDir = base.substring(0, base.lastIndexOf('/'));
+            return normalizePath(`${parentDir}/Codex`);
+        }
+        return `${this.plugin.settings.storyLineRoot}/Codex`;
+    }
+
+    /**
+     * Return the series folder (parent of the book folder).
+     * Only meaningful when the active project has a seriesId.
+     */
+    getSeriesFolder(): string | null {
+        if (this._activeProject?.seriesId) {
+            const base = deriveProjectFoldersFromFilePath(this._activeProject.filePath).baseFolder;
+            return base.substring(0, base.lastIndexOf('/'));
+        }
+        return null;
     }
 
     /**
@@ -285,6 +319,77 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
+     * Rename a project: renames the .md file, the project folder, updates
+     * frontmatter title, and series.json bookOrder if applicable.
+     * Uses fileManager.renameFile() so all vault links stay valid.
+     */
+    async renameProject(project: StoryLineProject, newTitle: string): Promise<StoryLineProject> {
+        const safeName = newTitle.replace(/[\\/:*?"<>|]/g, '-');
+        const folders = deriveProjectFoldersFromFilePath(project.filePath);
+        const oldBaseFolder = folders.baseFolder;
+        const parentDir = oldBaseFolder.substring(0, oldBaseFolder.lastIndexOf('/'));
+        const newBaseFolder = normalizePath(`${parentDir}/${safeName}`);
+        const newFilePath = normalizePath(`${newBaseFolder}/${safeName}.md`);
+
+        // Rename the project folder first (moves everything inside it)
+        if (normalizePath(oldBaseFolder) !== newBaseFolder) {
+            const folderFile = this.app.vault.getAbstractFileByPath(oldBaseFolder);
+            if (folderFile) {
+                await this.app.fileManager.renameFile(folderFile, newBaseFolder);
+            }
+        }
+
+        // Rename the project .md file inside the folder
+        const oldFileInNewFolder = normalizePath(`${newBaseFolder}/${oldBaseFolder.split('/').pop()}.md`);
+        if (normalizePath(oldFileInNewFolder) !== newFilePath) {
+            const mdFile = this.app.vault.getAbstractFileByPath(oldFileInNewFolder);
+            if (mdFile) {
+                await this.app.fileManager.renameFile(mdFile, newFilePath);
+            }
+        }
+
+        // Remove old project entry and add new one
+        this.projects.delete(project.filePath);
+        project.filePath = newFilePath;
+        project.title = newTitle;
+        // Re-derive folder paths
+        const newFolders = deriveProjectFoldersFromFilePath(newFilePath);
+        project.sceneFolder = newFolders.sceneFolder;
+        project.characterFolder = newFolders.characterFolder;
+        project.locationFolder = newFolders.locationFolder;
+        project.codexFolder = newFolders.codexFolder;
+        this.projects.set(newFilePath, project);
+
+        // Update frontmatter
+        await this.saveProjectFrontmatter(project);
+
+        // If this was the active project, update settings
+        if (this._activeProject?.filePath === newFilePath || this.plugin.settings.activeProjectFile === project.filePath) {
+            this._activeProject = project;
+            this.plugin.settings.activeProjectFile = newFilePath;
+            await this.plugin.saveSettings();
+        }
+
+        // If in a series, update bookOrder in series.json
+        if (project.seriesId) {
+            const seriesFolder = this.getSeriesFolder();
+            if (seriesFolder) {
+                const meta = await this.plugin.seriesManager.loadSeriesMetadata(seriesFolder);
+                if (meta) {
+                    const oldName = oldBaseFolder.split('/').pop() ?? '';
+                    const idx = meta.bookOrder.indexOf(oldName);
+                    if (idx !== -1) {
+                        meta.bookOrder[idx] = safeName;
+                        await this.plugin.seriesManager.saveSeriesMetadata(seriesFolder, meta);
+                    }
+                }
+            }
+        }
+
+        return project;
+    }
+
+    /**
      * Duplicate an existing project (fork a variant).
      */
     async forkProject(source: StoryLineProject, newTitle: string): Promise<StoryLineProject> {
@@ -348,6 +453,7 @@ export class SceneManager implements ISceneStore {
                 chapterDescriptions: (fm.chapterDescriptions && typeof fm.chapterDescriptions === 'object') ? Object.fromEntries(Object.entries(fm.chapterDescriptions).map(([k, v]) => [Number(k), String(v)])) : {},
                 filterPresets: Array.isArray(fm.filterPresets) ? fm.filterPresets : [],
                 corkboardPositions: {},
+                seriesId: fm.seriesId || undefined,
             };
         } catch {
             return null;
@@ -1049,6 +1155,13 @@ export class SceneManager implements ISceneStore {
 
         // corkboardPositions no longer stored in frontmatter — lives in System/board.json
         delete existingFm.corkboardPositions;
+
+        // Series ID
+        if (project.seriesId) {
+            existingFm.seriesId = project.seriesId;
+        } else {
+            delete existingFm.seriesId;
+        }
 
         const newContent = `---\n${stringifyYaml(existingFm)}---${body}`;
         await this.app.vault.modify(file, newContent);

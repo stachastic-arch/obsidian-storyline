@@ -49,6 +49,25 @@ export interface StoryLineProject {
     filterPresets: FilterPreset[];
     /** Corkboard free-position layout (scene file path -> coordinates + layer order) */
     corkboardPositions: Record<string, { x: number; y: number; z?: number }>;
+
+    // ── Series ──────────────────────────────────────
+    /** Optional series ID — links this project to a series (matches series.json name) */
+    seriesId?: string;
+}
+
+// ── Series metadata ────────────────────────────────
+
+/**
+ * Represents a series — a group of book projects sharing a common codex.
+ * Persisted as `series.json` in the series parent folder.
+ */
+export interface SeriesMetadata {
+    /** Display name of the series */
+    name: string;
+    /** Ordered list of book folder names within the series folder */
+    bookOrder: string[];
+    /** ISO date string when the series was created */
+    created: string;
 }
 
 /**

@@ -2,6 +2,43 @@
 
 ---
 
+## Version 1.7.0
+
+### New Features
+
+- **Series Mode** — Group multiple book projects into a shared series. Books in a series share a single Codex (characters, locations, and custom categories) so every entry is available across all books without duplication.
+
+  - **Create Series** — Command palette → **Create Series from Current Project**. Wraps the active book in a new series folder, moves its Codex to the series level, and writes a `series.json` manifest.
+  - **Add to Series** — Command palette → **Add Current Project to Series**. Discovers existing series in your vault and lets you pick one. The book folder moves into the series folder and its Codex entries are migrated into the shared Codex.
+  - **Remove from Series** — Command palette → **Remove Current Project from Series**. Copies the shared Codex back into the book's local folder and moves the book out of the series folder.
+  - **Series badge** — When the active project belongs to a series, the project selector toolbar shows a small badge with the series name and a library icon.
+  - **Transparent to all views** — Characters, Locations, and Codex views automatically resolve to the series-level Codex folder when the active project belongs to a series. No changes needed in your workflow.
+  - **Pre-flight check** — Before migration, StoryLine verifies that Obsidian's "Automatically update internal links" setting is enabled, so all `[[wikilinks]]` stay valid when files move.
+  - **Safe file moves** — All file operations use Obsidian's `fileManager.renameFile()` to ensure links are updated vault-wide. Duplicate filenames in the destination are skipped with a notice.
+  - **Settings → Project Management** — New section in the plugin settings tab with buttons for **Rename book**, **Create series from this book**, and **Manage series** — no need to use the command palette.
+  - **Series Management Modal** — Accessible from Settings or the Open Project modal. View, rename, and reorder books within a series, add standalone books, or remove them.
+
+  Series folder structure:
+  ```
+  StoryLine/
+    My Series/
+      series.json              ← Series manifest (name, book order)
+      Codex/                   ← Shared across all books
+        Characters/
+        Locations/
+        [Custom]/
+      Book One.md
+      Book One/
+        Scenes/
+        System/
+      Book Two.md
+      Book Two/
+        Scenes/
+        System/
+  ```
+
+---
+
 ## Version 1.6.0
 
 ### New Features

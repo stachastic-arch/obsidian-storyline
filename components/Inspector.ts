@@ -79,6 +79,13 @@ export class InspectorComponent {
     }
 
     /**
+     * Return the scene currently shown in the inspector (if any).
+     */
+    getCurrentScene(): Scene | null {
+        return this.currentScene;
+    }
+
+    /**
      * Hide inspector
      */
     hide(): void {

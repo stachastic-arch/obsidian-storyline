@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.6.0** · By Jan Sandström
+**Version 1.7.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -54,6 +54,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Settings](#settings)
 - [Project Management](#project-management)
+- [Series Mode](#series-mode)
 - [File Structure](#file-structure)
 - [Tips & Workflow](#tips--workflow)
 
@@ -1139,6 +1140,73 @@ Create a copy of an existing project (useful for alternate drafts or backups):
 
 ---
 
+## Series Mode
+
+Series Mode lets you group multiple book projects into a **series** with a shared Codex. Characters, locations, and any custom categories are stored once at the series level and automatically available in every book.
+
+### Creating a Series
+1. Open the project you want to use as the first book.
+2. **From Settings:** Go to **Settings → Project Management** and click **Create Series…**.
+   *Or from the command palette:* **Create Series from Current Project**.
+3. Enter a series name.
+4. StoryLine creates a series folder, moves your book into it, migrates the Codex to the series level, and writes a `series.json` manifest.
+
+### Adding a Book to an Existing Series
+1. Open the project you want to add.
+2. Command palette → **Add Current Project to Series**.
+3. Pick a series from the dropdown (StoryLine scans for folders containing `series.json`).
+4. The book folder moves into the series folder and its Codex entries are merged into the shared Codex. Duplicate filenames are skipped.
+
+You can also add books from the **Series Management Modal** — open it from **Settings → Project Management → Manage Series…** or the "Manage Series…" button in the Open Project modal. Each series card has an "Add book" dropdown at the bottom.
+
+### Removing a Book from a Series
+1. Open a project that belongs to a series.
+2. Command palette → **Remove Current Project from Series**.
+3. The shared Codex is copied into a local Codex inside the book folder, and the book moves out of the series folder.
+
+### Renaming a Book
+Go to **Settings → Project Management** and click **Rename…**. This renames the project file, its folder, updates the frontmatter title, and updates the series manifest if the book belongs to a series.
+
+### Managing Series
+Open the **Series Management Modal** from **Settings → Project Management → Manage Series…** or the "Manage Series…" button in the Open Project modal. From here you can:
+- Rename a series (also renames the folder on disk).
+- Reorder books within a series using the arrow buttons.
+- Rename individual books.
+- Add standalone books to the series.
+- Remove books from the series.
+
+### How It Works
+- When a project has a `seriesId` in its frontmatter, all Codex paths (Characters, Locations, custom categories) resolve to the **series-level** Codex folder instead of the book-local one.
+- All existing views — Characters, Locations, Codex Hub, Relationship Map, Story Graph, Link Scanner — work transparently with the shared Codex.
+- The project selector toolbar shows a **series badge** (library icon + series name) when the active project belongs to a series.
+- **Settings → Project Management** provides buttons for Rename book, Create series, and Manage series — everything is accessible without the command palette.
+
+### Pre-flight Checks
+Before any migration, StoryLine verifies that Obsidian's **"Automatically update internal links"** setting is enabled. This ensures all `[[wikilinks]]` remain valid when files move between folders. If the setting is off, the migration is blocked with a notice.
+
+### Series Folder Layout
+```
+StoryLine/
+  My Series/
+    series.json              ← Series manifest (name, book order)
+    Codex/                   ← Shared across all books
+      Characters/
+      Locations/
+      [Custom]/
+    Book One.md
+    Book One/
+      Scenes/
+      System/
+    Book Two.md
+    Book Two/
+      Scenes/
+      System/
+```
+
+> **Rule:** A solo book has a local Codex. A series book uses the series Codex. A book never has both.
+
+---
+
 ## File Structure
 
 StoryLine organizes your vault like this:
@@ -1207,4 +1275,4 @@ MIT
 
 ---
 
-*StoryLine v1.5.5 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.7.0 — Transform your vault into a powerful book planning tool.*
