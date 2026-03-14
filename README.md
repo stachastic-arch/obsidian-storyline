@@ -20,7 +20,7 @@ StoryLine transforms your Obsidian vault into a complete book planning and writi
 
 A freeform spatial canvas inside the Board view. Use sticky notes to brainstorm and capture your first ideas — then convert them into full scenes when they're ready. Notes support markdown and can be styled with different colors. **Image sticky notes** let you pin reference art, maps, and charts directly on the board — drag images from the vault or desktop, add captions with `[[wikilinks]]`, and click to open a fullscreen lightbox. Pin scene cards and notes anywhere on the board and drag to rearrange. Toggle between the standard Kanban columns and corkboard mode with a single click. Positions are saved per project.
 
-![Corkboard View](screenshots/corkboard.jpg)
+![Corkboard View](screenshots/01.Corkboard.jpg)
 
 ---
 
@@ -75,6 +75,8 @@ Act and chapter dividers appear automatically between sections. Each scene block
 **Lock Links** — toggle on to make internal links and tags non-editable. The cursor skips over link text, preventing accidental changes while you write around them.
 
 Both toggles default to ON and appear in the filter bar.
+
+![Manuscript View](screenshots/Manuscript.jpg)
 
 ---
 
@@ -131,6 +133,10 @@ Statistics dashboard with eight collapsible sections: project overview with goal
 ![Stats — Plot Hole Detection](screenshots/14.Stats.jpg)
 
 ![Stats — Writing Sprint](screenshots/15.Stats.jpg)
+
+![Stats — Additional](screenshots/15b.Stats.jpg)
+
+![Stats — Additional](screenshots/15c.Stats.jpg)
 
 ---
 
