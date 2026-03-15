@@ -1061,7 +1061,7 @@ export class StorylineView extends ItemView {
         const file = this.app.vault.getAbstractFileByPath(scene.filePath);
         if (file instanceof TFile) {
             const leaf = this.app.workspace.getLeaf('tab');
-            await leaf.openFile(file, { state: { mode: 'preview' } });
+            await leaf.openFile(file, { state: { mode: 'source', source: false } });
         } else {
             new Notice(`Could not find file: ${scene.filePath}`);
         }

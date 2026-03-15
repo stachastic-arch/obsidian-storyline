@@ -621,6 +621,9 @@ export interface SceneCardsSettings {
 
     /** Hidden built-in field keys per view/category (e.g. { character: ['fears','belief'], items: ['previousOwners'] }) */
     hiddenFields: Record<string, string[]>;
+
+    /** Show the built-in formatting toolbar in scene editors when Editing Toolbar plugin is not installed */
+    showFormattingToolbar: boolean;
 }
 
 /**
@@ -697,6 +700,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     extraFolders: [],
 
     hiddenFields: {},
+
+    showFormattingToolbar: true,
 };
 
 /**
@@ -876,6 +881,16 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.compactCardView)
                 .onChange(async (value) => {
                     this.plugin.settings.compactCardView = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Formatting toolbar')
+            .setDesc('Show a formatting toolbar in scene editors when the Editing Toolbar plugin is not installed')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showFormattingToolbar)
+                .onChange(async (value) => {
+                    this.plugin.settings.showFormattingToolbar = value;
                     await this.plugin.saveSettings();
                 }));
 

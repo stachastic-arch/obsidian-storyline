@@ -8,3 +8,5 @@ declare module '@codemirror/language' {
     export interface SyntaxNode { name: string; from: number; to: number; }
     export function syntaxTree(state: EditorState): { iterate(spec: { enter(node: SyntaxNode): void | false }): void };
 }
+
+declare module '@codemirror/commands';

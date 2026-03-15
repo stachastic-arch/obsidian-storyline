@@ -370,7 +370,7 @@ export class NavigatorView extends ItemView {
             }
             const file = this.app.vault.getAbstractFileByPath(scene.filePath);
             if (file instanceof TFile) {
-                await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });
+                await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
             }
         });
 
@@ -398,7 +398,7 @@ export class NavigatorView extends ItemView {
                 item.onClick(async () => {
                     const file = this.app.vault.getAbstractFileByPath(scene.filePath);
                     if (file instanceof TFile) {
-                        await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });
+                        await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
                     }
                 });
             });

@@ -1,4 +1,4 @@
-import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile } from 'obsidian';
+import { ItemView, WorkspaceLeaf, WorkspaceSplit, MarkdownRenderer, TFile, setIcon } from 'obsidian';
 import { EditorView, Decoration } from '@codemirror/view';
 import { RangeSetBuilder, StateEffect, Compartment } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
@@ -9,6 +9,7 @@ import { FiltersComponent } from '../components/Filters';
 import type SceneCardsPlugin from '../main';
 import { MANUSCRIPT_VIEW_TYPE } from '../constants';
 import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/MobileAdapter';
+import { buildFormattingToolbar } from '../components/FormattingToolbar';
 
 /**
  * Manuscript View — Scrivenings-style continuous document view.
@@ -43,6 +44,10 @@ export class ManuscriptView extends ItemView {
     private atomicCompartment = new Compartment();
     /** File path of the scene currently most visible in the scroll area */
     focusedScenePath: string | null = null;
+    /** Formatting toolbar element */
+    private fmtToolbar: HTMLElement | null = null;
+    /** The currently focused embedded leaf (for toolbar commands) */
+    private activeLeaf: WorkspaceLeaf | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -158,16 +163,35 @@ export class ManuscriptView extends ItemView {
             });
         }
 
+        // Formatting toolbar (hidden until an editor is focused)
+        this.fmtToolbar = container.createDiv('sl-fmt-toolbar');
+        this.fmtToolbar.style.display = 'none';
+        this.buildFormattingToolbar(this.fmtToolbar);
+
         // Manuscript scroll area
         this.scrollArea = container.createDiv('sl-manuscript-scroll');
         if (this._plainText) this.scrollArea.addClass('sl-manuscript-plain');
 
-        // Track focus in embedded editors so refresh() doesn't destroy them mid-edit
-        this.scrollArea.addEventListener('focusin', () => { this._hasActiveFocus = true; });
+        // Track focus in embedded editors — show/hide formatting toolbar
+        this.scrollArea.addEventListener('focusin', (e) => {
+            this._hasActiveFocus = true;
+            // Find which embedded leaf owns the focused element
+            const target = e.target as HTMLElement;
+            for (const [path, leaf] of this.embeddedLeaves) {
+                const splitEl = (leaf as any).containerEl?.parentElement;
+                if (splitEl?.contains(target)) {
+                    this.activeLeaf = leaf;
+                    break;
+                }
+            }
+            if (this.fmtToolbar) this.fmtToolbar.style.display = '';
+        });
         this.scrollArea.addEventListener('focusout', () => {
             setTimeout(() => {
                 if (!this.scrollArea?.contains(document.activeElement)) {
                     this._hasActiveFocus = false;
+                    this.activeLeaf = null;
+                    if (this.fmtToolbar) this.fmtToolbar.style.display = 'none';
                 }
             }, 100);
         });
@@ -509,6 +533,17 @@ export class ManuscriptView extends ItemView {
                 effects: this.atomicCompartment.reconfigure(ext),
             });
         }
+    }
+
+    /** Get the CM6 EditorView from the currently focused embedded editor */
+    private getActiveCm(): EditorView | null {
+        if (!this.activeLeaf) return null;
+        return this.getCmView(this.activeLeaf);
+    }
+
+    /** Build the formatting toolbar buttons */
+    private buildFormattingToolbar(el: HTMLElement): void {
+        buildFormattingToolbar(el, () => this.getActiveCm());
     }
 
     /** Recalculate the footer word count from SceneManager data */

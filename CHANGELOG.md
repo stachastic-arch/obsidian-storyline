@@ -1,6 +1,15 @@
 # StoryLine — Changelog
 
 ---
+## Version 1.7.2
+
+### New Features
+
+
+- **Formatting Toolbar (Manuscript View)** — A built-in formatting toolbar appears above the manuscript when you click into any scene editor. Provides one-click access to common formatting commands without needing the third-party Editing Toolbar plugin (which cannot hook into embedded editors). The toolbar auto-hides when you click away from the editor.
+
+- **Formatting Toolbar in Scene Editors** — When the Editing Toolbar plugin is not installed, StoryLine now automatically opens a formatting toolbar into standard scene editor tabs (any markdown file inside the active project). This gives you formatting buttons everywhere without needing a third-party plugin. A new **Settings → Display Options → Formatting toolbar** toggle lets you turn this off if you prefer.
+
 
 ## Version 1.7.1
 
@@ -21,6 +30,8 @@
 - **Universal Fields scoped per category** — Custom universal fields (created with the + button in section headers) are now scoped to their entity type: character fields only appear on characters, location fields on locations, and codex fields on their specific codex category. Previously all universal fields were shared across all entity types.
 
 ### Bug Fixes
+
+- **Files open in Live Preview** — All scene and entity files now open in Live Preview mode (`source: false`) instead of Reading View, so the cursor is immediately editable and third-party editor plugins work correctly.
 
 - **Board: Quick-add inherits column context** — Creating a new scene from a Kanban column now pre-fills the field for that column's grouping. For example, adding a scene to the "Act 2" column pre-fills Act = 2; adding to the "Sarah" POV column pre-fills POV = Sarah.
 

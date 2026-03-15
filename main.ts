@@ -41,6 +41,7 @@ import { LinkScanner } from './services/LinkScanner';
 import { CascadeRenameService } from './services/CascadeRenameService';
 import { FieldTemplateService } from './services/FieldTemplateService';
 import { SeriesManager } from './services/SeriesManager';
+import { buildFormattingToolbar } from './components/FormattingToolbar';
 
 /**
  * StoryLine Plugin for Obsidian
@@ -405,6 +406,13 @@ export default class SceneCardsPlugin extends Plugin {
                 }
             })
         );
+
+        // Inject formatting toolbar into scene editors when Editing Toolbar is absent
+        this.registerEvent(
+            this.app.workspace.on('active-leaf-change', (leaf) => {
+                this.injectFormattingToolbar(leaf);
+            })
+        );
     }
 
     onunload(): void {
@@ -422,6 +430,46 @@ export default class SceneCardsPlugin extends Plugin {
 
         // Clean up any floating lightbox windows left on document.body
         document.querySelectorAll('.gallery-lightbox-window').forEach(el => el.remove());
+    }
+
+    /**
+     * Inject the StoryLine formatting toolbar into a standard MarkdownView
+     * editor tab when: (1) the setting is enabled, (2) Editing Toolbar
+     * plugin is not installed, and (3) the file belongs to the active project.
+     */
+    private injectFormattingToolbar(leaf: WorkspaceLeaf | null): void {
+        // Remove any previously injected toolbar in other leaves
+        document.querySelectorAll('.sl-injected-fmt-toolbar').forEach(el => el.remove());
+
+        if (!leaf) return;
+        if (!this.settings.showFormattingToolbar) return;
+
+        // Skip if Editing Toolbar plugin is installed
+        if ((this.app as any).plugins?.getPlugin?.('editing-toolbar')) return;
+
+        // Only inject into markdown views in source/live-preview mode
+        const view = leaf.view as any;
+        if (view?.getViewType?.() !== 'markdown') return;
+
+        // Only inject for files that belong to the active project
+        const file = view.file as TFile | null;
+        if (!file) return;
+        const sf = this.sceneManager?.activeProject?.sceneFolder;
+        const projectRoot = sf ? sf.replace(/\/Scenes$/, '') : undefined;
+        if (!projectRoot || !file.path.startsWith(projectRoot)) return;
+
+        // Get the CM6 EditorView
+        const cm: import('@codemirror/view').EditorView | null = view.editor?.cm ?? null;
+        if (!cm) return;
+
+        // Find the view-content container to insert the toolbar
+        const viewContent = (leaf as any).containerEl?.querySelector('.view-content');
+        if (!viewContent) return;
+
+        // Create and inject the toolbar at the top of view-content
+        const toolbar = createDiv({ cls: 'sl-fmt-toolbar sl-injected-fmt-toolbar' });
+        buildFormattingToolbar(toolbar, () => cm);
+        viewContent.insertBefore(toolbar, viewContent.firstChild);
     }
 
     private enableNativeTooltipSuppression(): void {
@@ -968,7 +1016,7 @@ export default class SceneCardsPlugin extends Plugin {
                 this.refreshOpenViews();
 
                 if (openAfter) {
-                    await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });
+                    await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
                 }
             }
         );

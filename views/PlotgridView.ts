@@ -819,7 +819,7 @@ export class PlotgridView extends ItemView {
                 ev.stopPropagation();
                 if (row.sourceType === 'auto' && row.sourceId && !(ev.ctrlKey || ev.metaKey)) {
                     const file = this.app.vault.getAbstractFileByPath(row.sourceId) as TFile | null;
-                    if (file) this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });
+                    if (file) this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
                     return;
                 }
                 this.selectRowHeader(ri);
@@ -1034,7 +1034,7 @@ export class PlotgridView extends ItemView {
                         badge.addEventListener('click', (ev) => {
                             ev.stopPropagation();
                             const f = this.app.vault.getAbstractFileByPath(cell.linkedSceneId as string) as TFile | null;
-                            if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'preview' } });
+                            if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'source', source: false } });
                             else new Notice('Linked file not found');
                         });
                         const sub = cellEl.createDiv('plot-grid-linked-subtitle');
@@ -1853,7 +1853,7 @@ export class PlotgridView extends ItemView {
         const file = this.app.vault.getAbstractFileByPath(scene.filePath);
         if (file instanceof TFile) {
             const leaf = this.app.workspace.getLeaf('tab');
-            await leaf.openFile(file, { state: { mode: 'preview' } });
+            await leaf.openFile(file, { state: { mode: 'source', source: false } });
         } else {
             new Notice(`Could not find file: ${scene.filePath}`);
         }
@@ -1870,7 +1870,7 @@ export class PlotgridView extends ItemView {
                 const match = charMgr.getAllCharacters().find(c => c.name.toLowerCase() === name);
                 if (match) {
                     const file = this.app.vault.getAbstractFileByPath(match.filePath) as TFile | null;
-                    if (file) { this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } }); return; }
+                    if (file) { this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } }); return; }
                 }
             }
         }
@@ -1882,7 +1882,7 @@ export class PlotgridView extends ItemView {
                 const match = allLocs.find(l => l.name.toLowerCase() === name);
                 if (match) {
                     const file = this.app.vault.getAbstractFileByPath(match.filePath) as TFile | null;
-                    if (file) { this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } }); return; }
+                    if (file) { this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } }); return; }
                 }
             }
         }
@@ -1914,7 +1914,7 @@ export class PlotgridView extends ItemView {
                 this.scheduleSave();
                 this.renderGrid();
                 if (openAfter) {
-                    await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });
+                    await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
                 }
             }
         );
@@ -2700,7 +2700,7 @@ export class PlotgridView extends ItemView {
             sceneLink.style.color = 'var(--text-accent)';
             sceneLink.addEventListener('click', () => {
                 const f = this.app.vault.getAbstractFileByPath(linkedScene.filePath) as TFile | null;
-                if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'preview' } });
+                if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'source', source: false } });
             });
         }
     }
@@ -2751,7 +2751,7 @@ export class PlotgridView extends ItemView {
                     const char = charMgr?.getAllCharacters().find(c => c.name.toLowerCase() === key);
                     if (char) {
                         const f = this.app.vault.getAbstractFileByPath(char.filePath) as TFile | null;
-                        if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'preview' } });
+                        if (f) this.app.workspace.getLeaf('tab').openFile(f, { state: { mode: 'source', source: false } });
                     }
                 });
             }

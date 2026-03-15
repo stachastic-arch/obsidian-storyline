@@ -8887,6 +8887,101 @@ body.theme-dark .location-field-input.dropdown {
     pointer-events: none !important;
 }
 
+/* ── Formatting Toolbar ────────────────────────────────── */
+
+.sl-fmt-toolbar {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0;
+    padding: 6px 12px;
+    margin: 4px auto;
+    width: fit-content;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-m);
+    flex-wrap: wrap;
+    flex: 0 0 auto;
+    user-select: none;
+}
+
+.sl-fmt-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 30px;
+    color: var(--text-normal);
+    cursor: pointer;
+    border-radius: var(--radius-s);
+}
+.sl-fmt-btn:hover {
+    background: var(--background-modifier-hover);
+}
+.sl-fmt-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Text-label buttons (H2, H3, Hn) */
+.sl-fmt-btn.sl-fmt-text {
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--font-interface);
+    line-height: 1;
+}
+
+/* Small triangle indicator for sub-menu triggers */
+.sl-fmt-btn.sl-fmt-has-sub::after {
+    content: '';
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-left: 3px solid transparent;
+    border-right: 3px solid transparent;
+    border-top: 3.5px solid var(--text-muted);
+    margin-left: 1px;
+    margin-top: 2px;
+}
+
+.sl-fmt-sep {
+    width: 1px;
+    height: 20px;
+    background: var(--background-modifier-border);
+    margin: 0 8px;
+    flex-shrink: 0;
+}
+
+/* Sub-menu wrapper (hover-reveal like Editing Toolbar) */
+.sl-fmt-submenu {
+    display: inline-flex;
+    position: relative;
+}
+
+.sl-fmt-subpanel {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding: 4px 6px;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border-hover);
+    border-radius: var(--radius-m);
+    z-index: 100;
+    visibility: hidden;
+    opacity: 0;
+    transition: visibility 0.15s, opacity 0.15s;
+}
+
+.sl-fmt-submenu:hover > .sl-fmt-subpanel {
+    visibility: visible;
+    opacity: 1;
+    transition: visibility 0.2s, opacity 0.2s;
+}
+
 /* ── Manuscript mobile adjustments ─────────────────────── */
 
 /* Phone: tighter padding */
