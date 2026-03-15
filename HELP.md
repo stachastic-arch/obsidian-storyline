@@ -46,6 +46,8 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Relationship Map](#relationship-map)
 - [Story Graph](#story-graph)
 - [Link Scanner & Detected Links](#link-scanner--detected-links)
+- [Cross-Entity References](#cross-entity-references)
+- [Hide / Show Built-in Fields](#hide--show-built-in-fields)
 - [Tag Type Overrides](#tag-type-overrides)
 - [Export](#export)
 - [Custom Field Templates](#custom-field-templates)
@@ -229,6 +231,8 @@ A dedicated character management system with rich profiles. Characters are acces
   - Intensity curve graph for scenes featuring this character.
   - Gap detection warnings.
   - Full list of scenes the character appears in, with status badges.
+  - **Referenced By** — other characters, locations, codex entries, and scenes that mention this character (see [Cross-Entity References](#cross-entity-references)).
+- **Hide/show fields** — hover over any field label to reveal an eye icon. Click to hide unused fields. See [Hide / Show Built-in Fields](#hide--show-built-in-fields).
 
 ### Locations View
 
@@ -259,6 +263,8 @@ A hierarchical worldbuilding and location management system. Locations are acces
   - List of scenes set at the location.
   - Characters who appear at the location (with frequency count).
   - For worlds: all locations in that world with one-click navigation.
+  - **Referenced By** — other entities and scenes that mention this location (see [Cross-Entity References](#cross-entity-references)).
+- **Hide/show fields** — hover over any field label to reveal an eye icon. Click to hide unused fields. See [Hide / Show Built-in Fields](#hide--show-built-in-fields).
 
 ### Codex Hub
 
@@ -900,21 +906,96 @@ StoryLine includes a **Link Scanner** that automatically extracts `[[wikilinks]]
 ### How It Works
 
 1. The scanner extracts all `[[wikilinks]]` from each scene's Markdown body (below the frontmatter).
-2. Each link is classified against your project's characters and locations:
+2. Each link is classified against your project's characters, locations, and codex entries:
    - If the link matches a character name or nickname → **character**
    - If the link matches a location name → **location**
+   - If the link matches a codex entry name → **codex** (with its category)
    - Otherwise → **other** (unclassified)
 
 ### Where Links Appear
 
-- **Inspector Panel** — a "Detected Links" section shows all wikilinks found in the selected scene, displayed as typed pills (character / location / other).
+- **Inspector Panel** — a "Detected Links" section shows all wikilinks found in the selected scene, displayed as typed pills (character / location / codex / other).
 - **Story Graph** — detected links drive the scene-to-entity edges in the graph visualization.
+- **Referenced By panel** — cross-entity references are shown on every character, location, and codex detail page (see [Cross-Entity References](#cross-entity-references)).
 
 ### Usage Tips
 
-- Write `[[Character Name]]` or `[[Location Name]]` naturally in your scene prose.
+- Write `[[Character Name]]`, `[[Location Name]]`, or `[[Codex Entry]]` naturally in your scene prose or in any entity text field.
 - The scanner runs automatically — no manual tagging required.
-- Links that don't match any known character or location appear as "other" — you can override their type via the context menu (see [Tag Type Overrides](#tag-type-overrides)).
+- Links that don't match any known entity appear as "other" — you can override their type via the context menu (see [Tag Type Overrides](#tag-type-overrides)).
+
+---
+
+## Cross-Entity References
+
+StoryLine now tracks **cross-entity references** across your entire project. When you mention a character in a location description, or reference a location in a codex entry, StoryLine detects the connection and displays it in a **"Referenced By"** panel on the entity's side panel.
+
+### How It Works
+
+1. Write `[[Character Name]]`, `[[Location Name]]`, or `[[Codex Entry]]` in any text field — scene prose, character backstory, location descriptions, codex entry fields, etc.
+2. Use `#tags` that match entity names (e.g., `#MagicSword` will reference a codex entry named "MagicSword").
+3. Plain-text name mentions (without brackets or #) are also detected automatically.
+4. StoryLine scans all entities and scenes and builds a reverse reference index.
+5. Open any character, location, or codex detail page — the side panel shows a **"Referenced By"** section listing every entity and scene that mentions it.
+
+### What Gets Scanned
+
+| Source | Fields scanned |
+|---|---|
+| **Characters** | Backstory, appearance, personality, motivations, strengths, flaws, fears, belief, misbelief, notes |
+| **Locations** | Description, atmosphere, significance, inhabitants, connected locations, map notes, notes |
+| **Worlds** | Description, geography, culture, politics, magic/technology, beliefs, economy, history, notes |
+| **Codex entries** | All text fields |
+| **Scenes** | Full body text (wikilinks and plain-text matches) |
+
+### Reference Display
+
+References are grouped by type:
+- **Character** — other characters that mention this entity
+- **Location** — locations or worlds that mention it
+- **Codex category name** (e.g., "Items", "Creatures") — codex entries that mention it
+- **Scene** — scenes that contain a wikilink or name match
+
+Each reference is a clickable link that opens the source file.
+
+### Tips
+
+- Use `[[wikilinks]]` or `#tags` for guaranteed detection — plain-text matching depends on exact name matches.
+- `#tags` are matched case-insensitively: `#magicsword` will match a codex entry named "MagicSword".
+- The scanner updates every time you open an entity detail page, so new connections appear immediately.
+- Self-references are excluded (a character's own fields won't list itself).
+
+---
+
+## Hide / Show Built-in Fields
+
+Every character, location, and codex detail editor comes with a set of built-in fields (e.g., Fears, Belief, Atmosphere, Significance). If you don't use all of them, you can **hide** the ones you don't need to keep your editor clean.
+
+### How to Hide a Field
+
+1. Open any character, location, or codex detail editor.
+2. **Hover** over a field label — a small **eye-off icon** (👁‍🗨) appears to the right of the label.
+3. **Click the icon** — the field disappears from the form.
+
+### How to Show Hidden Fields
+
+1. At the bottom of each category section, a link appears: **"Show N hidden fields"**.
+2. **Click the link** — the hidden fields expand in a dimmed container with a left border.
+3. You can view and edit data in hidden fields while they're expanded.
+4. The link text changes to **"Hide N hidden fields"** — click again to collapse.
+
+### How to Unhide a Field
+
+1. Expand the hidden fields using the "Show N hidden fields" link.
+2. **Hover** over the hidden field's label — an **eye icon** appears.
+3. **Click the eye icon** — the field is restored to its normal position permanently.
+
+### Details
+
+- The **Name** field can never be hidden.
+- Hidden fields are stored per entity type: `character`, `location`, or the codex category ID (e.g., `items`, `creatures`). Hiding "Fears" in Characters does not affect any other view.
+- **Data is never deleted.** Hiding a field only removes it from the UI. The value stays in your frontmatter unchanged and reappears when you unhide the field.
+- Hidden field preferences are saved in plugin settings and persist across sessions.
 
 ---
 

@@ -8265,6 +8265,14 @@ body.theme-dark {
     cursor: pointer;
 }
 
+/* Dark mode: ensure native <select> dropdowns use dark color scheme */
+body.theme-dark .codex-field-input.dropdown,
+body.theme-dark .location-field-input.dropdown {
+    color-scheme: dark;
+    background: var(--background-primary);
+    color: var(--text-normal);
+}
+
 /* Custom fields row */
 .codex-custom-field-row {
     display: flex;
@@ -8894,4 +8902,102 @@ body.theme-dark {
 /* Read-only preview fallback (phone) — normal markdown rendering */
 .sl-manuscript-preview {
     line-height: 1.6;
+}
+
+/* ── Referenced By panel ───────────────────────────── */
+.character-references-panel,
+.location-references-panel,
+.codex-references-panel {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--background-secondary);
+}
+
+.character-references-panel h3,
+.location-references-panel h3,
+.codex-references-panel h3 {
+    margin: 0 0 8px;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: var(--text-normal);
+}
+
+.reference-group h4 {
+    margin: 8px 0 4px;
+    font-size: 0.85em;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: capitalize;
+}
+
+.reference-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.reference-list li {
+    padding: 3px 0;
+}
+
+.reference-link {
+    color: var(--text-accent);
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.reference-link:hover {
+    text-decoration: underline;
+}
+
+/* ── Hide/show built-in fields ─────────────────────── */
+.field-hide-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 6px;
+    opacity: 0;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: opacity 0.15s;
+    vertical-align: middle;
+}
+
+.field-hide-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.character-field-row:hover .field-hide-btn,
+.codex-field-row:hover .field-hide-btn,
+.location-field-row:hover .field-hide-btn {
+    opacity: 0.6;
+}
+
+.field-hide-btn:hover {
+    opacity: 1 !important;
+    color: var(--text-accent);
+}
+
+.hidden-fields-toggle {
+    padding: 4px 0;
+    margin-top: 4px;
+}
+
+.hidden-fields-toggle-link {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    cursor: pointer;
+}
+
+.hidden-fields-toggle-link:hover {
+    color: var(--text-accent);
+    text-decoration: underline;
+}
+
+.hidden-fields-container {
+    border-left: 2px solid var(--background-modifier-border);
+    padding-left: 8px;
+    margin-top: 4px;
+    opacity: 0.7;
 }

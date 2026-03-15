@@ -215,6 +215,7 @@ export class AddFieldModal extends Modal {
                 id: this.existing?.id ?? generateId(),
                 label: this.label,
                 section: this.section || CHARACTER_CATEGORIES[0].title,
+                category: this.existing?.category,
                 type: this.type,
                 options: this.type === 'dropdown' ? cleanOptions : [],
                 placeholder: this.placeholder,

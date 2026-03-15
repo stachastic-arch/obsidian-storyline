@@ -89,6 +89,7 @@ export class LocationManager {
                 economy: fm.economy,
                 history: fm.history,
                 custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
+                universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
                 created: fm.created,
                 modified: fm.modified,
                 notes: body || undefined,
@@ -111,6 +112,7 @@ export class LocationManager {
                 connectedLocations: fm.connectedLocations,
                 mapNotes: fm.mapNotes,
                 custom: fm.custom && typeof fm.custom === 'object' ? fm.custom : undefined,
+                universalFields: fm.universalFields && typeof fm.universalFields === 'object' ? fm.universalFields : undefined,
                 created: fm.created,
                 modified: fm.modified,
                 notes: body || undefined,
@@ -265,6 +267,12 @@ export class LocationManager {
             fm.custom = item.custom;
         } else {
             delete fm.custom;
+        }
+
+        if (item.universalFields && Object.keys(item.universalFields).length > 0) {
+            fm.universalFields = item.universalFields;
+        } else {
+            delete fm.universalFields;
         }
 
         const finalBody = item.notes ?? body;

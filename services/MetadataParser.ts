@@ -107,6 +107,8 @@ export class MetadataParser {
             if (key === 'plotgridOrigin' && !value) { delete frontmatter[key]; continue; }
             if (value !== undefined) {
                 frontmatter[key] = value;
+            } else {
+                delete frontmatter[key];
             }
         }
 

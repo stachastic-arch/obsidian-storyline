@@ -159,7 +159,9 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Beat Sheet Templates** — Save the Cat, Three-Act, Hero's Journey — scaffold your acts with named beats.
 - **Relationship Map** — Interactive force-directed graph with six color-coded relationship types.
 - **Story Graph** — Visualize how scenes connect to characters, locations, and props via `#tags` and `[[wikilinks]]`.
-- **Link Scanner** — Auto-detects `[[wikilinks]]` in scene text and classifies them as characters, locations, or other.
+- **Link Scanner** — Auto-detects `[[wikilinks]]`, `#tags`, and plain-text name mentions in scene text and entity fields, classifies them as characters, locations, codex entries, or other.
+- **Cross-Entity References** — "Referenced By" panel on every character, location, and codex detail page shows which other entities and scenes mention it. Uses `[[wikilinks]]`, `#tags`, and plain-text name detection.
+- **Hide / Show Fields** — Hide built-in fields you don't use (per entity type) to declutter editors. Hover any field label → click the eye icon. Data is never deleted.
 - **Tag Type Overrides** — Right-click any tag to reclassify it (prop, location, character, other).
 - **Filtering & Presets** — Filter by status, character, location, tag, or free text. Save presets for quick reuse.
 - **Setup / Payoff Tracking** — Link foreshadowing and resolution scenes. Warns about unresolved setups.

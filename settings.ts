@@ -531,6 +531,10 @@ export interface SceneCardsSettings {
     // Display
     defaultView: ViewType;
     defaultBoardMode: 'corkboard' | 'kanban';
+    /** Remembered board sub-mode from last session */
+    lastBoardMode: 'corkboard' | 'kanban';
+    /** Remembered kanban groupBy from last session */
+    lastBoardGroupBy: string;
     autoOpenNavigator: boolean;
     showNotesInKanban: boolean;
     showScenesInCorkboard: boolean;
@@ -614,6 +618,9 @@ export interface SceneCardsSettings {
     sharedCodex: string;
     /** Extra vault-relative folder paths to scan for StoryLine entities */
     extraFolders: string[];
+
+    /** Hidden built-in field keys per view/category (e.g. { character: ['fears','belief'], items: ['previousOwners'] }) */
+    hiddenFields: Record<string, string[]>;
 }
 
 /**
@@ -629,6 +636,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     defaultView: 'board',
     defaultBoardMode: 'corkboard',
+    lastBoardMode: 'corkboard',
+    lastBoardGroupBy: 'act',
     autoOpenNavigator: true,
     showNotesInKanban: false,
     showScenesInCorkboard: true,
@@ -686,6 +695,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     series: '',
     sharedCodex: '',
     extraFolders: [],
+
+    hiddenFields: {},
 };
 
 /**

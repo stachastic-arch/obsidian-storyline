@@ -11,6 +11,8 @@ import { LocationManager } from '../services/LocationManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { UndoManager } from '../services/UndoManager';
 import { pickImage as pickImageModal, resolveImagePath } from '../components/ImagePicker';
+import { AddFieldModal } from '../components/AddFieldModal';
+import type { UniversalFieldTemplate } from '../services/FieldTemplateService';
 
 import type SceneCardsPlugin from '../main';
 import { CharacterManager } from '../services/CharacterManager';
@@ -418,7 +420,7 @@ export class LocationView extends ItemView {
         }
 
         const isWorld = item.type === 'world';
-        const draft: WorldOrLocation = { ...item, custom: { ...(item.custom || {}) } };
+        const draft: WorldOrLocation = { ...item, custom: { ...(item.custom || {}) }, universalFields: { ...(item.universalFields || {}) } };
         // Snapshot for undo — taken once when the detail view opens
         this.undoSnapshot = { ...item, custom: { ...(item.custom || {}) } };
         // Track original name for cascade rename detection
@@ -538,6 +540,9 @@ export class LocationView extends ItemView {
         } else {
             this.renderLocationSidePanel(sidePanel, draft as StoryLocation);
         }
+
+        // Cross-entity references
+        this.renderReferencesPanel(sidePanel, item.name);
     }
 
     private renderCategory(
@@ -555,10 +560,39 @@ export class LocationView extends ItemView {
         obsidian.setIcon(icon, category.icon);
         sectionHeader.createSpan({ text: category.title });
 
+        // '+' button to add a universal field to this section
+        const addFieldBtn = sectionHeader.createEl('button', {
+            cls: 'character-section-add-field-btn',
+            attr: { title: 'Add universal field to this section', 'aria-label': 'Add universal field' },
+        });
+        obsidian.setIcon(addFieldBtn, 'plus');
+        addFieldBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isWorld = draft.type === 'world';
+            const categories = isWorld ? WORLD_CATEGORIES : LOCATION_CATEGORIES;
+            const sectionNames = categories.map(c => c.title);
+            const modal = new AddFieldModal(
+                this.app,
+                category.title,
+                null,
+                async (template) => {
+                    template.category = 'location';
+                    await this.plugin.fieldTemplates.add(template);
+                    if (this.rootContainer) {
+                        this.renderDetail(this.rootContainer);
+                    }
+                },
+                undefined,
+                sectionNames,
+            );
+            modal.open();
+        });
+
         const sectionBody = section.createDiv('location-section-body');
         if (isCollapsed) sectionBody.style.display = 'none';
 
-        sectionHeader.addEventListener('click', () => {
+        sectionHeader.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).closest('.character-section-add-field-btn')) return;
             if (this.collapsedSections.has(category.title)) {
                 this.collapsedSections.delete(category.title);
                 sectionBody.style.display = '';
@@ -570,14 +604,72 @@ export class LocationView extends ItemView {
             }
         });
 
-        for (const field of category.fields) {
+        // Built-in fields (skip hidden ones)
+        const hiddenKeys = this.plugin.settings.hiddenFields['location'] ?? [];
+        const visibleFields = category.fields.filter(f => !hiddenKeys.includes(f.key));
+        const hiddenFieldsInCat = category.fields.filter(f => hiddenKeys.includes(f.key));
+
+        for (const field of visibleFields) {
             this.renderField(sectionBody, field, draft);
+        }
+
+        // Universal fields for this section
+        const universalFields = this.plugin.fieldTemplates.getBySection(category.title, 'location');
+        for (const tpl of universalFields) {
+            this.renderUniversalField(sectionBody, tpl, draft);
+        }
+
+        // Hidden fields toggle
+        if (hiddenFieldsInCat.length > 0) {
+            const toggleEl = sectionBody.createDiv('hidden-fields-toggle');
+            toggleEl.createEl('a', {
+                text: `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`,
+                cls: 'hidden-fields-toggle-link',
+            });
+            const hiddenContainer = sectionBody.createDiv('hidden-fields-container');
+            hiddenContainer.style.display = 'none';
+            for (const field of hiddenFieldsInCat) {
+                this.renderField(hiddenContainer, field, draft);
+            }
+            let showing = false;
+            toggleEl.addEventListener('click', () => {
+                showing = !showing;
+                hiddenContainer.style.display = showing ? '' : 'none';
+                toggleEl.querySelector('a')!.textContent = showing
+                    ? `Hide ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`
+                    : `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`;
+            });
         }
     }
 
     private renderField(parent: HTMLElement, field: LocationFieldDef, draft: WorldOrLocation): void {
         const row = parent.createDiv('location-field-row');
-        row.createEl('label', { cls: 'location-field-label', text: field.label });
+        const labelEl = row.createEl('label', { cls: 'location-field-label', text: field.label });
+
+        // Hide/unhide toggle (skip 'name')
+        if (field.key !== 'name') {
+            const hiddenKeys = this.plugin.settings.hiddenFields['location'] ?? [];
+            const isHidden = hiddenKeys.includes(field.key);
+            const hideBtn = labelEl.createEl('span', {
+                cls: 'field-hide-btn',
+                attr: { 'aria-label': isHidden ? 'Show this field' : 'Hide this field' },
+            });
+            obsidian.setIcon(hideBtn, isHidden ? 'eye' : 'eye-off');
+            hideBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const settings = this.plugin.settings;
+                if (!settings.hiddenFields['location']) settings.hiddenFields['location'] = [];
+                const list = settings.hiddenFields['location'];
+                const idx = list.indexOf(field.key);
+                if (idx >= 0) {
+                    list.splice(idx, 1);
+                } else {
+                    list.push(field.key);
+                }
+                await this.plugin.saveSettings();
+                if (this.rootContainer) this.renderDetail(this.rootContainer);
+            });
+        }
 
         const value = (draft as any)[field.key] ?? '';
 
@@ -624,6 +716,81 @@ export class LocationView extends ItemView {
                     this.checkLocationRename(draft, input);
                 });
             }
+        }
+    }
+
+    private renderUniversalField(
+        parent: HTMLElement,
+        tpl: UniversalFieldTemplate,
+        draft: WorldOrLocation,
+    ): void {
+        if (!draft.universalFields) draft.universalFields = {};
+        const value = draft.universalFields[tpl.id] ?? '';
+
+        const row = parent.createDiv('location-field-row codex-universal-field-row');
+
+        const labelWrap = row.createDiv('codex-universal-label-wrap');
+        labelWrap.createEl('label', { cls: 'location-field-label', text: tpl.label });
+
+        const editBtn = labelWrap.createEl('button', {
+            cls: 'codex-universal-edit-btn',
+            attr: { title: 'Edit or remove this universal field', 'aria-label': 'Edit field' },
+        });
+        obsidian.setIcon(editBtn, 'pencil');
+        editBtn.addEventListener('click', () => {
+            const isWorld = draft.type === 'world';
+            const categories = isWorld ? WORLD_CATEGORIES : LOCATION_CATEGORIES;
+            const sectionNames = categories.map(c => c.title);
+            const modal = new AddFieldModal(
+                this.app,
+                tpl.section,
+                tpl,
+                async (updated) => {
+                    updated.category = 'location';
+                    await this.plugin.fieldTemplates.update(tpl.id, updated);
+                    if (this.rootContainer) this.renderDetail(this.rootContainer);
+                },
+                async () => {
+                    await this.plugin.fieldTemplates.remove(tpl.id);
+                    if (this.rootContainer) this.renderDetail(this.rootContainer);
+                },
+                sectionNames,
+            );
+            modal.open();
+        });
+
+        if (tpl.type === 'dropdown') {
+            const select = row.createEl('select', { cls: 'location-field-input dropdown' });
+            select.createEl('option', { text: tpl.placeholder || 'Select…', value: '' });
+            for (const opt of tpl.options) {
+                const el = select.createEl('option', { text: opt, value: opt });
+                if (value === opt) el.selected = true;
+            }
+            select.addEventListener('change', () => {
+                draft.universalFields![tpl.id] = select.value;
+                this.scheduleSave(draft);
+            });
+        } else if (tpl.type === 'textarea') {
+            const textarea = row.createEl('textarea', {
+                cls: 'location-field-textarea',
+                attr: { placeholder: tpl.placeholder, rows: '3' },
+            });
+            textarea.value = value;
+            textarea.addEventListener('input', () => {
+                draft.universalFields![tpl.id] = textarea.value;
+                this.scheduleSave(draft);
+            });
+        } else {
+            const input = row.createEl('input', {
+                cls: 'location-field-input',
+                type: 'text',
+                attr: { placeholder: tpl.placeholder },
+            });
+            input.value = value;
+            input.addEventListener('input', () => {
+                draft.universalFields![tpl.id] = input.value;
+                this.scheduleSave(draft);
+            });
         }
     }
 
@@ -892,6 +1059,38 @@ export class LocationView extends ItemView {
                 obsidian.setIcon(icon, 'user');
                 item.createSpan({ text: ` ${name}` });
                 item.createSpan({ cls: 'location-side-char-count', text: `${count}` });
+            }
+        }
+    }
+
+    private renderReferencesPanel(container: HTMLElement, entityName: string): void {
+        const index = this.plugin.linkScanner.buildEntityIndex();
+        const refs = index.get(entityName.toLowerCase());
+        if (!refs || refs.length === 0) return;
+
+        const section = container.createDiv('location-references-panel');
+        section.createEl('h3', { text: 'Referenced By' });
+
+        const groups: Record<string, typeof refs> = {};
+        for (const ref of refs) {
+            const label = ref.type === 'codex' && ref.codexCategory
+                ? ref.codexCategory
+                : ref.type;
+            if (!groups[label]) groups[label] = [];
+            groups[label].push(ref);
+        }
+
+        for (const [groupLabel, groupRefs] of Object.entries(groups)) {
+            const groupEl = section.createDiv('reference-group');
+            groupEl.createEl('h4', { text: groupLabel.charAt(0).toUpperCase() + groupLabel.slice(1) });
+            const list = groupEl.createEl('ul', { cls: 'reference-list' });
+            for (const ref of groupRefs) {
+                const li = list.createEl('li');
+                const link = li.createEl('a', { text: ref.name, cls: 'reference-link' });
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.app.workspace.openLinkText(ref.filePath, '', false);
+                });
             }
         }
     }

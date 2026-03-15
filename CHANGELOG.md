@@ -2,6 +2,38 @@
 
 ---
 
+## Version 1.7.1
+
+### New Features
+
+- **Cross-Entity References ("Referenced By" panel)** — Characters, Locations, and Codex entries now show a **Referenced By** section in their side panel. StoryLine scans all entity descriptions and scene text for `[[wikilinks]]`, `#tags`, and plain-text name mentions, then builds a reverse index so you can see at a glance which other characters, locations, codex entries, and scenes mention the entity you're viewing. References are grouped by type (characters, locations, codex category, scenes) and each is a clickable link that opens the source file.
+
+  Use standard Obsidian `[[wikilinks]]`, `#tags`, or just write entity names as plain text in any text field — scene prose, character backstory, location descriptions, codex entry notes — and StoryLine will automatically detect the cross-entity connection.
+
+- **Hide / Show Built-in Fields** — Declutter your character, location, and codex editors by hiding built-in fields you don't use. Every built-in field (except Name) now has a small **eye icon** that appears when you hover over the field label.
+
+  - **Hide a field** — hover over any field label and click the eye-off (👁‍🗨) icon. The field disappears from the form.
+  - **Show hidden fields** — a "Show N hidden fields" link appears at the bottom of each category section. Click it to expand the hidden fields in a dimmed container.
+  - **Unhide a field** — inside the hidden-fields container, hover over the field label and click the eye icon to restore it permanently.
+  - Hidden fields are grouped per view: `character`, `location`, or the codex category ID (e.g., `items`, `creatures`). Hiding a field in one category does not affect other categories.
+  - **Data is never deleted** — hiding a field only affects the UI. The value remains safely stored in your frontmatter and will reappear if you unhide the field later.
+
+- **Universal Fields scoped per category** — Custom universal fields (created with the + button in section headers) are now scoped to their entity type: character fields only appear on characters, location fields on locations, and codex fields on their specific codex category. Previously all universal fields were shared across all entity types.
+
+### Bug Fixes
+
+- **Board: Quick-add inherits column context** — Creating a new scene from a Kanban column now pre-fills the field for that column's grouping. For example, adding a scene to the "Act 2" column pre-fills Act = 2; adding to the "Sarah" POV column pre-fills POV = Sarah.
+
+- **Board: View mode remembered** — The Board view now remembers your last-used sub-mode (Corkboard or Kanban) and Kanban grouping (act, chapter, status, or POV) across sessions.
+
+- **MetadataParser: Clear act field** — Setting a scene's act to "None" now correctly removes the `act` field from frontmatter instead of leaving it as an empty value.
+
+- **Dark mode: Dropdown styling** — Select dropdowns in character and location editors now render correctly in dark themes (proper background and text colors via `color-scheme: dark`).
+
+- **Locations: Universal fields** — Locations and worlds now support universal (template-defined) fields, matching the existing support in characters and codex entries.
+
+---
+
 ## Version 1.7.0
 
 ### New Features

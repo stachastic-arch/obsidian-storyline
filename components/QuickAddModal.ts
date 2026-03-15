@@ -15,18 +15,23 @@ export class QuickAddModal extends Modal {
     private conflictSameAsDescription = false;
     private selectedTemplate: SceneTemplate | null = null;
     private onSubmit: (scene: Partial<Scene>, openAfter: boolean) => void;
+    private defaults: Partial<Scene>;
 
     constructor(
         app: App,
         plugin: SceneCardsPlugin,
         sceneManager: SceneManager,
-        onSubmit: (scene: Partial<Scene>, openAfter: boolean) => void
+        onSubmit: (scene: Partial<Scene>, openAfter: boolean) => void,
+        defaults?: Partial<Scene>
     ) {
         super(app);
         this.plugin = plugin;
         this.sceneManager = sceneManager;
         this.onSubmit = onSubmit;
+        this.defaults = defaults || {};
         this.result.status = plugin.settings.defaultStatus as SceneStatus;
+        // Apply defaults
+        Object.assign(this.result, this.defaults);
     }
 
     onOpen() {
@@ -73,6 +78,9 @@ export class QuickAddModal extends Modal {
         for (let i = 1; i <= 5; i++) {
             actSelect.createEl('option', { text: `Act ${i}`, value: String(i) });
         }
+        if (this.result.act != null) {
+            actSelect.value = String(this.result.act);
+        }
         actSelect.addEventListener('change', () => {
             this.result.act = actSelect.value ? Number(actSelect.value) : undefined;
         });
@@ -84,6 +92,9 @@ export class QuickAddModal extends Modal {
             cls: 'story-line-field-input',
             placeholder: 'Chapter #'
         });
+        if (this.result.chapter != null) {
+            chapterInput.value = String(this.result.chapter);
+        }
         chapterInput.addEventListener('input', () => {
             const val = chapterInput.value;
             this.result.chapter = val ? (Number(val) || val) : undefined;
@@ -94,7 +105,7 @@ export class QuickAddModal extends Modal {
         const povContainer = povSetting.controlEl.createDiv('sl-quickadd-autocomplete');
         renderAutocompleteInput({
             container: povContainer,
-            value: '',
+            value: this.result.pov || '',
             getSuggestions: () => {
                 const characters = this.sceneManager.getAllCharacters();
                 const cm = this.plugin.characterManager;

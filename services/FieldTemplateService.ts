@@ -16,8 +16,10 @@ export interface UniversalFieldTemplate {
     id: string;
     /** Human-readable label shown in the UI */
     label: string;
-    /** Which section this field belongs to (must match a CHARACTER_CATEGORIES title) */
+    /** Which section this field belongs to (must match a category section title) */
     section: string;
+    /** Which entity category this field belongs to (e.g. 'character', 'location', 'items', 'creatures'). Empty/undefined = 'character' for backward compat. */
+    category?: string;
     /** Input type */
     type: UniversalFieldType;
     /** Dropdown options (only used when type === 'dropdown') */
@@ -60,10 +62,18 @@ export class FieldTemplateService {
         return [...this.templates];
     }
 
-    /** Templates belonging to a specific section */
-    getBySection(sectionTitle: string): UniversalFieldTemplate[] {
+    /** Templates belonging to a specific section, optionally scoped by category */
+    getBySection(sectionTitle: string, category?: string): UniversalFieldTemplate[] {
         return this.templates
-            .filter(t => t.section === sectionTitle)
+            .filter(t => {
+                if (t.section !== sectionTitle) return false;
+                // Scope by category if provided
+                if (category !== undefined) {
+                    const tCat = t.category || 'character';
+                    return tCat === category;
+                }
+                return true;
+            })
             .sort((a, b) => a.order - b.order);
     }
 
@@ -120,6 +130,7 @@ export class FieldTemplateService {
                     id: f.id ?? generateId(),
                     label: f.label ?? 'Untitled',
                     section: f.section ?? 'Other',
+                    category: f.category,
                     type: f.type ?? 'text',
                     options: Array.isArray(f.options) ? f.options : [],
                     placeholder: f.placeholder ?? '',

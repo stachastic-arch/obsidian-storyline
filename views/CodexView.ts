@@ -488,9 +488,10 @@ export class CodexView extends ItemView {
         // Books (series-ready)
         this.renderBooksField(formPanel, draft);
 
-        // Side panel — gallery + notes
+        // Side panel — gallery + notes + references
         this.renderGallerySection(sidePanel, draft);
         this.renderNotesSection(sidePanel, draft);
+        this.renderReferencesPanel(sidePanel, entry.name);
     }
 
     // ── Field category rendering ───────────────────────
@@ -539,6 +540,7 @@ export class CodexView extends ItemView {
                 cat.title,
                 null,
                 async (template) => {
+                    template.category = catDef.id;
                     await this.plugin.fieldTemplates.add(template);
                     if (this.rootContainer) this.renderView(this.rootContainer);
                 },
@@ -550,14 +552,42 @@ export class CodexView extends ItemView {
 
         if (!isCollapsed) {
             const body = section.createDiv('codex-section-body');
-            for (const field of cat.fields) {
+
+            // Filter hidden fields
+            const hiddenKeys = this.plugin.settings.hiddenFields[catDef.id] ?? [];
+            const visibleFields = cat.fields.filter(f => !hiddenKeys.includes(f.key));
+            const hiddenFieldsInCat = cat.fields.filter(f => hiddenKeys.includes(f.key));
+
+            for (const field of visibleFields) {
                 this.renderField(body, field, draft, catDef);
             }
 
             // Render universal fields for this section
-            const universalFields = this.plugin.fieldTemplates.getBySection(cat.title);
+            const universalFields = this.plugin.fieldTemplates.getBySection(cat.title, catDef.id);
             for (const tpl of universalFields) {
                 this.renderUniversalField(body, tpl, draft);
+            }
+
+            // Hidden fields toggle
+            if (hiddenFieldsInCat.length > 0) {
+                const toggleEl = body.createDiv('hidden-fields-toggle');
+                toggleEl.createEl('a', {
+                    text: `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`,
+                    cls: 'hidden-fields-toggle-link',
+                });
+                const hiddenContainer = body.createDiv('hidden-fields-container');
+                hiddenContainer.style.display = 'none';
+                for (const field of hiddenFieldsInCat) {
+                    this.renderField(hiddenContainer, field, draft, catDef);
+                }
+                let showing = false;
+                toggleEl.addEventListener('click', () => {
+                    showing = !showing;
+                    hiddenContainer.style.display = showing ? '' : 'none';
+                    toggleEl.querySelector('a')!.textContent = showing
+                        ? `Hide ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`
+                        : `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`;
+                });
             }
         }
     }
@@ -570,7 +600,32 @@ export class CodexView extends ItemView {
     ): void {
         const { key, label, placeholder, multiline, characterRef } = field;
         const row = container.createDiv('codex-field-row');
-        row.createEl('label', { cls: 'codex-field-label', text: label });
+        const labelEl = row.createEl('label', { cls: 'codex-field-label', text: label });
+
+        // Hide/unhide toggle (skip 'name')
+        if (key !== 'name') {
+            const hiddenKeys = this.plugin.settings.hiddenFields[catDef.id] ?? [];
+            const isHidden = hiddenKeys.includes(key);
+            const hideBtn = labelEl.createEl('span', {
+                cls: 'field-hide-btn',
+                attr: { 'aria-label': isHidden ? 'Show this field' : 'Hide this field' },
+            });
+            obsidian.setIcon(hideBtn, isHidden ? 'eye' : 'eye-off');
+            hideBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const settings = this.plugin.settings;
+                if (!settings.hiddenFields[catDef.id]) settings.hiddenFields[catDef.id] = [];
+                const list = settings.hiddenFields[catDef.id];
+                const idx = list.indexOf(key);
+                if (idx >= 0) {
+                    list.splice(idx, 1);
+                } else {
+                    list.push(key);
+                }
+                await this.plugin.saveSettings();
+                if (this.rootContainer) this.renderView(this.rootContainer);
+            });
+        }
 
         const currentValue = draft[key] != null ? String(draft[key]) : '';
 
@@ -1110,6 +1165,38 @@ export class CodexView extends ItemView {
                 }))
             .addButton(btn => btn.setButtonText('Cancel').onClick(() => modal.close()));
         modal.open();
+    }
+
+    private renderReferencesPanel(container: HTMLElement, entityName: string): void {
+        const index = this.plugin.linkScanner.buildEntityIndex();
+        const refs = index.get(entityName.toLowerCase());
+        if (!refs || refs.length === 0) return;
+
+        const section = container.createDiv('codex-references-panel');
+        section.createEl('h3', { text: 'Referenced By' });
+
+        const groups: Record<string, typeof refs> = {};
+        for (const ref of refs) {
+            const label = ref.type === 'codex' && ref.codexCategory
+                ? ref.codexCategory
+                : ref.type;
+            if (!groups[label]) groups[label] = [];
+            groups[label].push(ref);
+        }
+
+        for (const [groupLabel, groupRefs] of Object.entries(groups)) {
+            const groupEl = section.createDiv('reference-group');
+            groupEl.createEl('h4', { text: groupLabel.charAt(0).toUpperCase() + groupLabel.slice(1) });
+            const list = groupEl.createEl('ul', { cls: 'reference-list' });
+            for (const ref of groupRefs) {
+                const li = list.createEl('li');
+                const link = li.createEl('a', { text: ref.name, cls: 'reference-link' });
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.app.workspace.openLinkText(ref.filePath, '', false);
+                });
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════

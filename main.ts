@@ -80,6 +80,7 @@ export default class SceneCardsPlugin extends Plugin {
         this.codexManager = new CodexManager(this.app);
         this.snapshotManager = new SnapshotManager(this.app);
         this.linkScanner = new LinkScanner(this.characterManager, this.locationManager);
+        this.linkScanner.setCodexManager(this.codexManager);
         this.cascadeRename = new CascadeRenameService(this.app, this.sceneManager, this.characterManager, this.locationManager);
         this.fieldTemplates = new FieldTemplateService(this.app, () => this.getProjectSystemFolder());
         this.seriesManager = new SeriesManager(this.app, this);

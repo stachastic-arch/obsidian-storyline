@@ -65,8 +65,10 @@ export class BoardView extends ItemView {
         this.plugin = plugin;
         this.sceneManager = sceneManager;
         this.cardComponent = new SceneCardComponent(plugin);
-        const preferred = plugin.settings.defaultBoardMode;
-        this.boardMode = preferred === 'kanban' ? 'kanban' : 'corkboard';
+        // Restore last used board mode and groupBy
+        const s = plugin.settings;
+        this.boardMode = s.lastBoardMode || (s.defaultBoardMode === 'kanban' ? 'kanban' : 'corkboard');
+        this.groupBy = (s.lastBoardGroupBy as BoardGroupBy) || 'act';
     }
 
     getViewType(): string {
@@ -160,6 +162,8 @@ export class BoardView extends ItemView {
                 });
                 groupSelect.addEventListener('change', () => {
                     this.groupBy = groupSelect.value as BoardGroupBy;
+                    this.plugin.settings.lastBoardGroupBy = this.groupBy;
+                    this.plugin.saveSettings();
                     this.refreshBoard();
                 });
                 if (searchWrapper && searchWrapper.nextSibling) {
@@ -228,12 +232,16 @@ export class BoardView extends ItemView {
         corkboardBtn.addEventListener('click', () => {
             if (this.boardMode !== 'corkboard') {
                 this.boardMode = 'corkboard';
+                this.plugin.settings.lastBoardMode = 'corkboard';
+                this.plugin.saveSettings();
                 if (this.rootContainer) this.renderView(this.rootContainer);
             }
         });
         kanbanBtn.addEventListener('click', () => {
             if (this.boardMode !== 'kanban') {
                 this.boardMode = 'kanban';
+                this.plugin.settings.lastBoardMode = 'kanban';
+                this.plugin.saveSettings();
                 if (this.rootContainer) this.renderView(this.rootContainer);
             }
         });
@@ -2636,24 +2644,40 @@ export class BoardView extends ItemView {
      * Open the Quick Add modal
      */
     private openQuickAdd(presetColumn?: string): void {
+        // Build defaults based on groupBy and column title
+        const defaults: Partial<Scene> = {};
+        if (presetColumn) {
+            if (this.groupBy === 'act') {
+                const match = presetColumn.match(/Act (\d+)/);
+                if (match) defaults.act = Number(match[1]);
+            } else if (this.groupBy === 'chapter') {
+                const match = presetColumn.match(/Chapter (.+)/);
+                if (match) defaults.chapter = Number(match[1]) || match[1];
+            } else if (this.groupBy === 'status') {
+                const statusMap: Record<string, string> = {
+                    'Idea': 'idea', 'Outlined': 'outlined', 'Draft': 'draft',
+                    'Written': 'written', 'Revised': 'revised', 'Final': 'final',
+                };
+                const statusVal = statusMap[presetColumn] || presetColumn.toLowerCase();
+                defaults.status = statusVal as any;
+            } else if (this.groupBy === 'pov') {
+                if (presetColumn !== 'No POV') defaults.pov = presetColumn;
+            }
+        }
+
         const modal = new QuickAddModal(
             this.app,
             this.plugin,
             this.sceneManager,
             async (sceneData, openAfter) => {
-                // Set preset values from column
-                if (presetColumn && this.groupBy === 'act') {
-                    const match = presetColumn.match(/Act (\d+)/);
-                    if (match) sceneData.act = Number(match[1]);
-                }
-
                 const file = await this.sceneManager.createScene(sceneData);
                 this.refreshBoard();
 
                 if (openAfter) {
                     await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'preview' } });
                 }
-            }
+            },
+            defaults
         );
         modal.open();
     }

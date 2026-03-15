@@ -10,6 +10,7 @@
 
 import { CharacterManager } from './CharacterManager';
 import { LocationManager } from './LocationManager';
+import { CodexManager } from './CodexManager';
 import type { Scene } from '../models/Scene';
 
 /** A single detected link with its classification */
@@ -17,7 +18,7 @@ export interface DetectedLink {
     /** Display name extracted from the wikilink or plain-text match */
     name: string;
     /** Entity type derived from cross-referencing managers */
-    type: 'character' | 'location' | 'other';
+    type: 'character' | 'location' | 'codex' | 'other';
 }
 
 /** Scan result for one scene */
@@ -32,6 +33,18 @@ export interface LinkScanResult {
     other: string[];
 }
 
+/** An entity that references (or is referenced by) another entity */
+export interface EntityReference {
+    /** Display name of the referencing entity */
+    name: string;
+    /** Entity type */
+    type: 'character' | 'location' | 'codex' | 'scene';
+    /** Vault-relative file path */
+    filePath: string;
+    /** Codex category id (only when type === 'codex') */
+    codexCategory?: string;
+}
+
 /**
  * Scans scene body text for [[wikilinks]] and plain-text name mentions,
  * then classifies them.
@@ -42,10 +55,12 @@ export class LinkScanner {
 
     private characterManager: CharacterManager;
     private locationManager: LocationManager;
+    private codexManager: CodexManager | null = null;
 
     /** Pre-built lookup sets (lowercased) — rebuilt on invalidate */
     private charNames: Set<string> = new Set();
     private locNames: Set<string> = new Set();
+    private codexNames: Set<string> = new Set();
 
     /**
      * Maps a lowercased name/nickname to the canonical (display) character name.
@@ -65,6 +80,11 @@ export class LinkScanner {
     constructor(characterManager: CharacterManager, locationManager: LocationManager) {
         this.characterManager = characterManager;
         this.locationManager = locationManager;
+    }
+
+    /** Set the codex manager (called after initial construction) */
+    setCodexManager(codexManager: CodexManager): void {
+        this.codexManager = codexManager;
     }
 
     // ── Public API ─────────────────────────────────────
@@ -180,9 +200,21 @@ export class LinkScanner {
             this.locNames.add(w.name.toLowerCase());
         }
 
+        // Codex entry names
+        this.codexNames.clear();
+        if (this.codexManager) {
+            for (const entry of this.codexManager.getAllEntries()) {
+                const lower = entry.name.toLowerCase();
+                // Don't add if already a character or location name
+                if (!this.charNames.has(lower) && !this.locNames.has(lower)) {
+                    this.codexNames.add(lower);
+                }
+            }
+        }
+
         // Build sorted list of all names for plain-text scanning (longest first
         // so "Anna Svensson" matches before "Anna")
-        this.plainTextNames = [...this.charNames, ...this.locNames]
+        this.plainTextNames = [...this.charNames, ...this.locNames, ...this.codexNames]
             .sort((a, b) => b.length - a.length);
     }
 
@@ -228,6 +260,8 @@ export class LinkScanner {
             } else if (this.locNames.has(key)) {
                 type = 'location';
                 locations.push(name);
+            } else if (this.codexNames.has(key)) {
+                type = 'codex';
             } else {
                 other.push(name);
             }
@@ -347,6 +381,8 @@ export class LinkScanner {
             } else if (this.locNames.has(key)) {
                 type = 'location';
                 locations.push(name);
+            } else if (this.codexNames.has(key)) {
+                type = 'codex';
             } else {
                 other.push(name);
             }
@@ -354,5 +390,108 @@ export class LinkScanner {
         }
 
         return { links, characters, locations, other, tags };
+    }
+
+    // ── Cross-entity reference index ───────────────────
+
+    /**
+     * Build a reverse-lookup index: for each entity name, which other entities
+     * mention it in their text fields.
+     *
+     * Returns a Map keyed by lowercased entity name → array of referencing entities.
+     */
+    buildEntityIndex(): Map<string, EntityReference[]> {
+        // Ensure lookups are built
+        if (this.charNames.size === 0 && this.locNames.size === 0) {
+            this.rebuildLookups(this.lastManualAliases);
+        }
+
+        const index = new Map<string, EntityReference[]>();
+
+        const addRefs = (sourceName: string, sourceType: EntityReference['type'], sourceFilePath: string, text: string, codexCategory?: string) => {
+            if (!text) return;
+            const result = this.scanText(text);
+            for (const link of result.links) {
+                const key = link.name.toLowerCase();
+                // Don't reference yourself
+                if (key === sourceName.toLowerCase()) continue;
+                if (!index.has(key)) index.set(key, []);
+                const refs = index.get(key)!;
+                // Deduplicate by filePath
+                if (!refs.some(r => r.filePath === sourceFilePath)) {
+                    refs.push({ name: sourceName, type: sourceType, filePath: sourceFilePath, codexCategory });
+                }
+            }
+            // Also match #tags against entity names (e.g. #Aragorn → character Aragorn)
+            for (const tag of result.tags) {
+                const key = tag.toLowerCase();
+                if (key === sourceName.toLowerCase()) continue;
+                if (!index.has(key)) index.set(key, []);
+                const refs = index.get(key)!;
+                if (!refs.some(r => r.filePath === sourceFilePath)) {
+                    refs.push({ name: sourceName, type: sourceType, filePath: sourceFilePath, codexCategory });
+                }
+            }
+        };
+
+        // Scan characters
+        for (const c of this.characterManager.getAllCharacters()) {
+            const textFields = [
+                (c as any).backstory, (c as any).appearance, (c as any).personality,
+                (c as any).internalMotivation, (c as any).externalMotivation,
+                (c as any).strengths, (c as any).flaws, (c as any).fears,
+                (c as any).belief, (c as any).misbelief, (c as any).notes,
+            ].filter(Boolean).join('\n');
+            addRefs(c.name, 'character', c.filePath, textFields);
+        }
+
+        // Scan locations and worlds
+        for (const l of this.locationManager.getAllLocations()) {
+            const textFields = [
+                l.description, l.atmosphere, l.significance,
+                l.inhabitants, l.connectedLocations, l.mapNotes, l.notes,
+            ].filter(Boolean).join('\n');
+            addRefs(l.name, 'location', l.filePath, textFields);
+        }
+        for (const w of this.locationManager.getAllWorlds()) {
+            const textFields = [
+                w.description, w.geography, w.culture, w.politics,
+                w.magicTechnology, w.beliefs, w.economy, w.history, w.notes,
+            ].filter(Boolean).join('\n');
+            addRefs(w.name, 'location', w.filePath, textFields);
+        }
+
+        // Scan codex entries
+        if (this.codexManager) {
+            for (const entry of this.codexManager.getAllEntries()) {
+                const textParts: string[] = [];
+                // Gather all string values from the entry
+                for (const [key, val] of Object.entries(entry)) {
+                    if (key === 'filePath' || key === 'type' || key === 'name' || key === 'image' ||
+                        key === 'gallery' || key === 'created' || key === 'modified' || key === 'books') continue;
+                    if (typeof val === 'string' && val.length > 0) {
+                        textParts.push(val);
+                    }
+                }
+                if (entry.notes) textParts.push(entry.notes);
+                const codexCat = entry.type || undefined;
+                addRefs(entry.name, 'codex', entry.filePath, textParts.join('\n'), codexCat);
+            }
+        }
+
+        // Scan scenes (already cached)
+        for (const [filePath, result] of this.cache) {
+            const sceneName = filePath.split('/').pop()?.replace(/\.md$/i, '') ?? filePath;
+            for (const link of result.links) {
+                const key = link.name.toLowerCase();
+                if (!index.has(key)) index.set(key, []);
+                const refs = index.get(key)!;
+                if (!refs.some(r => r.filePath === filePath)) {
+                    refs.push({ name: sceneName, type: 'scene', filePath });
+                }
+            }
+        }
+
+        return index;
     }
 }

@@ -32,6 +32,8 @@ interface LocationBase {
     notes?: string;
     /** User-defined custom fields */
     custom?: Record<string, string>;
+    /** Universal field values (keyed by template id) */
+    universalFields?: Record<string, string>;
 }
 
 // ── World ──────────────────────────────────────────

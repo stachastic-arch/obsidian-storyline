@@ -790,9 +790,10 @@ export class CharacterView extends ItemView {
         // ── Custom fields section ──
         this.renderCustomFields(formPanel, draft);
 
-        // ── Side panel: gallery + scene info ──
+        // ── Side panel: gallery + scene info + references ──
         this.renderGallery(sidePanel, draft);
         this.renderScenePanel(sidePanel, character.name);
+        this.renderReferencesPanel(sidePanel, character.name);
     }
 
     private renderCategory(
@@ -824,6 +825,7 @@ export class CharacterView extends ItemView {
                 category.title,
                 null,
                 async (template) => {
+                    template.category = 'character';
                     await this.plugin.fieldTemplates.add(template);
                     // Re-render the detail view to show the new field
                     if (this.selectedCharacter && this.rootContainer) {
@@ -851,21 +853,74 @@ export class CharacterView extends ItemView {
             }
         });
 
-        // Built-in fields
-        for (const field of category.fields) {
+        // Built-in fields (skip hidden ones)
+        const hiddenKeys = this.plugin.settings.hiddenFields['character'] ?? [];
+        const visibleFields = category.fields.filter(f => !hiddenKeys.includes(f.key));
+        const hiddenFieldsInCat = category.fields.filter(f => hiddenKeys.includes(f.key));
+
+        for (const field of visibleFields) {
             this.renderField(sectionBody, field, draft);
         }
 
         // ── Universal fields for this section ──
-        const universalFields = this.plugin.fieldTemplates.getBySection(category.title);
+        const universalFields = this.plugin.fieldTemplates.getBySection(category.title, 'character');
         for (const tpl of universalFields) {
             this.renderUniversalField(sectionBody, tpl, draft);
+        }
+
+        // Show toggle for hidden fields
+        if (hiddenFieldsInCat.length > 0) {
+            const toggleEl = sectionBody.createDiv('hidden-fields-toggle');
+            toggleEl.createEl('a', {
+                text: `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`,
+                cls: 'hidden-fields-toggle-link',
+            });
+            const hiddenContainer = sectionBody.createDiv('hidden-fields-container');
+            hiddenContainer.style.display = 'none';
+            for (const field of hiddenFieldsInCat) {
+                this.renderField(hiddenContainer, field, draft);
+            }
+            let showing = false;
+            toggleEl.addEventListener('click', () => {
+                showing = !showing;
+                hiddenContainer.style.display = showing ? '' : 'none';
+                toggleEl.querySelector('a')!.textContent = showing
+                    ? `Hide ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`
+                    : `Show ${hiddenFieldsInCat.length} hidden field${hiddenFieldsInCat.length > 1 ? 's' : ''}`;
+            });
         }
     }
 
     private renderField(parent: HTMLElement, field: CharacterFieldDef, draft: Character): void {
         const row = parent.createDiv('character-field-row');
-        row.createEl('label', { cls: 'character-field-label', text: field.label });
+        const labelEl = row.createEl('label', { cls: 'character-field-label', text: field.label });
+
+        // Hide/unhide field button (skip for 'name' — always visible)
+        if (field.key !== 'name') {
+            const hiddenKeys = this.plugin.settings.hiddenFields['character'] ?? [];
+            const isHidden = hiddenKeys.includes(field.key);
+            const hideBtn = labelEl.createEl('span', {
+                cls: 'field-hide-btn',
+                attr: { 'aria-label': isHidden ? 'Show this field' : 'Hide this field' },
+            });
+            obsidian.setIcon(hideBtn, isHidden ? 'eye' : 'eye-off');
+            hideBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const settings = this.plugin.settings;
+                if (!settings.hiddenFields['character']) settings.hiddenFields['character'] = [];
+                const list = settings.hiddenFields['character'];
+                const idx = list.indexOf(field.key);
+                if (idx >= 0) {
+                    list.splice(idx, 1);
+                } else {
+                    list.push(field.key);
+                }
+                await this.plugin.saveSettings();
+                if (this.selectedCharacter && this.rootContainer) {
+                    this.renderCharacterDetail(this.rootContainer);
+                }
+            });
+        }
 
         const value = (draft as any)[field.key] ?? '';
 
@@ -1861,6 +1916,38 @@ export class CharacterView extends ItemView {
 
         // Gap detection
         this.renderGapDetection(container, characterName, scenes, allCharScenes);
+    }
+
+    private renderReferencesPanel(container: HTMLElement, entityName: string): void {
+        const index = this.plugin.linkScanner.buildEntityIndex();
+        const refs = index.get(entityName.toLowerCase());
+        if (!refs || refs.length === 0) return;
+
+        const section = container.createDiv('character-references-panel');
+        section.createEl('h3', { text: 'Referenced By' });
+
+        const groups: Record<string, typeof refs> = {};
+        for (const ref of refs) {
+            const label = ref.type === 'codex' && ref.codexCategory
+                ? ref.codexCategory
+                : ref.type;
+            if (!groups[label]) groups[label] = [];
+            groups[label].push(ref);
+        }
+
+        for (const [groupLabel, groupRefs] of Object.entries(groups)) {
+            const groupEl = section.createDiv('reference-group');
+            groupEl.createEl('h4', { text: groupLabel.charAt(0).toUpperCase() + groupLabel.slice(1) });
+            const list = groupEl.createEl('ul', { cls: 'reference-list' });
+            for (const ref of groupRefs) {
+                const li = list.createEl('li');
+                const link = li.createEl('a', { text: ref.name, cls: 'reference-link' });
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.app.workspace.openLinkText(ref.filePath, '', false);
+                });
+            }
+        }
     }
 
     private renderStat(parent: HTMLElement, value: string, label: string): void {
