@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.7.0** · By Jan Sandström
+**Version 1.8.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -143,6 +143,7 @@ A spreadsheet-like grid for detailed scene planning.
   - **Cell tab** — cell content, detected characters/locations/tags, and a linked scene link.
   - **Scene tab** — the full scene editor (status, POV, characters, location, tags, conflict, synopsis, etc.) so you can edit scene details without leaving the grid.
 - **Auto-Note** — When the Auto-Note toggle is on (enabled by default), typing text into an empty, unlinked cell automatically creates a corkboard note and links it back to the cell. The note is saved as an *idea* with a `plotgridOrigin` label built from the row and column names, so you can always trace it back to where it started. Toggle Auto-Note on or off with the sticky-note icon in the Plotgrid toolbar — the icon turns accent-colored when active.
+- **Codex entity tags** — Each cell automatically displays small color-coded pills at the bottom showing characters (blue), locations (green), and codex entries (purple) detected in the cell text and/or the linked scene's prose. Entity detection uses the same LinkScanner engine — no manual tagging needed.
 
 ### Timeline View
 
@@ -197,6 +198,7 @@ A Scrivenings-style continuous document view that presents your entire story as 
 - **Lazy loading** — editors are mounted on demand as you scroll, keeping memory usage low even for large projects.
 - **Navigator integration** — clicking a scene in the Navigator scrolls the manuscript to that scene instead of opening a new file.
 - **Inspector tracking** — the Scene Details sidebar automatically follows whichever scene is currently visible in the manuscript.
+- **Focus Mode** — click the glasses icon (👓) in the filter bar to enter Focus Mode. Surrounding UI (sidebars, ribbon, title bar, tab headers) is dimmed, darkened, and optionally blurred so you can concentrate on your text. The filter bar, scene headers, dividers, and footer are hidden. Adjust the effect in **Settings → Focus Mode Settings**: Dim amount (toolbar opacity), Darken (environment brightness), and Blur (environment blur). Click the glasses icon again to exit.
 
 Access the Manuscript view from the **Manuscript** tab (📖 book-open-text icon) in the view switcher, located between Plotlines and Codex.
 
@@ -274,6 +276,7 @@ The Codex is a unified hub that brings Characters, Locations, and custom categor
 - **Custom categories** — Add your own categories (for example: Props, Factions, Magic Systems, Creatures) from the Codex toolbar. Each category gets its own folder inside `Codex/`, its own search, and individual detail pages with editable fields.
 - **Search** — A search bar at the top of the hub filters across all entries, including Characters and Locations.
 - **Back navigation** — From any detail page, click the back arrow to return to the Codex hub.
+- **Change detection** — When a codex entry's content has been modified since it was last reviewed, an amber warning banner appears on the detail page listing all scenes that reference the entry. Click any scene name to open it. Click **"Mark as reviewed"** to clear the warning and update the stored digest. Digests are stored per-project in `System/codex-digests.json`.
 - **Backward compatible** — Existing projects that have Characters and Locations folders at the top level (outside Codex/) continue to work without any changes.
 
 ### Stats View
@@ -303,6 +306,7 @@ A statistics dashboard organized into eight collapsible sections. Click any sect
 #### 5. Characters & World (collapsed by default)
 - **POV distribution** — who gets the most page time.
 - **Character scene coverage** — heatmap of how often each character appears.
+- **Character × Chapter Heatmap** — a grid showing character appearances per chapter with color-coded intensity. Helps spot under-represented characters and distribution gaps.
 - **Location frequency** — bar chart of how often each location is used.
 
 #### 6. Pacing & Tension (collapsed by default)
@@ -312,12 +316,26 @@ A statistics dashboard organized into eight collapsible sections. Click any sect
 - **Dialogue vs. narrative ratio** — per-scene breakdown.
 - **Tension curve** — visual graph of your story's emotional arc based on scene intensity values.
 
+#### 5b. Setup & Payoff Map (collapsed by default)
+- **Setup → Payoff chains** — visualizes explicit links between scenes using `setup_scenes` and `payoff_scenes` frontmatter.
+- **Dangling payoffs** — flags scenes whose setup references are never paid off.
+- **Click to open** — click any scene name to open it in a new tab.
+
+#### 6b. Pacing Coach (inside Pacing & Tension)
+- **Scene length with conflict presence** — bar chart where each bar is a scene and dots indicate whether `conflict` is defined. Long bars without conflict are highlighted.
+- **Summary stats** — average word count with/without conflict, total scene counts.
+- **Flagged scenes** — specific long scenes lacking conflict are listed as potential pacing issues.
+
 #### 7. Prose Analysis (collapsed, lazy-loaded)
 - **Readability scores** — Flesch-Kincaid Grade Level and Flesch Reading Ease.
 - **Average sentence and word length.**
 - **Word frequency** — top 20 most-used words (excluding common stop words), shown as a bar chart.
 - **Overused words** — flags words that appear disproportionately often.
 - This section loads on demand when expanded to avoid slowing down the dashboard.
+
+#### 7b. Echo Finder (collapsed, lazy-loaded)
+- **Repeated phrases** — scans all scene prose for duplicated multi-word sequences that may indicate unintentional repetition.
+- Lazy-loaded on expand to avoid slowing down the dashboard.
 
 #### 8. Warnings (open by default)
 - **Plot hole detection** — automated warnings grouped by category (see [Plot Hole Detection](#plot-hole-detection)).

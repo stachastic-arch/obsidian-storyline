@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.7.0** · By Jan Sandström
+**Version 1.8.0** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
@@ -40,6 +40,8 @@ Act and chapter divider bands show where story sections begin and end. Scene row
 
 **Auto-Note** — When enabled (on by default), typing into an empty cell automatically creates a linked corkboard note. The note is tagged as an idea with a plotgrid origin label so you can trace it back to the row and column it came from. Toggle Auto-Note on or off from the toolbar.
 
+**Codex Entity Tags** — Each cell automatically shows color-coded pills for characters, locations, and codex entries detected in the cell text or linked scene prose.
+
 ![Plotgrid View](screenshots/02.Plotgrid.jpg)
 
 ---
@@ -75,6 +77,8 @@ Act and chapter dividers appear automatically between sections. Each scene block
 **Lock Links** — toggle on to make internal links and tags non-editable. The cursor skips over link text, preventing accidental changes while you write around them.
 
 Both toggles default to ON and appear in the filter bar.
+
+**Focus Mode** — click the glasses icon to dim, darken, and blur surrounding UI so you can focus purely on writing. Configurable in Settings with sliders for dim, darken, and blur amounts.
 
 ![Manuscript View](screenshots/Manuscript.jpg)
 
@@ -124,7 +128,7 @@ A standalone sidebar panel that displays the full Inspector for the currently ac
 
 ### Stats View
 
-Statistics dashboard with eight collapsible sections: project overview with goal tracking and reading time estimate, writing sprint timer with daily goal and streak, writing history with daily bar charts (7d/30d/90d/All), progress breakdown by status/chapter/act, character & world coverage analysis, pacing & tension with dialogue ratio and tension curve, prose analysis with readability scores and word frequency, and automated plot hole warnings.
+Statistics dashboard with eight collapsible sections: project overview with goal tracking and reading time estimate, writing sprint timer with daily goal and streak, writing history with daily bar charts (7d/30d/90d/All), progress breakdown by status/chapter/act, character & world coverage analysis with character × chapter heatmap, setup & payoff map with chain visualization, pacing & tension with dialogue ratio, tension curve, and pacing coach, prose analysis with readability scores and word frequency, echo finder for repeated phrases, and automated plot hole warnings.
 
 ![Stats — Overview](screenshots/12.Stats.jpg)
 
@@ -150,8 +154,8 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 
 ## Key Features
 
-- **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages.
-- **Manuscript View** — Scrivenings-style continuous document with embedded Live Preview editors. Read and edit your whole story in one scrollable page. Plain Text and Lock Links toggles for distraction-free writing.
+- **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages. Two-way change detection flags scenes that reference modified codex entries.
+- **Manuscript View** — Scrivenings-style continuous document with embedded Live Preview editors. Read and edit your whole story in one scrollable page. Plain Text, Lock Links, and Focus Mode toggles for distraction-free writing.
 - **Scene Management** — Full metadata, six-stage status pipeline, drag-and-drop, multi-select bulk edits, notes, snapshots, and reusable templates.
 - **Corkboard Mode** — Freeform spatial canvas with text and image sticky notes for brainstorming. Drag images from vault or desktop, add captions with wikilinks, open lightbox previews. Convert notes into scenes when ready.
 - **DOCX / PDF / HTML Export** — Export manuscripts and outlines to Word, PDF, and standalone HTML. DOCX includes configurable page size, margins, and font settings.

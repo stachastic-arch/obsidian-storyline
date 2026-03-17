@@ -1,6 +1,30 @@
 # StoryLine — Changelog
 
 ---
+## Version 1.8.0
+
+### New Features
+
+- **Focus Mode (Manuscript View)** — A glasses icon (👓) in the filter bar toggles Focus Mode. When active, surrounding UI (sidebars, ribbon, title bar, tab headers) is dimmed, darkened, and optionally blurred so you can concentrate on writing. The filter bar, scene headers, dividers, and footer are hidden. Three adjustable sliders in **Settings → Focus Mode**: Dim amount (inactive scenes), Darken amount (environment), and Blur amount (environment). A reset button restores defaults (25% / 40% / 1px).
+
+- **Codex Tags in Plot Grid Cells** — Every plot grid cell now automatically shows color-coded pills for characters (blue), locations (green), and codex entries (purple) detected in the cell text and/or the linked scene's body. Entity detection uses the same LinkScanner engine that powers cross-entity references. No manual tagging required.
+
+- **Two-Way Codex ↔ Prose Change Detection** — When a codex entry's content is edited after its initial creation, StoryLine flags it as "modified" on the Codex detail page and lists all scenes that reference the entry. A **"Mark as reviewed"** button clears the warning. Digests are stored per-project in `System/codex-digests.json`.
+
+- **Setup & Payoff Map (Stats View)** — A new collapsible section in the Stats dashboard visualizes setup → payoff chains across your scenes. Uses `setup_scenes` and `payoff_scenes` frontmatter to draw explicit links and flags dangling payoffs with no matching setup. Click any scene name to open it.
+
+- **Pacing Coach (Stats View)** — Added inside the Pacing & Tension section. A bar chart with conflict-presence dots highlights scenes where word count is high but no conflict is defined — potential pacing issues. Includes summary stats (average length with/without conflict) and flags specific long scenes lacking conflict.
+
+- **Character × Chapter Heatmap (Stats View)** — A grid heatmap in the Characters & World section showing how often each character appears per chapter. Color intensity reflects appearance count. Helps spot under-represented characters and distribution gaps.
+
+- **Echo Finder (Stats View)** — A new collapsible section that scans your prose for repeated phrases and sentence-level echoes. Finds duplicated multi-word sequences that may indicate unintentional repetition.
+
+### Improvements
+
+- **Manuscript Performance** — Memoized filtered scene list, skeleton placeholders during lazy loading, and cached footer stats reduce re-render overhead for large projects.
+
+---
+
 ## Version 1.7.2
 
 ### New Features

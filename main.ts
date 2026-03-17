@@ -666,6 +666,93 @@ export default class SceneCardsPlugin extends Plugin {
     }
 
     // ────────────────────────────────────
+    //  Codex change detection
+    // ────────────────────────────────────
+
+    /**
+     * Load stored codex content digests from System/codex-digests.json.
+     */
+    async loadCodexDigests(): Promise<Record<string, string>> {
+        const data = await this.readSystemJson('codex-digests.json');
+        return (data.digests || {}) as Record<string, string>;
+    }
+
+    /**
+     * Save codex content digests to System/codex-digests.json.
+     */
+    async saveCodexDigests(digests: Record<string, string>): Promise<void> {
+        await this.writeSystemJson('codex-digests.json', { digests });
+    }
+
+    /**
+     * Ensure new codex entries get a baseline digest and deleted entries are
+     * pruned. Does NOT overwrite existing digests (so changes are detectable).
+     */
+    async refreshCodexDigests(): Promise<void> {
+        const stored = await this.loadCodexDigests();
+        const current = this.linkScanner.computeCodexDigests();
+        let changed = false;
+
+        // Add digests for entries not yet tracked
+        for (const [fp, digest] of Object.entries(current)) {
+            if (!(fp in stored)) {
+                stored[fp] = digest;
+                changed = true;
+            }
+        }
+
+        // Remove digests for deleted entries
+        for (const fp of Object.keys(stored)) {
+            if (!(fp in current)) {
+                delete stored[fp];
+                changed = true;
+            }
+        }
+
+        if (changed) await this.saveCodexDigests(stored);
+    }
+
+    /**
+     * Return codex entries whose content has changed since the last review,
+     * along with the scenes that reference them.
+     */
+    async getStaleCodexEntries(): Promise<{ entry: import('./models/Codex').CodexEntry; affectedScenes: import('./services/LinkScanner').EntityReference[] }[]> {
+        const stored = await this.loadCodexDigests();
+        const current = this.linkScanner.computeCodexDigests();
+
+        const stale: { entry: import('./models/Codex').CodexEntry; affectedScenes: import('./services/LinkScanner').EntityReference[] }[] = [];
+        const index = this.linkScanner.buildEntityIndex();
+
+        for (const [fp, digest] of Object.entries(current)) {
+            if (fp in stored && stored[fp] !== digest) {
+                const entry = this.codexManager.getAllEntries().find(e => e.filePath === fp);
+                if (entry) {
+                    const refs = index.get(entry.name.toLowerCase()) || [];
+                    const sceneRefs = refs.filter(r => r.type === 'scene');
+                    if (sceneRefs.length > 0) {
+                        stale.push({ entry, affectedScenes: sceneRefs });
+                    }
+                }
+            }
+        }
+
+        return stale;
+    }
+
+    /**
+     * Mark a codex entry as reviewed — updates its stored digest to the
+     * current content so it's no longer flagged as stale.
+     */
+    async markCodexEntryReviewed(filePath: string): Promise<void> {
+        const stored = await this.loadCodexDigests();
+        const current = this.linkScanner.computeCodexDigests();
+        if (current[filePath]) {
+            stored[filePath] = current[filePath];
+        }
+        await this.saveCodexDigests(stored);
+    }
+
+    // ────────────────────────────────────
     //  Project System folder helpers
     // ────────────────────────────────────
 
@@ -1110,6 +1197,9 @@ export default class SceneCardsPlugin extends Plugin {
         this.linkScanner.invalidateAll();
         this.linkScanner.rebuildLookups(this.settings.characterAliases);
         this.linkScanner.scanAll(this.sceneManager.getAllScenes());
+
+        // Update codex digests (baseline new entries, prune deleted ones)
+        void this.refreshCodexDigests();
 
         const viewTypes = [
             BOARD_VIEW_TYPE,

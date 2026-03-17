@@ -1044,6 +1044,43 @@ export class PlotgridView extends ItemView {
                     }
                 }
 
+                // ── Codex entity tags ──────────────────────────
+                if (this.plugin?.linkScanner) {
+                    const seenLower = new Set<string>();
+                    const mentions: { name: string; type: string }[] = [];
+
+                    const addMentions = (result: { links: Array<{ name: string; type: string }> }) => {
+                        for (const link of result.links) {
+                            if (link.type === 'other') continue;
+                            const low = link.name.toLowerCase();
+                            if (!seenLower.has(low)) {
+                                seenLower.add(low);
+                                mentions.push({ name: link.name, type: link.type });
+                            }
+                        }
+                    };
+
+                    // Scan linked scene body (uses cache)
+                    if (cell.linkedSceneId) {
+                        const scMgr2 = this.plugin.sceneManager as SceneManager | undefined;
+                        const linkedScene = scMgr2?.getScene(cell.linkedSceneId);
+                        if (linkedScene) addMentions(this.plugin.linkScanner.scan(linkedScene));
+                    }
+
+                    // Scan cell text
+                    if (cell.content?.trim()) {
+                        addMentions(this.plugin.linkScanner.scanText(cell.content));
+                    }
+
+                    if (mentions.length > 0) {
+                        const tagsEl = cellEl.createDiv('pg-codex-tags');
+                        for (const m of mentions) {
+                            const pill = tagsEl.createSpan({ cls: `pg-codex-tag pg-codex-tag-${m.type}` });
+                            pill.textContent = m.name;
+                        }
+                    }
+                }
+
                 cellEl.addEventListener('dblclick', (ev) => {
                     ev.stopPropagation();
                     this.enterEditMode(cellEl, cell, contentEl);

@@ -492,6 +492,9 @@ export class CodexView extends ItemView {
         this.renderGallerySection(sidePanel, draft);
         this.renderNotesSection(sidePanel, draft);
         this.renderReferencesPanel(sidePanel, entry.name);
+
+        // Show stale-entry warning if codex content changed since last review
+        void this.renderStaleWarning(sidePanel, entry);
     }
 
     // ── Field category rendering ───────────────────────
@@ -1197,6 +1200,40 @@ export class CodexView extends ItemView {
                 });
             }
         }
+    }
+
+    // ── Stale codex entry warning ──────────────────────
+
+    private async renderStaleWarning(container: HTMLElement, entry: CodexEntry): Promise<void> {
+        const staleEntries = await this.plugin.getStaleCodexEntries();
+        const match = staleEntries.find(s => s.entry.filePath === entry.filePath);
+        if (!match || match.affectedScenes.length === 0) return;
+
+        const section = container.createDiv('codex-stale-warning');
+        const header = section.createDiv('codex-stale-header');
+        const icon = header.createSpan();
+        obsidian.setIcon(icon, 'alert-triangle');
+        header.createSpan({ text: ` Modified — ${match.affectedScenes.length} scene${match.affectedScenes.length !== 1 ? 's' : ''} may need review` });
+
+        const list = section.createEl('ul', { cls: 'codex-stale-scene-list' });
+        for (const ref of match.affectedScenes) {
+            const li = list.createEl('li');
+            const link = li.createEl('a', { text: ref.name, cls: 'reference-link' });
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.app.workspace.openLinkText(ref.filePath, '', false);
+            });
+        }
+
+        const reviewBtn = section.createEl('button', {
+            text: 'Mark as reviewed',
+            cls: 'codex-stale-reviewed-btn',
+        });
+        reviewBtn.addEventListener('click', async () => {
+            await this.plugin.markCodexEntryReviewed(entry.filePath);
+            section.remove();
+            new Notice('Entry marked as reviewed');
+        });
     }
 
     // ══════════════════════════════════════════════════

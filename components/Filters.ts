@@ -4,6 +4,8 @@ import { SceneFilter, SceneStatus, SortConfig, SortField, SortDirection, FilterP
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
 
+type FocusModeCallback = (active: boolean) => void;
+
 /**
  * Filter controls component for scene views
  */
@@ -16,16 +18,20 @@ export class FiltersComponent {
     private onChange: (filter: SceneFilter, sort: SortConfig) => void;
     private visible = false;
 
+    private onFocusModeChange?: FocusModeCallback;
+
     constructor(
         container: HTMLElement,
         sceneManager: SceneManager,
         onChange: (filter: SceneFilter, sort: SortConfig) => void,
-        plugin?: SceneCardsPlugin
+        plugin: SceneCardsPlugin,
+        onFocusModeChange?: FocusModeCallback,
     ) {
         this.container = container;
         this.sceneManager = sceneManager;
         this.onChange = onChange;
         this.plugin = plugin ?? null;
+        this.onFocusModeChange = onFocusModeChange;
     }
 
     /**

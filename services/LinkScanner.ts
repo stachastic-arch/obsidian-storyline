@@ -494,4 +494,37 @@ export class LinkScanner {
 
         return index;
     }
+
+    // ── Codex change detection ─────────────────────────
+
+    /**
+     * Compute a content digest for every codex entry.
+     * Returns a map of filePath → hash string.
+     * Used to detect when a codex entry has been edited since the last review.
+     */
+    computeCodexDigests(): Record<string, string> {
+        if (!this.codexManager) return {};
+        const digests: Record<string, string> = {};
+        for (const entry of this.codexManager.getAllEntries()) {
+            const textParts: string[] = [];
+            for (const [key, val] of Object.entries(entry)) {
+                if (key === 'filePath' || key === 'type' || key === 'name' || key === 'image' ||
+                    key === 'gallery' || key === 'created' || key === 'modified' || key === 'books') continue;
+                if (typeof val === 'string' && val.length > 0) textParts.push(val);
+            }
+            const text = textParts.join('\n');
+            if (text) digests[entry.filePath] = this.djb2(text);
+        }
+        return digests;
+    }
+
+    /** Simple DJB2 hash — fast, non-cryptographic, sufficient for change detection */
+    private djb2(str: string): string {
+        let h = 5381;
+        for (let i = 0; i < str.length; i++) {
+            h = ((h << 5) + h) + str.charCodeAt(i);
+            h |= 0;
+        }
+        return h.toString(36);
+    }
 }

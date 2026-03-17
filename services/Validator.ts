@@ -58,6 +58,7 @@ export class Validator {
         this.checkSetupPayoff(scenes, warnings);
         this.checkStructure(scenes, warnings);
         this.checkContinuity(scenes, warnings);
+        this.checkTimelineGaps(scenes, warnings);
 
         return warnings;
     }
@@ -470,5 +471,84 @@ export class Validator {
                 streakStart = i;
             }
         }
+    }
+
+    // ─── Timeline Gap Detection ────────────────────────────────
+
+    /**
+     * Detect significant jumps in story time (storyDate) between consecutive
+     * scenes that aren't marked as timeskip/flashback/dream etc.
+     * These may indicate unintentional continuity gaps.
+     */
+    private static checkTimelineGaps(scenes: Scene[], warnings: PlotWarning[]): void {
+        const sorted = [...scenes].sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
+        const withDates = sorted.filter(s => s.storyDate);
+        if (withDates.length < 2) return;
+
+        for (let i = 1; i < withDates.length; i++) {
+            const prev = withDates[i - 1];
+            const curr = withDates[i];
+
+            // Skip if either scene is exempt from gap checks
+            if (EXEMPT_FROM_GAP.has(prev.timeline_mode) || EXEMPT_FROM_GAP.has(curr.timeline_mode)) continue;
+            // Skip flashbacks, flash-forwards, dreams etc.
+            if (EXEMPT_FROM_DATE_ORDER.has(prev.timeline_mode) || EXEMPT_FROM_DATE_ORDER.has(curr.timeline_mode)) continue;
+
+            // Try to parse as ISO dates
+            const prevDate = this.parseStoryDate(prev.storyDate!);
+            const currDate = this.parseStoryDate(curr.storyDate!);
+            if (!prevDate || !currDate) continue;
+
+            const dayGap = Math.round((currDate.getTime() - prevDate.getTime()) / (1000 * 60 * 60 * 24));
+
+            // Flag gaps of 7+ days without a timeskip mode
+            if (dayGap >= 7) {
+                warnings.push({
+                    severity: 'info',
+                    category: 'Timeline',
+                    message: `${dayGap}-day gap between "${prev.title}" (${prev.storyDate}) and "${curr.title}" (${curr.storyDate}) without a timeskip marker`,
+                    scenePaths: [prev.filePath, curr.filePath],
+                });
+            }
+
+            // Flag negative gaps (going backward in time without flashback mode)
+            if (dayGap < -1) {
+                warnings.push({
+                    severity: 'warning',
+                    category: 'Timeline',
+                    message: `Time goes backward: "${prev.title}" (${prev.storyDate}) → "${curr.title}" (${curr.storyDate}) — ${Math.abs(dayGap)} days earlier, but no flashback/flash_forward mode set`,
+                    scenePaths: [prev.filePath, curr.filePath],
+                });
+            }
+        }
+
+        // Check for scenes with storyTime but no storyDate (incomplete data)
+        const timeOnly = sorted.filter(s => s.storyTime && !s.storyDate);
+        if (timeOnly.length > 0 && withDates.length > 0) {
+            warnings.push({
+                severity: 'info',
+                category: 'Timeline',
+                message: `${timeOnly.length} scene(s) have storyTime but no storyDate — timeline gap detection can't cover them`,
+                scenePaths: timeOnly.map(s => s.filePath),
+            });
+        }
+    }
+
+    /**
+     * Attempt to parse a story date string into a Date.
+     * Supports ISO (YYYY-MM-DD) and common formats.
+     * Returns null if unparseable (e.g. "Day 1", "morning").
+     */
+    private static parseStoryDate(dateStr: string): Date | null {
+        // Try ISO format first (YYYY-MM-DD)
+        const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+        if (isoMatch) {
+            const d = new Date(parseInt(isoMatch[1]), parseInt(isoMatch[2]) - 1, parseInt(isoMatch[3]));
+            if (!isNaN(d.getTime())) return d;
+        }
+        // Try Date.parse as fallback (handles many formats)
+        const parsed = Date.parse(dateStr);
+        if (!isNaN(parsed)) return new Date(parsed);
+        return null;
     }
 }

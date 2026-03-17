@@ -18,6 +18,7 @@ export class StatsView extends ItemView {
     private sceneManager: SceneManager;
     private rootContainer: HTMLElement | null = null;
     private proseCache: { readability: ReadabilityResult; wordFreq: [string, number][] } | null = null;
+    private echoCache: { echoes: EchoCluster[]; perScene: SceneEchoReport[] } | null = null;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -88,6 +89,10 @@ export class StatsView extends ItemView {
         this.renderCollapsible(content, 'users', 'Characters & World', false, body =>
             this.renderCharactersWorld(body, stats, allScenes));
 
+        // 5b. Setup & Payoff Map (collapsible, default collapsed)
+        this.renderCollapsible(content, 'link', 'Setup & Payoff Map', false, body =>
+            this.renderSetupPayoffMap(body, allScenes));
+
         // 6. Pacing & Tension (collapsible, default collapsed)
         this.renderCollapsible(content, 'activity', 'Pacing & Tension', false, body =>
             this.renderPacingTension(body, allScenes));
@@ -95,6 +100,10 @@ export class StatsView extends ItemView {
         // 7. Prose Analysis (collapsible, default collapsed — lazy)
         this.renderCollapsible(content, 'text', 'Prose Analysis', false, body =>
             this.renderProseAnalysisPlaceholder(body, allScenes));
+
+        // 7b. Echo Finder (collapsible, default collapsed — lazy)
+        this.renderCollapsible(content, 'repeat', 'Echo Finder', false, body =>
+            this.renderEchoFinderPlaceholder(body, allScenes));
 
         // 8. Warnings & Plot Holes (collapsible, default open)
         this.renderCollapsible(content, 'alert-triangle', 'Warnings & Plot Holes', true, body =>
@@ -204,6 +213,12 @@ export class StatsView extends ItemView {
             this.createStatCard(sessionRow, 'flame', 'Streak', `${streak} day${streak > 1 ? 's' : ''}`);
         }
 
+        // Revision volume (absolute changes — adds + deletes)
+        const todayRevisions = tracker.getTodayRevisions();
+        if (todayRevisions > 0) {
+            this.createStatCard(sessionRow, 'rotate-cw', 'Revisions', `${todayRevisions.toLocaleString()} words`);
+        }
+
         // Daily goal
         const goalPct = Math.min(100, Math.round((todayWords / dailyGoal) * 100));
         const goalRow = section.createDiv('stats-sprint-goal');
@@ -226,6 +241,24 @@ export class StatsView extends ItemView {
             b.style.height = `${Math.max(2, hPct)}%`;
             b.setAttribute('title', `${day.date}: ${day.words} words`);
             col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
+        }
+
+        // 7-day revision sparkline (if any revision data exists)
+        const recentRevisions = tracker.getRecentRevisionDays(7).reverse();
+        const hasRevisionData = recentRevisions.some(d => d.words > 0);
+        if (hasRevisionData) {
+            const maxRev = Math.max(...recentRevisions.map(d => d.words), 1);
+            const revSection = section.createDiv('stats-sprint-sparkline');
+            revSection.createSpan({ cls: 'stats-sprint-sparkline-label', text: 'Revisions (7 days):' });
+            const revRow = revSection.createDiv('stats-sprint-spark-row');
+            for (const day of recentRevisions) {
+                const col = revRow.createDiv('stats-sprint-spark-col');
+                const hPct = (day.words / maxRev) * 100;
+                const b = col.createDiv('stats-sprint-spark-bar stats-revision-bar');
+                b.style.height = `${Math.max(2, hPct)}%`;
+                b.setAttribute('title', `${day.date}: ${day.words} words revised`);
+                col.createDiv({ cls: 'stats-sprint-spark-label', text: day.date.slice(5) });
+            }
         }
     }
 
@@ -462,6 +495,233 @@ export class StatsView extends ItemView {
         } else {
             parent.createEl('p', { cls: 'stats-empty', text: 'No location data.' });
         }
+
+        // ── Character Appearance Heatmap (character × chapter) ──
+        this.renderCharacterHeatmap(parent, allScenes, resolve);
+    }
+
+    private renderCharacterHeatmap(
+        parent: HTMLElement,
+        allScenes: Scene[],
+        resolve: (name: string) => string,
+    ): void {
+        // Build chapter list (sorted)
+        const chapterSet = new Set<string>();
+        for (const s of allScenes) {
+            if (s.chapter !== undefined) chapterSet.add(String(s.chapter));
+        }
+        const chapters = Array.from(chapterSet).sort((a, b) => {
+            const na = parseInt(a), nb = parseInt(b);
+            if (!isNaN(na) && !isNaN(nb)) return na - nb;
+            return a.localeCompare(b);
+        });
+        if (chapters.length < 2) return;
+
+        // Build character × chapter matrix
+        const charChapterMap: Record<string, Record<string, number>> = {};
+        for (const s of allScenes) {
+            const ch = s.chapter !== undefined ? String(s.chapter) : null;
+            if (!ch) continue;
+            const chars = new Set<string>();
+            if (s.pov) chars.add(resolve(s.pov));
+            if (s.characters) s.characters.forEach(c => chars.add(resolve(c)));
+            for (const c of chars) {
+                if (!charChapterMap[c]) charChapterMap[c] = {};
+                charChapterMap[c][ch] = (charChapterMap[c][ch] || 0) + 1;
+            }
+        }
+
+        // Sort characters by total appearances (descending), limit to top 15
+        const charEntries = Object.entries(charChapterMap)
+            .map(([name, counts]) => ({
+                name,
+                counts,
+                total: Object.values(counts).reduce((s, c) => s + c, 0),
+            }))
+            .sort((a, b) => b.total - a.total)
+            .slice(0, 15);
+
+        if (charEntries.length === 0) return;
+
+        const maxCount = Math.max(...charEntries.flatMap(c => Object.values(c.counts)), 1);
+
+        const sec = parent.createDiv('stats-subsection');
+        sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Character × Chapter Heatmap' });
+        sec.createEl('p', { cls: 'stats-hint', text: 'Darker cells = more scene appearances in that chapter.' });
+
+        const table = sec.createEl('table', { cls: 'stats-heatmap-table' });
+
+        // Header row
+        const thead = table.createEl('thead');
+        const headerRow = thead.createEl('tr');
+        headerRow.createEl('th', { text: '' }); // empty corner
+        for (const ch of chapters) {
+            headerRow.createEl('th', { text: `Ch ${ch}`, cls: 'stats-heatmap-ch-header' });
+        }
+
+        // Data rows
+        const tbody = table.createEl('tbody');
+        for (const entry of charEntries) {
+            const row = tbody.createEl('tr');
+            row.createEl('td', { text: entry.name, cls: 'stats-heatmap-name' });
+            for (const ch of chapters) {
+                const count = entry.counts[ch] || 0;
+                const cell = row.createEl('td', { cls: 'stats-heatmap-cell' });
+                if (count > 0) {
+                    const opacity = Math.max(0.15, count / maxCount);
+                    cell.style.backgroundColor = `rgba(var(--sl-accent-rgb, 66, 150, 252), ${opacity})`;
+                    cell.setAttribute('title', `${entry.name} in Ch ${ch}: ${count} scene${count !== 1 ? 's' : ''}`);
+                    cell.textContent = String(count);
+                }
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  5b. Setup & Payoff Map
+    // ════════════════════════════════════════════════════
+
+    private renderSetupPayoffMap(parent: HTMLElement, allScenes: Scene[]): void {
+        const titleMap = new Map<string, Scene>();
+        allScenes.forEach(s => titleMap.set(s.title, s));
+
+        // Collect all setup → payoff links
+        const links: { from: Scene; to: Scene; label: 'payoff' | 'setup' }[] = [];
+        const danglingSetups: Scene[] = [];
+        const danglingPayoffs: Scene[] = [];
+
+        for (const scene of allScenes) {
+            if (scene.payoff_scenes?.length) {
+                for (const target of scene.payoff_scenes) {
+                    const targetScene = titleMap.get(target);
+                    if (targetScene) {
+                        links.push({ from: scene, to: targetScene, label: 'payoff' });
+                    }
+                }
+            }
+            if (scene.setup_scenes?.length) {
+                for (const source of scene.setup_scenes) {
+                    const sourceScene = titleMap.get(source);
+                    if (sourceScene) {
+                        // Avoid duplicates — only add if not already covered by from→to
+                        const exists = links.some(l =>
+                            l.from.filePath === sourceScene.filePath && l.to.filePath === scene.filePath
+                        );
+                        if (!exists) {
+                            links.push({ from: sourceScene, to: scene, label: 'setup' });
+                        }
+                    }
+                }
+            }
+        }
+
+        // Find scenes that set things up but have no payoff pointing back
+        for (const scene of allScenes) {
+            if (scene.payoff_scenes?.length) {
+                const hasPayoffBack = scene.payoff_scenes.some(t => {
+                    const ts = titleMap.get(t);
+                    return ts?.setup_scenes?.includes(scene.title);
+                });
+                if (!hasPayoffBack) danglingSetups.push(scene);
+            }
+            // Scenes with setup_scenes but no one references them as payoff
+            if (scene.setup_scenes?.length) {
+                const hasSetupRef = scene.setup_scenes.some(s => {
+                    const ss = titleMap.get(s);
+                    return ss?.payoff_scenes?.includes(scene.title);
+                });
+                if (!hasSetupRef) danglingPayoffs.push(scene);
+            }
+        }
+
+        if (links.length === 0) {
+            parent.createEl('p', { cls: 'stats-empty', text: 'No setup/payoff links found. Add setup_scenes or payoff_scenes to your scene frontmatter to track them.' });
+            return;
+        }
+
+        // ── Visual map ──
+        const mapSec = parent.createDiv('stats-subsection');
+        mapSec.createEl('h5', { cls: 'stats-subsection-title', text: `Setup → Payoff Chains (${links.length} link${links.length !== 1 ? 's' : ''})` });
+        mapSec.createEl('p', { cls: 'stats-hint', text: 'Each row shows a setup scene and where it pays off.' });
+
+        // Group by "from" scene to show chains
+        const byFrom = new Map<string, { from: Scene; targets: Scene[] }>();
+        for (const link of links) {
+            const key = link.from.filePath;
+            if (!byFrom.has(key)) byFrom.set(key, { from: link.from, targets: [] });
+            byFrom.get(key)!.targets.push(link.to);
+        }
+
+        // Sort by sequence
+        const sorted = Array.from(byFrom.values()).sort((a, b) =>
+            (a.from.sequence ?? 0) - (b.from.sequence ?? 0)
+        );
+
+        for (const chain of sorted) {
+            const row = mapSec.createDiv('stats-setup-payoff-row');
+
+            // From scene
+            const fromEl = row.createDiv('stats-sp-from');
+            const seqLabel = chain.from.sequence !== undefined ? `#${chain.from.sequence} ` : '';
+            const fromLink = fromEl.createEl('a', {
+                text: `${seqLabel}${chain.from.title}`,
+                cls: 'stats-scene-link',
+            });
+            fromLink.addEventListener('click', () => {
+                this.app.workspace.openLinkText(chain.from.filePath, '', true);
+            });
+
+            // Arrow
+            row.createSpan({ cls: 'stats-sp-arrow', text: '→' });
+
+            // To scenes
+            const toEl = row.createDiv('stats-sp-to');
+            for (const target of chain.targets.sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0))) {
+                const tSeq = target.sequence !== undefined ? `#${target.sequence} ` : '';
+                const toLink = toEl.createEl('a', {
+                    text: `${tSeq}${target.title}`,
+                    cls: 'stats-scene-link stats-sp-target',
+                });
+                toLink.addEventListener('click', () => {
+                    this.app.workspace.openLinkText(target.filePath, '', true);
+                });
+            }
+        }
+
+        // ── Dangling setups (Chekhov's guns that haven't fired) ──
+        const scenesWithPayoff = new Set(links.map(l => l.from.filePath));
+        const scenesBeingPaidOff = new Set(links.map(l => l.to.filePath));
+        const orphanSetups = allScenes.filter(s =>
+            s.payoff_scenes?.length && s.payoff_scenes.length > 0 &&
+            !s.payoff_scenes.some(t => titleMap.has(t))
+        );
+
+        // Scenes that have payoff_scenes pointing to non-existent scenes
+        if (orphanSetups.length > 0) {
+            const warnSec = mapSec.createDiv('stats-subsection');
+            warnSec.createEl('h5', {
+                cls: 'stats-subsection-title stats-overused-title',
+                text: `Broken Links (${orphanSetups.length})`,
+            });
+            const list = warnSec.createEl('ul', { cls: 'stats-list' });
+            for (const scene of orphanSetups) {
+                const li = list.createEl('li');
+                const link = li.createEl('a', { text: scene.title, cls: 'stats-scene-link' });
+                link.addEventListener('click', () => {
+                    this.app.workspace.openLinkText(scene.filePath, '', true);
+                });
+                const missing = scene.payoff_scenes!.filter(t => !titleMap.has(t));
+                li.createSpan({ text: ` → ${missing.map(t => `"${t}"`).join(', ')} (not found)` });
+            }
+        }
+
+        // Summary
+        const summaryRow = mapSec.createDiv('stats-sprint-row');
+        const totalSetups = new Set(links.map(l => l.from.filePath)).size;
+        const totalPayoffs = new Set(links.map(l => l.to.filePath)).size;
+        this.createStatCard(summaryRow, 'target', 'Setups', String(totalSetups));
+        this.createStatCard(summaryRow, 'check-circle', 'Payoffs', String(totalPayoffs));
+        this.createStatCard(summaryRow, 'link', 'Links', String(links.length));
     }
 
     // ════════════════════════════════════════════════════
@@ -559,6 +819,9 @@ export class StatsView extends ItemView {
 
         // ── Dialogue vs narrative ──
         this.renderDialogueRatio(parent, allScenes);
+
+        // ── Pacing Coach ──
+        this.renderPacingCoach(parent, allScenes);
 
         // ── Tension curve ──
         const ordered = this.sceneManager.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
@@ -777,6 +1040,296 @@ export class StatsView extends ItemView {
     }
 
     // ════════════════════════════════════════════════════
+    //  7b. Echo Finder
+    // ════════════════════════════════════════════════════
+
+    private renderEchoFinderPlaceholder(parent: HTMLElement, allScenes: Scene[]): void {
+        const withBody = allScenes.filter(s => s.body && s.body.trim().length > 0);
+        if (withBody.length === 0) {
+            parent.createEl('p', { cls: 'stats-empty', text: 'No scene body text available for echo analysis.' });
+            return;
+        }
+
+        if (this.echoCache) {
+            this.renderEchoResults(parent, this.echoCache);
+            return;
+        }
+
+        const spinner = parent.createDiv('stats-spinner-wrap');
+        const ico = spinner.createSpan({ cls: 'stats-spinner' });
+        obsidian.setIcon(ico, 'loader');
+        spinner.createSpan({ text: ' Finding echoes…' });
+
+        requestAnimationFrame(() => {
+            this.echoCache = this.computeEchoes(withBody);
+            spinner.remove();
+            this.renderEchoResults(parent, this.echoCache);
+        });
+    }
+
+    private computeEchoes(scenes: Scene[]): { echoes: EchoCluster[]; perScene: SceneEchoReport[] } {
+        const stop = new Set([
+            'the','and','was','for','that','with','his','her','had','not','but','you','are',
+            'from','they','she','been','have','him','has','this','were','said','each','its',
+            'who','which','their','will','would','could','than','them','then','into','more',
+            'some','when','what','there','about','just','like','all','out','did','one','over',
+            'how','back','down','only','very','after','before','even','also','other','our',
+            'own','still','being','your','too','here','those','both','does','where','most',
+            'much','through','while','now','way','may','any','well','between','another',
+            'because','such','never','went','came','made','around','long','time','know',
+            'looked','thought','could','would','should','going','come','take','make',
+        ]);
+
+        const echoes: EchoCluster[] = [];
+        const perScene: SceneEchoReport[] = [];
+
+        // Compute global word frequency across all scenes
+        const globalFreq: Record<string, number> = {};
+        let globalTotal = 0;
+        for (const scene of scenes) {
+            const words = this.extractWords(scene.body!);
+            for (const w of words) {
+                if (!stop.has(w) && w.length > 2) {
+                    globalFreq[w] = (globalFreq[w] || 0) + 1;
+                    globalTotal++;
+                }
+            }
+        }
+        const globalRate: Record<string, number> = {};
+        for (const [w, c] of Object.entries(globalFreq)) globalRate[w] = c / globalTotal;
+
+        for (const scene of scenes) {
+            const body = scene.body!;
+            const sentences = body.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
+            const sceneWordList = this.extractWords(body);
+            const sceneFreq: Record<string, number> = {};
+            const sceneTotal = sceneWordList.filter(w => !stop.has(w) && w.length > 2).length;
+
+            for (const w of sceneWordList) {
+                if (!stop.has(w) && w.length > 2) {
+                    sceneFreq[w] = (sceneFreq[w] || 0) + 1;
+                }
+            }
+
+            // Find proximity echoes: same word repeated within a window of 3 sentences
+            const sentenceWords: string[][] = sentences.map(s =>
+                this.extractWords(s).filter(w => !stop.has(w) && w.length > 2)
+            );
+
+            const proximityMap: Record<string, number> = {};
+            for (let i = 0; i < sentenceWords.length; i++) {
+                const window = new Set<string>();
+                for (let j = Math.max(0, i - 2); j < i; j++) {
+                    for (const w of sentenceWords[j]) window.add(w);
+                }
+                for (const w of sentenceWords[i]) {
+                    if (window.has(w)) {
+                        proximityMap[w] = (proximityMap[w] || 0) + 1;
+                    }
+                }
+            }
+
+            // Filter to significant echoes (repeated in proximity ≥ 2 times)
+            const sceneEchoes = Object.entries(proximityMap)
+                .filter(([, count]) => count >= 2)
+                .sort(([, a], [, b]) => b - a)
+                .map(([word, count]) => ({ word, proximityHits: count, total: sceneFreq[word] || 0 }));
+
+            if (sceneEchoes.length > 0) {
+                echoes.push({
+                    sceneTitle: scene.title || 'Untitled',
+                    filePath: scene.filePath,
+                    echoes: sceneEchoes.slice(0, 10),
+                });
+            }
+
+            // Per-scene favourite words: words whose frequency in this scene is ≥ 2× the global rate
+            const favourites: { word: string; sceneRate: number; globalRate: number; count: number }[] = [];
+            if (sceneTotal > 50) {
+                for (const [w, c] of Object.entries(sceneFreq)) {
+                    const sRate = c / sceneTotal;
+                    const gRate = globalRate[w] || 0;
+                    if (c >= 3 && gRate > 0 && sRate >= gRate * 2.5) {
+                        favourites.push({ word: w, sceneRate: sRate, globalRate: gRate, count: c });
+                    }
+                }
+            }
+
+            if (favourites.length > 0 || sceneEchoes.length > 0) {
+                perScene.push({
+                    sceneTitle: scene.title || 'Untitled',
+                    filePath: scene.filePath,
+                    favourites: favourites.sort((a, b) => (b.sceneRate / b.globalRate) - (a.sceneRate / a.globalRate)).slice(0, 8),
+                    echoCount: sceneEchoes.length,
+                });
+            }
+        }
+
+        return { echoes, perScene };
+    }
+
+    private extractWords(text: string): string[] {
+        return text
+            .replace(/^---[\s\S]*?---/gm, '')
+            .replace(/\[\[([^\]|]+)(\|([^\]]+))?\]\]/g, '$3$1')
+            .replace(/[#*_~`>\[\]()!]/g, '')
+            .toLowerCase()
+            .split(/\s+/)
+            .map(w => w.replace(/^[^a-z]+|[^a-z]+$/g, ''))
+            .filter(w => w.length > 0);
+    }
+
+    private renderEchoResults(
+        parent: HTMLElement,
+        cache: { echoes: EchoCluster[]; perScene: SceneEchoReport[] },
+    ): void {
+        const { echoes, perScene } = cache;
+
+        if (echoes.length === 0) {
+            parent.createEl('p', { cls: 'stats-empty', text: 'No significant word echoes detected. Great variety!' });
+            return;
+        }
+
+        // Proximity echoes per scene
+        const echoSec = parent.createDiv('stats-subsection');
+        echoSec.createEl('h5', { cls: 'stats-subsection-title', text: `Proximity Echoes (${echoes.length} scene${echoes.length !== 1 ? 's' : ''})` });
+        echoSec.createEl('p', { cls: 'stats-hint', text: 'Words repeated within 3 sentences of each other — often unintentional.' });
+
+        const shown = echoes.slice(0, 10);
+        for (const cluster of shown) {
+            const row = echoSec.createDiv('stats-echo-scene');
+            const link = row.createEl('a', { text: cluster.sceneTitle, cls: 'stats-scene-link' });
+            link.addEventListener('click', () => {
+                this.app.workspace.openLinkText(cluster.filePath, '', true);
+            });
+            const tags = row.createDiv('stats-overused-tags');
+            for (const e of cluster.echoes) {
+                tags.createSpan({
+                    cls: 'stats-echo-tag',
+                    text: `${e.word} ×${e.proximityHits}`,
+                    title: `"${e.word}" appears close together ${e.proximityHits} times (${e.total} total in scene)`,
+                });
+            }
+        }
+        if (echoes.length > 10) {
+            echoSec.createEl('p', { cls: 'stats-hint', text: `…and ${echoes.length - 10} more scenes with echoes.` });
+        }
+
+        // Per-scene favourites (words overused relative to manuscript average)
+        const withFavourites = perScene.filter(r => r.favourites.length > 0);
+        if (withFavourites.length > 0) {
+            const favSec = parent.createDiv('stats-subsection');
+            favSec.createEl('h5', { cls: 'stats-subsection-title stats-overused-title', text: 'Scene-specific Favourite Words' });
+            favSec.createEl('p', { cls: 'stats-hint', text: 'Words used much more in a specific scene than in the rest of the manuscript.' });
+
+            const showFav = withFavourites.slice(0, 10);
+            for (const report of showFav) {
+                const row = favSec.createDiv('stats-echo-scene');
+                const link = row.createEl('a', { text: report.sceneTitle, cls: 'stats-scene-link' });
+                link.addEventListener('click', () => {
+                    this.app.workspace.openLinkText(report.filePath, '', true);
+                });
+                const tags = row.createDiv('stats-overused-tags');
+                for (const f of report.favourites) {
+                    const ratio = (f.sceneRate / f.globalRate).toFixed(1);
+                    tags.createSpan({
+                        cls: 'stats-overused-tag',
+                        text: `${f.word} (${ratio}×)`,
+                        title: `"${f.word}" appears ${f.count} times — ${ratio}× the manuscript average`,
+                    });
+                }
+            }
+            if (withFavourites.length > 10) {
+                favSec.createEl('p', { cls: 'stats-hint', text: `…and ${withFavourites.length - 10} more scenes.` });
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════
+    //  Pacing Coach (inside Pacing & Tension)
+    // ════════════════════════════════════════════════════
+
+    private renderPacingCoach(parent: HTMLElement, allScenes: Scene[]): void {
+        const ordered = this.sceneManager.getFilteredScenes(undefined, { field: 'sequence', direction: 'asc' });
+        if (ordered.length < 3) return;
+
+        const sec = parent.createDiv('stats-subsection');
+        sec.createEl('h5', { cls: 'stats-subsection-title', text: 'Pacing Coach' });
+        sec.createEl('p', { cls: 'stats-hint', text: 'Scene length (bars) with conflict presence (dots). Long scenes without conflict may slow pacing.' });
+
+        const maxWc = Math.max(...ordered.map(s => s.wordcount || 0), 1);
+        const chart = sec.createDiv('pacing-coach-chart');
+
+        for (const scene of ordered) {
+            const wc = scene.wordcount || 0;
+            const hasConflict = !!(scene.conflict && scene.conflict.trim().length > 0);
+            const hPct = (wc / maxWc) * 100;
+
+            const col = chart.createDiv('pacing-coach-col');
+            const bar = col.createDiv('pacing-coach-bar');
+            bar.style.height = `${Math.max(2, hPct)}%`;
+
+            if (!hasConflict && wc > 0) {
+                bar.addClass('pacing-no-conflict');
+            }
+
+            // Conflict dot
+            const dot = col.createDiv('pacing-coach-dot');
+            if (hasConflict) {
+                dot.addClass('pacing-has-conflict');
+            }
+
+            const actLabel = scene.act !== undefined ? ` (Act ${scene.act})` : '';
+            bar.setAttribute('title', `${scene.title || 'Untitled'}${actLabel}\n${wc.toLocaleString()} words${hasConflict ? '\n✓ Has conflict' : '\n✗ No conflict'}`);
+        }
+
+        // Legend
+        const legend = sec.createDiv('pacing-coach-legend');
+        const l1 = legend.createSpan({ cls: 'pacing-coach-legend-item' });
+        l1.createSpan({ cls: 'pacing-coach-legend-swatch pacing-coach-bar-swatch' });
+        l1.createSpan({ text: ' With conflict' });
+        const l2 = legend.createSpan({ cls: 'pacing-coach-legend-item' });
+        l2.createSpan({ cls: 'pacing-coach-legend-swatch pacing-coach-noconflict-swatch' });
+        l2.createSpan({ text: ' No conflict' });
+
+        // Summary stats
+        const withConflict = ordered.filter(s => s.conflict && s.conflict.trim().length > 0);
+        const avgWithConflict = withConflict.length > 0
+            ? Math.round(withConflict.reduce((s, sc) => s + (sc.wordcount || 0), 0) / withConflict.length)
+            : 0;
+        const withoutConflict = ordered.filter(s => !s.conflict || s.conflict.trim().length === 0);
+        const avgWithout = withoutConflict.length > 0
+            ? Math.round(withoutConflict.reduce((s, sc) => s + (sc.wordcount || 0), 0) / withoutConflict.length)
+            : 0;
+
+        const summaryRow = sec.createDiv('stats-sprint-row');
+        this.createStatCard(summaryRow, 'swords', 'With conflict', `${withConflict.length} scenes (avg ${avgWithConflict.toLocaleString()} words)`);
+        this.createStatCard(summaryRow, 'minus-circle', 'No conflict', `${withoutConflict.length} scenes (avg ${avgWithout.toLocaleString()} words)`);
+
+        // Flag long scenes without conflict
+        const longNoConflict = withoutConflict
+            .filter(s => (s.wordcount || 0) > avgWithConflict * 1.5 && (s.wordcount || 0) > 500)
+            .sort((a, b) => (b.wordcount || 0) - (a.wordcount || 0));
+
+        if (longNoConflict.length > 0) {
+            const flagSec = sec.createDiv('stats-subsection');
+            flagSec.createEl('p', {
+                cls: 'stats-hint stats-overused-title',
+                text: `${longNoConflict.length} long scene${longNoConflict.length !== 1 ? 's' : ''} without conflict — potential pacing issues:`,
+            });
+            const list = flagSec.createEl('ul', { cls: 'stats-list' });
+            for (const scene of longNoConflict.slice(0, 8)) {
+                const li = list.createEl('li');
+                const link = li.createEl('a', { text: scene.title || 'Untitled', cls: 'stats-scene-link' });
+                link.addEventListener('click', () => {
+                    this.app.workspace.openLinkText(scene.filePath, '', true);
+                });
+                li.createSpan({ text: ` — ${(scene.wordcount || 0).toLocaleString()} words, no conflict` });
+            }
+        }
+    }
+
+    // ════════════════════════════════════════════════════
     //  8. Warnings & Plot Holes
     // ════════════════════════════════════════════════════
 
@@ -856,6 +1409,7 @@ export class StatsView extends ItemView {
      */
     refresh(): void {
         this.proseCache = null;
+        this.echoCache = null;
         if (this.rootContainer) {
             this.renderView(this.rootContainer);
         }
@@ -867,4 +1421,17 @@ interface ReadabilityResult {
     fleschReadingEase: number;
     avgSentenceLength: number;
     avgWordLength: number;
+}
+
+interface EchoCluster {
+    sceneTitle: string;
+    filePath: string;
+    echoes: { word: string; proximityHits: number; total: number }[];
+}
+
+interface SceneEchoReport {
+    sceneTitle: string;
+    filePath: string;
+    favourites: { word: string; sceneRate: number; globalRate: number; count: number }[];
+    echoCount: number;
 }

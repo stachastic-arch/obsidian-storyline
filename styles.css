@@ -762,6 +762,13 @@ body.theme-dark {
     align-items: flex-start;
 }
 
+/* Extra trailing space so users can scroll the last column(s) clear of the inspector panel */
+.story-line-board::after {
+    content: '';
+    flex-shrink: 0;
+    min-width: 360px;
+}
+
 .story-line-board.story-line-corkboard {
     display: block;
     overflow: hidden;
@@ -5394,6 +5401,162 @@ body.theme-dark {
     font-weight: 600;
 }
 
+/* ── Echo Finder ── */
+.stats-echo-scene {
+    margin-bottom: 10px;
+}
+.stats-echo-scene .stats-scene-link {
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 600;
+    font-size: 0.88em;
+}
+.stats-echo-tag {
+    display: inline-block;
+    padding: 3px 8px;
+    font-size: 0.8em;
+    border-radius: 12px;
+    background: rgba(156, 39, 176, 0.15);
+    color: var(--sl-echo, #9C27B0);
+    font-weight: 600;
+    cursor: default;
+}
+
+/* ── Character × Chapter Heatmap ── */
+.stats-heatmap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.78em;
+    margin-top: 8px;
+}
+.stats-heatmap-table th,
+.stats-heatmap-table td {
+    padding: 4px 6px;
+    text-align: center;
+    border: 1px solid var(--sc-card-border);
+}
+.stats-heatmap-ch-header {
+    font-weight: 600;
+    font-size: 0.85em;
+    white-space: nowrap;
+}
+.stats-heatmap-name {
+    text-align: left !important;
+    font-weight: 600;
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.stats-heatmap-cell {
+    min-width: 28px;
+    font-size: 0.85em;
+    color: var(--text-normal);
+    transition: background-color 0.15s;
+}
+
+/* ── Setup & Payoff Map ── */
+.stats-setup-payoff-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+.stats-setup-payoff-row:last-child {
+    border-bottom: none;
+}
+.stats-sp-from {
+    flex-shrink: 0;
+    min-width: 140px;
+}
+.stats-sp-arrow {
+    color: var(--sc-text-muted);
+    font-size: 1.1em;
+    flex-shrink: 0;
+}
+.stats-sp-to {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+}
+.stats-sp-target {
+    padding: 2px 8px;
+    background: rgba(76, 175, 80, 0.1);
+    border-radius: 4px;
+    font-size: 0.88em;
+}
+
+/* ── Revision sparkline bar colour ── */
+.stats-revision-bar {
+    background: var(--sl-revision, #FF9800) !important;
+}
+
+/* ── Pacing Coach chart ── */
+.pacing-coach-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 120px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--sc-card-border);
+}
+.pacing-coach-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    height: 100%;
+    min-width: 4px;
+}
+.pacing-coach-bar {
+    width: 100%;
+    min-height: 2px;
+    background: var(--sl-info, #2196F3);
+    border-radius: 2px 2px 0 0;
+    transition: height 0.2s;
+}
+.pacing-coach-bar.pacing-no-conflict {
+    background: var(--sl-warning, #FF9800);
+    opacity: 0.7;
+}
+.pacing-coach-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    margin-top: 3px;
+    background: transparent;
+}
+.pacing-coach-dot.pacing-has-conflict {
+    background: var(--sl-success, #4CAF50);
+}
+.pacing-coach-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 0.78em;
+    color: var(--sc-text-muted);
+    margin-top: 6px;
+}
+.pacing-coach-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.pacing-coach-legend-swatch {
+    display: inline-block;
+    width: 12px;
+    height: 8px;
+    border-radius: 2px;
+}
+.pacing-coach-bar-swatch {
+    background: var(--sl-info, #2196F3);
+}
+.pacing-coach-noconflict-swatch {
+    background: var(--sl-warning, #FF9800);
+    opacity: 0.7;
+}
+
 /* ── Misc stats helpers ── */
 .stats-hint {
     font-size: 0.82em;
@@ -8645,6 +8808,31 @@ body.theme-dark .location-field-input.dropdown {
     border-bottom: none;
 }
 
+/* ── Focus mode ───────────────────────────────────────── */
+.sl-focus-btn {
+    color: var(--text-faint);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+}
+.sl-focus-btn:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.sl-focus-btn.is-active { color: var(--text-accent); }
+
+/* Hide non-writing UI in focus mode */
+.sl-manuscript-focus .story-line-filter-bar > .story-line-search-wrapper,
+.sl-manuscript-focus .story-line-filter-bar > .story-line-sort,
+.sl-manuscript-focus .story-line-filter-bar > button:not(.sl-focus-btn),
+.sl-manuscript-focus .story-line-filter-bar > .sl-toggle-wrap,
+.sl-manuscript-focus .story-line-filter-panel,
+.sl-manuscript-focus .sl-fmt-toolbar,
+.sl-manuscript-focus .sl-manuscript-footer,
+.sl-manuscript-focus .sl-manuscript-act-divider,
+.sl-manuscript-focus .sl-manuscript-chapter-divider,
+.sl-manuscript-focus .sl-manuscript-scene-header {
+    display: none !important;
+}
+
 /* Scene header */
 .sl-manuscript-scene-header {
     display: flex;
@@ -8691,9 +8879,33 @@ body.theme-dark .location-field-input.dropdown {
 }
 
 .sl-manuscript-loading {
-    color: var(--text-faint);
-    font-style: italic;
-    padding: 8px 0;
+    padding: 24px 0;
+    font-size: 0;
+    color: transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+.sl-manuscript-loading::before,
+.sl-manuscript-loading::after {
+    content: '';
+    display: block;
+    height: 14px;
+    border-radius: 4px;
+    background: linear-gradient(
+        90deg,
+        var(--background-modifier-hover) 25%,
+        var(--background-modifier-border) 50%,
+        var(--background-modifier-hover) 75%
+    );
+    background-size: 200% 100%;
+    animation: sl-skeleton-shimmer 1.5s ease-in-out infinite;
+}
+.sl-manuscript-loading::before { width: 100%; }
+.sl-manuscript-loading::after  { width: 70%; }
+@keyframes sl-skeleton-shimmer {
+    0%   { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 /* ── Embedded editor chrome removal ────────────────────── */
@@ -9044,6 +9256,115 @@ body.theme-dark .location-field-input.dropdown {
 
 .reference-link:hover {
     text-decoration: underline;
+}
+
+/* ── Plot Grid: Codex entity tags in cells ─────────── */
+.pg-codex-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    margin-top: 4px;
+    justify-content: center;
+}
+
+.pg-codex-tag {
+    display: inline-block;
+    font-size: 9px;
+    line-height: 1;
+    padding: 2px 5px;
+    border-radius: 8px;
+    white-space: nowrap;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+
+.pg-codex-tag-character {
+    background: hsla(210, 70%, 55%, 0.18);
+    color: hsl(210, 70%, 45%);
+}
+
+.pg-codex-tag-location {
+    background: hsla(145, 55%, 45%, 0.18);
+    color: hsl(145, 55%, 35%);
+}
+
+.pg-codex-tag-codex {
+    background: hsla(275, 55%, 55%, 0.18);
+    color: hsl(275, 55%, 45%);
+}
+
+.theme-dark .pg-codex-tag-character {
+    background: hsla(210, 60%, 50%, 0.22);
+    color: hsl(210, 60%, 72%);
+}
+
+.theme-dark .pg-codex-tag-location {
+    background: hsla(145, 50%, 45%, 0.22);
+    color: hsl(145, 50%, 68%);
+}
+
+.theme-dark .pg-codex-tag-codex {
+    background: hsla(275, 50%, 55%, 0.22);
+    color: hsl(275, 50%, 72%);
+}
+
+/* ── Codex stale-entry warning ─────────────────────── */
+.codex-stale-warning {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: 8px;
+    background: hsla(40, 90%, 55%, 0.12);
+    border-left: 3px solid hsl(40, 90%, 55%);
+}
+
+.codex-stale-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.9em;
+    color: hsl(40, 80%, 40%);
+}
+
+.theme-dark .codex-stale-header {
+    color: hsl(40, 80%, 65%);
+}
+
+.codex-stale-header svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+}
+
+.codex-stale-scene-list {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+}
+
+.codex-stale-scene-list li {
+    padding: 2px 0;
+}
+
+.codex-stale-scene-list .reference-link {
+    font-size: 0.85em;
+}
+
+.codex-stale-reviewed-btn {
+    margin-top: 6px;
+    padding: 4px 12px;
+    font-size: 0.8em;
+    border-radius: 4px;
+    cursor: pointer;
+    background: var(--interactive-normal);
+    border: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+}
+
+.codex-stale-reviewed-btn:hover {
+    background: var(--interactive-hover);
 }
 
 /* ── Hide/show built-in fields ─────────────────────── */

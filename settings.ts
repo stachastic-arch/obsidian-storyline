@@ -624,6 +624,13 @@ export interface SceneCardsSettings {
 
     /** Show the built-in formatting toolbar in scene editors when Editing Toolbar plugin is not installed */
     showFormattingToolbar: boolean;
+
+    /** Focus mode: how much to dim inactive scenes (0–100, percentage opacity) */
+    focusDimOpacity: number;
+    /** Focus mode: how much to darken the whole UI (0–100, percentage) */
+    focusDarkenAmount: number;
+    /** Focus mode: blur radius in px for everything outside the text area (0–20) */
+    focusBlurAmount: number;
 }
 
 /**
@@ -702,6 +709,10 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     hiddenFields: {},
 
     showFormattingToolbar: true,
+
+    focusDimOpacity: 25,
+    focusDarkenAmount: 40,
+    focusBlurAmount: 1,
 };
 
 /**
@@ -1053,6 +1064,127 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.projectWordGoal = Number(value) || 80000;
                     await this.plugin.saveSettings();
                 }));
+
+        // --- Focus Mode ---
+        containerEl.createEl('h2', { text: 'Focus Mode' });
+
+        const focusDetails = containerEl.createEl('details', { cls: 'story-line-color-section', attr: { open: '' } });
+        focusDetails.createEl('summary', { text: 'Focus Mode Settings' });
+        const focusBody = focusDetails.createDiv();
+        focusBody.style.padding = '12px 16px';
+
+        const focusDesc = focusBody.createDiv({ cls: 'setting-item-description' });
+        focusDesc.style.marginBottom = '16px';
+        focusDesc.setText('Control how the UI changes when Focus mode is enabled in Manuscript view.');
+
+        // ── Inactive scenes group ──
+        const scenesLabel = focusBody.createDiv();
+        scenesLabel.style.fontSize = '11px';
+        scenesLabel.style.fontWeight = '600';
+        scenesLabel.style.color = 'var(--text-muted)';
+        scenesLabel.style.textTransform = 'uppercase';
+        scenesLabel.style.letterSpacing = '0.05em';
+        scenesLabel.style.marginBottom = '6px';
+        scenesLabel.textContent = 'Inactive Scenes';
+
+        const createFocusSlider = (
+            parent: HTMLElement,
+            label: string,
+            desc: string,
+            value: number,
+            min: number,
+            max: number,
+            step: number,
+            unit: string,
+            onChange: (v: number) => void,
+        ) => {
+            const row = parent.createDiv();
+            row.style.display = 'flex';
+            row.style.alignItems = 'center';
+            row.style.gap = '8px';
+            row.style.marginBottom = '6px';
+
+            const lbl = row.createSpan();
+            lbl.style.fontSize = '12px';
+            lbl.style.minWidth = '90px';
+            lbl.textContent = label;
+            lbl.title = desc;
+
+            const slider = row.createEl('input', {
+                type: 'range',
+                attr: { min: String(min), max: String(max), step: String(step) },
+            });
+            slider.value = String(value);
+            slider.style.flex = '1';
+
+            const valEl = row.createSpan();
+            valEl.style.fontSize = '11px';
+            valEl.style.minWidth = '36px';
+            valEl.style.textAlign = 'right';
+            valEl.textContent = `${value}${unit}`;
+
+            let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+            slider.addEventListener('input', () => {
+                const v = Number.parseFloat(slider.value);
+                valEl.textContent = `${v}${unit}`;
+                onChange(v);
+                if (debounceTimer) clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    this.plugin.saveSettings();
+                    this.plugin.refreshOpenViews();
+                }, 300);
+            });
+        };
+
+        createFocusSlider(
+            focusBody, 'Dim amount',
+            'Opacity of inactive scenes (lower = more faded)',
+            this.plugin.settings.focusDimOpacity,
+            0, 100, 5, '%',
+            (v) => { this.plugin.settings.focusDimOpacity = v; },
+        );
+
+        // ── Environment group ──
+        const envLabel = focusBody.createDiv();
+        envLabel.style.fontSize = '11px';
+        envLabel.style.fontWeight = '600';
+        envLabel.style.color = 'var(--text-muted)';
+        envLabel.style.textTransform = 'uppercase';
+        envLabel.style.letterSpacing = '0.05em';
+        envLabel.style.marginTop = '14px';
+        envLabel.style.marginBottom = '6px';
+        envLabel.textContent = 'Environment';
+
+        createFocusSlider(
+            focusBody, 'Darken',
+            'Darken the entire Obsidian UI (higher = darker overlay)',
+            this.plugin.settings.focusDarkenAmount,
+            0, 100, 5, '%',
+            (v) => { this.plugin.settings.focusDarkenAmount = v; },
+        );
+
+        createFocusSlider(
+            focusBody, 'Blur',
+            'Blur everything outside the active text area (px)',
+            this.plugin.settings.focusBlurAmount,
+            0, 20, 1, 'px',
+            (v) => { this.plugin.settings.focusBlurAmount = v; },
+        );
+
+        // Reset
+        const focusResetRow = focusBody.createDiv();
+        focusResetRow.style.marginTop = '8px';
+        const focusResetBtn = focusResetRow.createEl('button', { text: 'Reset to defaults' });
+        focusResetBtn.style.fontSize = '11px';
+        focusResetBtn.style.padding = '2px 10px';
+        focusResetBtn.addEventListener('click', async () => {
+            this.plugin.settings.focusDimOpacity = 25;
+            this.plugin.settings.focusDarkenAmount = 40;
+            this.plugin.settings.focusBlurAmount = 1;
+            await this.plugin.saveSettings();
+            this.plugin.refreshOpenViews();
+            this.display();
+        });
 
         // --- Advanced ---
         containerEl.createEl('h2', { text: 'Advanced' });

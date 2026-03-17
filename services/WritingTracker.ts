@@ -16,6 +16,8 @@ export interface DailyEntry {
 export interface WritingTrackerData {
     /** Daily word counts keyed by ISO date */
     history: Record<string, number>;
+    /** Daily revision counts (absolute word changes — adds + deletes) keyed by ISO date */
+    revisionHistory?: Record<string, number>;
 }
 
 export class WritingTracker {
@@ -25,6 +27,10 @@ export class WritingTracker {
     private sessionStart: number = Date.now();
     /** Persisted daily history */
     private history: Record<string, number> = {};
+    /** Persisted daily revision (absolute change) history */
+    private revisionHistory: Record<string, number> = {};
+    /** Last known total word count — used to measure revision deltas between flushes */
+    private lastKnownTotal: number | null = null;
 
     /**
      * Start (or restart) a session, capturing the current total word count
@@ -37,6 +43,7 @@ export class WritingTracker {
         if (currentTotalWords <= 0) return;
 
         this.baselineWords = currentTotalWords;
+        this.lastKnownTotal = currentTotalWords;
         this.sessionStart = Date.now();
 
         // Sanitise: if today's stored value is unreasonably large (≥ 50% of
@@ -86,12 +93,50 @@ export class WritingTracker {
         if (sw > 0) {
             this.recordToday(sw);
         }
+
+        // Track revision volume (absolute change since last flush)
+        if (this.lastKnownTotal !== null) {
+            const delta = Math.abs(currentTotalWords - this.lastKnownTotal);
+            if (delta > 0) {
+                this.recordRevisionToday(delta);
+            }
+        }
+        this.lastKnownTotal = currentTotalWords;
+
         this.baselineWords = currentTotalWords;
+    }
+
+    /** Record today's revision volume */
+    private recordRevisionToday(absChange: number): void {
+        const today = this.todayKey();
+        this.revisionHistory[today] = (this.revisionHistory[today] || 0) + absChange;
     }
 
     /** Get words written today */
     getTodayWords(): number {
         return this.history[this.todayKey()] || 0;
+    }
+
+    /** Get revision volume for today (absolute word changes — adds + deletes) */
+    getTodayRevisions(): number {
+        return this.revisionHistory[this.todayKey()] || 0;
+    }
+
+    /** Get recent revision history (most recent first) */
+    getRecentRevisionDays(count: number): DailyEntry[] {
+        const entries: DailyEntry[] = [];
+        const d = new Date();
+        for (let i = 0; i < count; i++) {
+            const key = this.dateKey(d);
+            entries.push({ date: key, words: this.revisionHistory[key] || 0 });
+            d.setDate(d.getDate() - 1);
+        }
+        return entries;
+    }
+
+    /** Return the raw daily revision history record (date→words) */
+    getFullRevisionHistory(): Record<string, number> {
+        return { ...this.revisionHistory };
     }
 
     /** Get the last N days of history (most recent first) */
@@ -135,13 +180,19 @@ export class WritingTracker {
 
     /** Export data for saving */
     exportData(): WritingTrackerData {
-        return { history: { ...this.history } };
+        return {
+            history: { ...this.history },
+            revisionHistory: { ...this.revisionHistory },
+        };
     }
 
     /** Import previously saved data */
     importData(data: WritingTrackerData | undefined): void {
         if (data?.history) {
             this.history = { ...data.history };
+        }
+        if (data?.revisionHistory) {
+            this.revisionHistory = { ...data.revisionHistory };
         }
     }
 

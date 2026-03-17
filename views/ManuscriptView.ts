@@ -7,7 +7,7 @@ import { SceneManager } from '../services/SceneManager';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
 import { FiltersComponent } from '../components/Filters';
 import type SceneCardsPlugin from '../main';
-import { MANUSCRIPT_VIEW_TYPE } from '../constants';
+import { MANUSCRIPT_VIEW_TYPE, NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE } from '../constants';
 import { applyMobileClass, isMobile, isPhone, isTablet } from '../components/MobileAdapter';
 import { buildFormattingToolbar } from '../components/FormattingToolbar';
 
@@ -40,8 +40,16 @@ export class ManuscriptView extends ItemView {
     private _plainText = true;
     /** When true, links/tags are atomic (cursor skips over them) */
     private _lockLinks = true;
+    /** Cached sorted scene list from last renderManuscript */
+    private _lastScenes: Scene[] = [];
+    /** Filter/sort key for the cached scene list */
+    private _lastFilterKey = '';
     /** CM6 compartment for toggling atomic-link extension */
     private atomicCompartment = new Compartment();
+    /** Whether focus mode is active (hides non-writing UI, dims inactive scenes) */
+    private _focusMode = false;
+    /** Dynamic style element for focus-mode dimming values */
+    private focusStyleEl: HTMLStyleElement | null = null;
     /** File path of the scene currently most visible in the scroll area */
     focusedScenePath: string | null = null;
     /** Formatting toolbar element */
@@ -86,6 +94,10 @@ export class ManuscriptView extends ItemView {
         this.lazyObserver?.disconnect();
         this.focusObserver = null;
         this.lazyObserver = null;
+        // Clean up focus styles and body class on close
+        this.focusStyleEl?.remove();
+        this.focusStyleEl = null;
+        document.body.removeClass('sl-focus-active-global');
     }
 
 
@@ -142,6 +154,37 @@ export class ManuscriptView extends ItemView {
         // Plain-text toggle (same style as Board view's Scenes on/off)
         const filterBar = filterContainer.querySelector('.story-line-filter-bar');
         if (filterBar) {
+            // Focus mode icon — insert before the search wrapper
+            const searchWrapper = filterBar.querySelector('.story-line-search-wrapper');
+            const focusBtn = createEl('button', {
+                cls: 'sl-focus-btn clickable-icon',
+                attr: { 'aria-label': 'Focus mode' },
+            });
+            setIcon(focusBtn, 'glasses');
+            if (this._focusMode) focusBtn.addClass('is-active');
+            focusBtn.addEventListener('click', () => {
+                this._focusMode = !this._focusMode;
+                focusBtn.toggleClass('is-active', this._focusMode);
+                container.toggleClass('sl-manuscript-focus', this._focusMode);
+                this.applyFocusCssVars(container);
+                this.toggleSidebarVisibility(!this._focusMode);
+                if (!this._focusMode) {
+                    this.scrollArea?.querySelectorAll('.sl-focus-active').forEach(
+                        el => el.removeClass('sl-focus-active'),
+                    );
+                }
+            });
+            if (searchWrapper) {
+                filterBar.insertBefore(focusBtn, searchWrapper);
+            } else {
+                (filterBar as HTMLElement).prepend(focusBtn);
+            }
+            if (this._focusMode) {
+                container.addClass('sl-manuscript-focus');
+                this.applyFocusCssVars(container);
+                this.toggleSidebarVisibility(false);
+            }
+
             const plainWrap = (filterBar as HTMLElement).createEl('label', { cls: 'sl-toggle-wrap' });
             plainWrap.createSpan({ cls: 'sl-toggle-label', text: 'Plain text' });
             const plainCb = plainWrap.createEl('input', { type: 'checkbox' });
@@ -181,6 +224,14 @@ export class ManuscriptView extends ItemView {
                 const splitEl = (leaf as any).containerEl?.parentElement;
                 if (splitEl?.contains(target)) {
                     this.activeLeaf = leaf;
+                    // In focus mode, highlight the active scene block
+                    if (this._focusMode) {
+                        this.scrollArea?.querySelectorAll('.sl-focus-active').forEach(
+                            el => el.removeClass('sl-focus-active'),
+                        );
+                        const block = splitEl.closest('.sl-manuscript-scene-block');
+                        if (block) block.addClass('sl-focus-active');
+                    }
                     break;
                 }
             }
@@ -205,30 +256,51 @@ export class ManuscriptView extends ItemView {
         this.renderManuscript();
     }
 
+    /** Build a cache key from the current filter + sort configuration */
+    private computeFilterKey(): string {
+        return JSON.stringify(this.currentFilter) + '|' + JSON.stringify(this.currentSort);
+    }
+
     private async renderManuscript(): Promise<void> {
         if (!this.scrollArea || !this.footerEl) return;
         this.detachAllEmbedded();
         this.scrollArea.empty();
         this.footerEl.empty();
 
-        const scenes = this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
-            .filter(s => !s.corkboardNote);
+        const filterKey = this.computeFilterKey();
+        let scenes: Scene[];
 
-        // For manuscript view, always sort by act → chapter → sequence
-        // so scenes are grouped properly under their act/chapter dividers.
-        // Only compare act/chapter when both scenes have the field defined;
-        // if one or both are missing, fall through to sequence.
-        scenes.sort((a, b) => {
-            if (a.act != null && b.act != null) {
-                const actCmp = Number(a.act) - Number(b.act);
-                if (actCmp !== 0) return actCmp;
-            }
-            if (a.chapter != null && b.chapter != null) {
-                const chCmp = Number(a.chapter) - Number(b.chapter);
-                if (chCmp !== 0) return chCmp;
-            }
-            return (a.sequence ?? 9999) - (b.sequence ?? 9999);
-        });
+        // Re-use cached scene list if filter/sort unchanged and count matches
+        const allCount = this.sceneManager.getAllScenes().length;
+        if (
+            filterKey === this._lastFilterKey &&
+            this._lastScenes.length > 0 &&
+            this._lastScenes.length <= allCount
+        ) {
+            scenes = this._lastScenes;
+        } else {
+            scenes = this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
+                .filter(s => !s.corkboardNote);
+
+            // For manuscript view, always sort by act → chapter → sequence
+            // so scenes are grouped properly under their act/chapter dividers.
+            // Only compare act/chapter when both scenes have the field defined;
+            // if one or both are missing, fall through to sequence.
+            scenes.sort((a, b) => {
+                if (a.act != null && b.act != null) {
+                    const actCmp = Number(a.act) - Number(b.act);
+                    if (actCmp !== 0) return actCmp;
+                }
+                if (a.chapter != null && b.chapter != null) {
+                    const chCmp = Number(a.chapter) - Number(b.chapter);
+                    if (chCmp !== 0) return chCmp;
+                }
+                return (a.sequence ?? 9999) - (b.sequence ?? 9999);
+            });
+
+            this._lastScenes = scenes;
+            this._lastFilterKey = filterKey;
+        }
 
         if (scenes.length === 0) {
             this.scrollArea.createDiv({
@@ -548,9 +620,14 @@ export class ManuscriptView extends ItemView {
 
     /** Recalculate the footer word count from SceneManager data */
     private updateFooter(): void {
-        if (!this.footerEl) return;
-        const scenes = this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
-            .filter(s => !s.corkboardNote);
+        if (!this.footerEl || this._focusMode) return;
+        // Re-use cached scene list when filter/sort hasn't changed (avoids
+        // re-filtering during editing when refresh() is called frequently)
+        const key = this.computeFilterKey();
+        const scenes = (key === this._lastFilterKey && this._lastScenes.length > 0)
+            ? this._lastScenes
+            : this.sceneManager.getFilteredScenes(this.currentFilter, this.currentSort)
+                .filter(s => !s.corkboardNote);
         let totalWords = 0;
         for (const s of scenes) {
             totalWords += s.wordcount ?? 0;
@@ -558,6 +635,66 @@ export class ManuscriptView extends ItemView {
         const wordLabel = totalWords === 1 ? 'word' : 'words';
         this.footerEl.setText(`${scenes.length} scenes · ${totalWords.toLocaleString()} ${wordLabel}`);
     }
+
+    /** Apply focus-mode effects via a dynamic <style> targeting specific UI elements */
+    private applyFocusCssVars(container: HTMLElement): void {
+        const s = this.plugin.settings;
+        const opacity = (s.focusDimOpacity ?? 25) / 100;
+        const darken = (s.focusDarkenAmount ?? 0) / 100;
+        const blur = s.focusBlurAmount ?? 0;
+
+        if (!this.focusStyleEl) {
+            this.focusStyleEl = document.createElement('style');
+            document.head.appendChild(this.focusStyleEl);
+        }
+
+        if (this._focusMode) {
+            document.body.addClass('sl-focus-active-global');
+
+            const darkenFilter = darken > 0 ? `brightness(${1 - darken})` : '';
+            const blurFilter = blur > 0 ? `blur(${blur}px)` : '';
+            const combinedFilter = [darkenFilter, blurFilter].filter(Boolean).join(' ') || 'none';
+
+            // Compute a darkened background to fill gaps/corners
+            const bgBright = Math.round(255 * (1 - darken));
+            const darkBg = `rgb(${bgBright}, ${bgBright}, ${bgBright})`;
+
+            this.focusStyleEl.textContent = `
+                /* StoryLine toolbar: dimmed but not darkened */
+                .sl-manuscript-focus .story-line-toolbar {
+                    opacity: ${opacity};
+                    transition: opacity 0.25s ease;
+                }
+                /* Fill all gaps/corners with matching dark background */
+                ${darken > 0 ? `.sl-focus-active-global .app-container {
+                    background-color: ${darkBg} !important;
+                }` : ''}
+                /* Darken + blur sidebars and ribbon */
+                .sl-focus-active-global .workspace-split.mod-left-split,
+                .sl-focus-active-global .workspace-split.mod-right-split,
+                .sl-focus-active-global .workspace-ribbon {
+                    filter: ${combinedFilter} !important;
+                    transition: filter 0.25s ease;
+                }
+                /* Center tab header bar */
+                .sl-focus-active-global .mod-root > .workspace-tabs > .workspace-tab-header-container {
+                    filter: ${combinedFilter} !important;
+                    transition: filter 0.25s ease;
+                }
+                /* Title bar */
+                .sl-focus-active-global .titlebar {
+                    filter: ${combinedFilter} !important;
+                    transition: filter 0.25s ease;
+                }
+            `;
+        } else {
+            document.body.removeClass('sl-focus-active-global');
+            this.focusStyleEl.textContent = '';
+        }
+    }
+
+    /** Stub — sidebar dimming now handled via CSS filter */
+    private toggleSidebarVisibility(_visible: boolean): void { }
 
     /** IntersectionObserver to detect which scene block is most visible (for Inspector sync) */
     private setupFocusObserver(): void {
