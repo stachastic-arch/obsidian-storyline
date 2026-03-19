@@ -433,14 +433,14 @@ export class CharacterView extends ItemView {
             }
         }
 
-        // Scene stats — match against all aliases
-        const povCount = scenes.filter(s =>
-            s.pov && charAliases.has(s.pov.toLowerCase())
-        ).length;
-        const presentCount = scenes.filter(s =>
-            s.characters?.some(c => charAliases.has(c.toLowerCase())) &&
-            !(s.pov && charAliases.has(s.pov.toLowerCase()))
-        ).length;
+        // Scene stats — match against all aliases (frontmatter + LinkScanner)
+        let povCount = 0;
+        let presentCount = 0;
+        for (const s of scenes) {
+            const { isPov, isPresent } = this.isCharInScene(s, charAliases);
+            if (isPov) povCount++;
+            else if (isPresent) presentCount++;
+        }
         const total = povCount + presentCount;
 
         const stats = card.createDiv('character-card-stats');
@@ -518,14 +518,14 @@ export class CharacterView extends ItemView {
             }
         }
 
-        // Scene stats — count across all aliases
-        const povCount = scenes.filter(s =>
-            s.pov && nameAliases.has(s.pov.toLowerCase())
-        ).length;
-        const presentCount = scenes.filter(s =>
-            s.characters?.some(c => nameAliases.has(c.toLowerCase())) &&
-            !(s.pov && nameAliases.has(s.pov.toLowerCase()))
-        ).length;
+        // Scene stats — count across all aliases (frontmatter + LinkScanner)
+        let povCount = 0;
+        let presentCount = 0;
+        for (const s of scenes) {
+            const { isPov, isPresent } = this.isCharInScene(s, nameAliases);
+            if (isPov) povCount++;
+            else if (isPresent) presentCount++;
+        }
 
         const stats = card.createDiv('character-card-stats');
         stats.createSpan({ text: `${povCount} POV \u00b7 ${povCount + presentCount} scenes` });
@@ -652,6 +652,29 @@ export class CharacterView extends ItemView {
             },
         );
         this.relationshipMap.render();
+    }
+
+    // ── Scene presence helper (frontmatter + LinkScanner) ──
+
+    /**
+     * Check if a character (identified by a set of lowercased aliases) is
+     * present in a scene — either via frontmatter characters/pov OR via
+     * LinkScanner body-text detection.
+     */
+    private isCharInScene(scene: Scene, charAliases: Set<string>): { isPov: boolean; isPresent: boolean } {
+        const isPov = !!(scene.pov && charAliases.has(scene.pov.toLowerCase()));
+        const fmPresent = scene.characters?.some(c => charAliases.has(c.toLowerCase())) ?? false;
+
+        // Check LinkScanner results for body-text mentions
+        let scanPresent = false;
+        try {
+            const scanResult = this.plugin.linkScanner?.getResult(scene.filePath);
+            if (scanResult?.characters) {
+                scanPresent = scanResult.characters.some(c => charAliases.has(c.toLowerCase()));
+            }
+        } catch { /* scanner not ready */ }
+
+        return { isPov, isPresent: isPov || fmPresent || scanPresent };
     }
 
     // ── Story Graph ────────────────────────────────────
@@ -1787,13 +1810,14 @@ export class CharacterView extends ItemView {
             }
         }
 
-        const povScenes = scenes.filter(s =>
-            s.pov && charAliases.has(s.pov.toLowerCase())
-        );
-        const presentScenes = scenes.filter(s =>
-            !(s.pov && charAliases.has(s.pov.toLowerCase())) &&
-            s.characters?.some(c => charAliases.has(c.toLowerCase()))
-        );
+        const povScenes = scenes.filter(s => {
+            const { isPov } = this.isCharInScene(s, charAliases);
+            return isPov;
+        });
+        const presentScenes = scenes.filter(s => {
+            const { isPov, isPresent } = this.isCharInScene(s, charAliases);
+            return !isPov && isPresent;
+        });
         const allCharScenes = [...povScenes, ...presentScenes];
 
         // Stats summary

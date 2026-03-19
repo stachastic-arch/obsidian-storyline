@@ -1175,25 +1175,25 @@ export default class SceneCardsPlugin extends Plugin {
     /**
      * Refresh all open Scene Cards views
      */
-    refreshOpenViews(): void {
+    async refreshOpenViews(): Promise<void> {
         // Keep LocationManager, CharacterManager, and CodexManager in sync
         try {
             const locFolder = this.sceneManager.getLocationFolder();
-            if (locFolder) this.locationManager.loadAll(locFolder);
+            if (locFolder) await this.locationManager.loadAll(locFolder);
             const charFolder = this.sceneManager.getCharacterFolder();
-            if (charFolder) this.characterManager.loadCharacters(charFolder);
-            this.scanExtraFolders();
+            if (charFolder) await this.characterManager.loadCharacters(charFolder);
+            await this.scanExtraFolders();
             const codexFolder = this.sceneManager.getCodexFolder();
             if (codexFolder) {
                 const customDefs = (this.settings.codexCustomCategories || []).map(
                     (cc: { id: string; label: string; icon: string }) => makeCustomCodexCategory(cc.id, cc.label, cc.icon)
                 );
                 this.codexManager.initCategories(this.settings.codexEnabledCategories || [], customDefs);
-                this.codexManager.loadAll(codexFolder);
+                await this.codexManager.loadAll(codexFolder);
             }
         } catch { /* project may not be set yet */ }
 
-        // Re-scan wikilinks after entity data may have changed
+        // Re-scan wikilinks after entity data is loaded
         this.linkScanner.invalidateAll();
         this.linkScanner.rebuildLookups(this.settings.characterAliases);
         this.linkScanner.scanAll(this.sceneManager.getAllScenes());

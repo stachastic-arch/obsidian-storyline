@@ -310,9 +310,21 @@ export class StorylineView extends ItemView {
         wrapper.style.overflowX = 'auto';
         wrapper.style.overflowY = 'auto';
         wrapper.style.padding = '12px 0';
+        wrapper.style.position = 'relative';
 
         // Enable drag-to-pan
         enableDragToPan(wrapper);
+
+        // ── Sticky label column (stays visible when scrolling right) ──
+        const labelCol = wrapper.createDiv('subway-label-col');
+        labelCol.style.position = 'sticky';
+        labelCol.style.left = '0';
+        labelCol.style.width = `${TRACK_LEFT}px`;
+        labelCol.style.height = `${svgHeight}px`;
+        labelCol.style.zIndex = '2';
+        labelCol.style.pointerEvents = 'none';
+        labelCol.style.background = 'var(--background-primary)';
+        labelCol.style.flexShrink = '0';
 
         const svgNS = 'http://www.w3.org/2000/svg';
         const svg = document.createElementNS(svgNS, 'svg');
@@ -320,6 +332,8 @@ export class StorylineView extends ItemView {
         svg.setAttribute('height', String(svgHeight));
         svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
         svg.style.minWidth = `${svgWidth}px`;
+        // Pull SVG up so it overlaps the label column
+        svg.style.marginTop = `-${svgHeight}px`;
         wrapper.appendChild(svg);
 
         const colX = (col: number) => TRACK_LEFT + col * SCENE_SPACING + SCENE_SPACING / 2;
@@ -396,15 +410,17 @@ export class StorylineView extends ItemView {
             const cols = plotlineCols.get(pk) || [];
             const y = laneY(li);
 
-            // Plotline label on the left
-            const label = document.createElementNS(svgNS, 'text');
-            label.setAttribute('x', String(LABEL_LEFT));
-            label.setAttribute('y', String(y + 5));
-            label.setAttribute('font-size', '15');
-            label.setAttribute('font-weight', '700');
-            label.setAttribute('fill', color);
-            label.textContent = this.formatPlotlineName(pk);
-            svg.appendChild(label);
+            // Plotline label in the sticky HTML column
+            const lblDiv = labelCol.createDiv('subway-lane-label');
+            lblDiv.style.position = 'absolute';
+            lblDiv.style.left = `${LABEL_LEFT}px`;
+            lblDiv.style.top = `${y - 8}px`;
+            lblDiv.style.fontSize = '15px';
+            lblDiv.style.fontWeight = '700';
+            lblDiv.style.color = color;
+            lblDiv.style.whiteSpace = 'nowrap';
+            lblDiv.style.fontFamily = 'var(--font-interface)';
+            lblDiv.textContent = this.formatPlotlineName(pk);
 
             if (cols.length === 0) continue;
 

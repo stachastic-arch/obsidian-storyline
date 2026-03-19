@@ -2542,6 +2542,10 @@ body.theme-dark {
     margin: 12px 0;
     -webkit-overflow-scrolling: touch;
 }
+/* Sticky plotline labels that stay visible on horizontal scroll */
+.subway-label-col {
+    border-right: 1px solid var(--background-modifier-border);
+}
 .subway-map-wrapper svg {
     display: block;
 }

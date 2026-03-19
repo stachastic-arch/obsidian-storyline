@@ -1,6 +1,11 @@
 # StoryLine — Changelog
 
 ---
+## Version 1.8.1
+
+Bug fixes to linkscanner and small UI improvements.
+
+
 ## Version 1.8.0
 
 ### New Features

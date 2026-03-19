@@ -105,8 +105,8 @@ export class StatsView extends ItemView {
         this.renderCollapsible(content, 'repeat', 'Echo Finder', false, body =>
             this.renderEchoFinderPlaceholder(body, allScenes));
 
-        // 8. Warnings & Plot Holes (collapsible, default open)
-        this.renderCollapsible(content, 'alert-triangle', 'Warnings & Plot Holes', true, body =>
+        // 8. Warnings & Plot Holes (collapsible, default collapsed)
+        this.renderCollapsible(content, 'alert-triangle', 'Warnings & Plot Holes', false, body =>
             this.renderWarnings(body, allScenes));
     }
 
@@ -425,6 +425,20 @@ export class StatsView extends ItemView {
         const resolve = (name: string): string =>
             aliasMap.get(name.toLowerCase()) || name;
 
+        // Helper: merge frontmatter characters + LinkScanner body detections
+        const sceneChars = (scene: Scene): Set<string> => {
+            const chars = new Set<string>();
+            if (scene.pov) chars.add(resolve(scene.pov));
+            if (scene.characters) scene.characters.forEach(c => chars.add(resolve(c)));
+            try {
+                const scanResult = this.plugin.linkScanner?.getResult(scene.filePath);
+                if (scanResult?.characters) {
+                    for (const c of scanResult.characters) chars.add(resolve(c));
+                }
+            } catch { /* LinkScanner not ready yet */ }
+            return chars;
+        };
+
         // ── POV distribution (merge aliases) ──
         const mergedPov: Record<string, number> = {};
         for (const [pov, count] of Object.entries(stats.povCounts)) {
@@ -445,13 +459,10 @@ export class StatsView extends ItemView {
             }
         }
 
-        // ── Character scene coverage (merge aliases) ──
+        // ── Character scene coverage (merge aliases + LinkScanner) ──
         const charCounts: Record<string, number> = {};
         for (const scene of allScenes) {
-            const chars = new Set<string>();
-            if (scene.pov) chars.add(resolve(scene.pov));
-            if (scene.characters) scene.characters.forEach(c => chars.add(resolve(c)));
-            for (const c of chars) charCounts[c] = (charCounts[c] || 0) + 1;
+            for (const c of sceneChars(scene)) charCounts[c] = (charCounts[c] || 0) + 1;
         }
         const charEntries = Object.entries(charCounts).sort(([, a], [, b]) => b - a);
         if (charEntries.length > 0) {
@@ -497,13 +508,14 @@ export class StatsView extends ItemView {
         }
 
         // ── Character Appearance Heatmap (character × chapter) ──
-        this.renderCharacterHeatmap(parent, allScenes, resolve);
+        this.renderCharacterHeatmap(parent, allScenes, resolve, sceneChars);
     }
 
     private renderCharacterHeatmap(
         parent: HTMLElement,
         allScenes: Scene[],
         resolve: (name: string) => string,
+        sceneChars: (scene: Scene) => Set<string>,
     ): void {
         // Build chapter list (sorted)
         const chapterSet = new Set<string>();
@@ -517,15 +529,12 @@ export class StatsView extends ItemView {
         });
         if (chapters.length < 2) return;
 
-        // Build character × chapter matrix
+        // Build character × chapter matrix (includes LinkScanner detections)
         const charChapterMap: Record<string, Record<string, number>> = {};
         for (const s of allScenes) {
             const ch = s.chapter !== undefined ? String(s.chapter) : null;
             if (!ch) continue;
-            const chars = new Set<string>();
-            if (s.pov) chars.add(resolve(s.pov));
-            if (s.characters) s.characters.forEach(c => chars.add(resolve(c)));
-            for (const c of chars) {
+            for (const c of sceneChars(s)) {
                 if (!charChapterMap[c]) charChapterMap[c] = {};
                 charChapterMap[c][ch] = (charChapterMap[c][ch] || 0) + 1;
             }
