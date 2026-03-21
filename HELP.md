@@ -120,9 +120,9 @@ The main workspace — a Kanban-style board that displays your scenes as cards.
 
 Toggle between the standard Kanban column layout and a freeform **corkboard** canvas using the toggle button in the Board toolbar.
 
-- **Sticky notes** — create color-coded sticky notes to brainstorm and capture your first ideas. Notes support markdown formatting.
+- **Sticky notes** — create color-coded sticky notes to brainstorm and capture your first ideas. Notes support markdown formatting. Sticky notes are stored in a separate `Notes/` folder inside your project so they don't clutter the `Scenes/` folder in Obsidian's file explorer.
 - **Image sticky notes** — pin reference art, maps, and charts on the board. Click **+ New Image Note** in the toolbar, or drag an image from the vault file explorer or your desktop onto the canvas. Each image note has an optional caption that supports markdown and `[[wikilinks]]` — links in captions are included in relationship scanning. Right-click an image note to set, change, or remove the image. Click the image to open a fullscreen lightbox.
-- **Convert to scene** — when an idea is ready, convert a sticky note into a full scene with one click.
+- **Convert to scene** — when an idea is ready, convert a sticky note into a full scene with one click. The file is moved from `Notes/` to `Scenes/` automatically.
 - **Freeform positioning** — drag scene cards and sticky notes anywhere on the spatial canvas.
 - **Positions saved per project** — your corkboard layout is stored in `System/board.json` and syncs across devices.
 

@@ -31,6 +31,8 @@ export interface StoryLineProject {
     locationFolder: string;
     /** Derived codex folder path (generic codex categories live here) */
     codexFolder: string;
+    /** Derived notes folder path (corkboard sticky notes live here) */
+    notesFolder: string;
 
     // ── Project-specific structure ──────────────────────
     /** Defined act numbers (persisted in project frontmatter) */
@@ -76,13 +78,14 @@ export interface SeriesMetadata {
 export function deriveProjectFolders(
     rootFolder: string,
     title: string
-): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string } {
+): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string } {
     const base = `${rootFolder}/${title}`;
     return {
         sceneFolder: `${base}/Scenes`,
         characterFolder: `${base}/Codex/Characters`,
         locationFolder: `${base}/Codex/Locations`,
         codexFolder: `${base}/Codex`,
+        notesFolder: `${base}/Notes`,
     };
 }
 
@@ -96,7 +99,7 @@ export function deriveProjectFolders(
  */
 export function deriveProjectFoldersFromFilePath(
     filePath: string
-): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string } {
+): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string } {
     const lastSlash = filePath.lastIndexOf('/');
     const parentDir = lastSlash >= 0 ? filePath.substring(0, lastSlash) : '';
     const basename = (filePath.split('/').pop() ?? '').replace(/\.md$/i, '');
@@ -110,5 +113,6 @@ export function deriveProjectFoldersFromFilePath(
         characterFolder: `${baseFolder}/Codex/Characters`,
         locationFolder: `${baseFolder}/Codex/Locations`,
         codexFolder: `${baseFolder}/Codex`,
+        notesFolder: `${baseFolder}/Notes`,
     };
 }

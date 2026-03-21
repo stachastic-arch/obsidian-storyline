@@ -1153,9 +1153,16 @@ export class PlotgridView extends ItemView {
 
                         menu.addSeparator();
                         menu.addItem((it) => it.setTitle('Convert to Scene').setIcon('clapperboard').onClick(async () => {
-                            await scMgr?.updateScene(linkedScene.filePath, { corkboardNote: false, plotgridOrigin: undefined });
+                            const oldPath = linkedScene.filePath;
+                            const newPath = await scMgr?.moveNoteToSceneFolder(oldPath) ?? oldPath;
                             linkedScene.corkboardNote = false;
                             linkedScene.plotgridOrigin = undefined;
+                            linkedScene.filePath = newPath;
+                            // Update plot grid cell reference if the file moved
+                            if (newPath !== oldPath) {
+                                const c = this.data.cells[key];
+                                if (c) { c.linkedSceneId = newPath; this.scheduleSave(); }
+                            }
                             this.renderGrid();
                         }));
                         menu.addItem((it) => it.setTitle('Edit Cell Text').onClick(() => this.enterEditMode(cellEl, cell, contentEl)));

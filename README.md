@@ -20,7 +20,7 @@ StoryLine transforms your Obsidian vault into a complete book planning and writi
 
 ### Corkboard View
 
-A freeform spatial canvas inside the Board view. Use sticky notes to brainstorm and capture your first ideas — then convert them into full scenes when they're ready. Notes support markdown and can be styled with different colors. **Image sticky notes** let you pin reference art, maps, and charts directly on the board — drag images from the vault or desktop, add captions with `[[wikilinks]]`, and click to open a fullscreen lightbox. Pin scene cards and notes anywhere on the board and drag to rearrange. Toggle between the standard Kanban columns and corkboard mode with a single click. Positions are saved per project.
+A freeform spatial canvas inside the Board view. Use sticky notes to brainstorm and capture your first ideas — then convert them into full scenes when they're ready. Notes are stored in a separate `Notes/` folder to keep your `Scenes/` folder clean; converting a note moves it to `Scenes/` automatically. Notes support markdown and can be styled with different colors. **Image sticky notes** let you pin reference art, maps, and charts directly on the board — drag images from the vault or desktop, add captions with `[[wikilinks]]`, and click to open a fullscreen lightbox. Pin scene cards and notes anywhere on the board and drag to rearrange. Toggle between the standard Kanban columns and corkboard mode with a single click. Positions are saved per project.
 
 ![Corkboard View](screenshots/01.Corkboard.jpg)
 

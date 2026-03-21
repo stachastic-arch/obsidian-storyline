@@ -781,12 +781,20 @@ export class BoardView extends ItemView {
     }
 
     private async convertCorkboardNoteToScene(scene: Scene): Promise<void> {
-        await this.sceneManager.updateScene(scene.filePath, {
-            corkboardNote: false,
-            plotgridOrigin: undefined,
-        });
+        const oldPath = scene.filePath;
+        const newPath = await this.sceneManager.moveNoteToSceneFolder(oldPath);
+        // Update corkboard position key if the file moved
+        if (newPath !== oldPath) {
+            const pos = this.corkboardPositions.get(oldPath);
+            if (pos) {
+                this.corkboardPositions.delete(oldPath);
+                this.corkboardPositions.set(newPath, pos);
+                this.schedulePersistCorkboardLayout();
+            }
+        }
         scene.corkboardNote = false;
         scene.plotgridOrigin = undefined;
+        scene.filePath = newPath;
         this.refreshBoard();
     }
 

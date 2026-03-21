@@ -1,6 +1,11 @@
 # StoryLine — Changelog
 
 ---
+## Version 1.8.2
+
+- **Separate Notes/ folder** — Corkboard sticky notes are now stored in a dedicated `Notes/` folder inside your project, keeping the `Scenes/` folder clean. Converting a note to a scene moves the file to `Scenes/` automatically.
+
+---
 ## Version 1.8.1
 
 Bug fixes to linkscanner and small UI improvements.

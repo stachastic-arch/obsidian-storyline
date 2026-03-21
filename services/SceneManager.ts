@@ -88,6 +88,13 @@ export class SceneManager implements ISceneStore {
         return `${root}/Codex`;
     }
 
+    /** Computed notes folder for the active project (corkboard sticky notes) */
+    getNotesFolder(): string {
+        if (this._activeProject) return this._activeProject.notesFolder;
+        const root = this.plugin.settings.storyLineRoot;
+        return `${root}/Notes`;
+    }
+
     /**
      * Return the series-level Codex folder (parent of book folder + `/Codex`).
      * Only meaningful when the active project has a seriesId.
@@ -155,7 +162,7 @@ export class SceneManager implements ISceneStore {
                 for (const sub of listing.folders) {
                     // Skip internal folders that never contain project files
                     const folderName = sub.split('/').pop() ?? '';
-                    if (['System', 'Scenes', 'Characters', 'Locations', 'Codex'].includes(folderName)) continue;
+                    if (['System', 'Scenes', 'Characters', 'Locations', 'Codex', 'Notes'].includes(folderName)) continue;
                     await scanFolder(sub);
                 }
             } catch { /* folder unreadable — skip */ }
@@ -238,6 +245,7 @@ export class SceneManager implements ISceneStore {
             await this.ensureFolder(folders.codexFolder);
             await this.ensureFolder(folders.characterFolder);
             await this.ensureFolder(folders.locationFolder);
+            await this.ensureFolder(folders.notesFolder);
 
             // Create System folder for project data files
             const systemFolder = normalizePath(`${baseFolder}/System`);
@@ -358,6 +366,7 @@ export class SceneManager implements ISceneStore {
         project.characterFolder = newFolders.characterFolder;
         project.locationFolder = newFolders.locationFolder;
         project.codexFolder = newFolders.codexFolder;
+        project.notesFolder = newFolders.notesFolder;
         this.projects.set(newFilePath, project);
 
         // Update frontmatter
@@ -407,7 +416,20 @@ export class SceneManager implements ISceneStore {
             }
         }
 
-        new Notice(`Forked "${source.title}" → "${newTitle}" (${sourceFolder instanceof TFolder ? sourceFolder.children.filter(c => c instanceof TFile).length : 0} scenes copied)`);
+        // Copy all note files from source to new project
+        const sourceNotesFolder = this.app.vault.getAbstractFileByPath(source.notesFolder);
+        if (sourceNotesFolder && sourceNotesFolder instanceof TFolder) {
+            for (const child of sourceNotesFolder.children) {
+                if (child instanceof TFile && child.extension === 'md') {
+                    const content = await this.app.vault.read(child);
+                    const newPath = normalizePath(`${newProject.notesFolder}/${child.name}`);
+                    await this.app.vault.create(newPath, content);
+                }
+            }
+        }
+
+        const sceneCount = sourceFolder instanceof TFolder ? sourceFolder.children.filter(c => c instanceof TFile).length : 0;
+        new Notice(`Forked "${source.title}" → "${newTitle}" (${sceneCount} scenes copied)`);
         return newProject;
     }
 
@@ -492,6 +514,8 @@ export class SceneManager implements ISceneStore {
         this.scenes.clear();
         const sceneFolder = this.getSceneFolder();
         await this.scanFolderAdapter(sceneFolder);
+        const notesFolder = this.getNotesFolder();
+        await this.scanFolderAdapter(notesFolder);
         this.initialized = true;
     }
 
@@ -571,15 +595,17 @@ export class SceneManager implements ISceneStore {
      * Create a new scene
      */
     async createScene(sceneData: Partial<Scene>, afterScene?: Scene): Promise<TFile> {
-        const sceneFolder = this.getSceneFolder();
+        // Route corkboard notes to the Notes/ folder
+        const isNote = sceneData.corkboardNote === true;
+        const baseFolder = isNote ? this.getNotesFolder() : this.getSceneFolder();
 
         // Ensure folder exists
-        await this.ensureFolder(sceneFolder);
+        await this.ensureFolder(baseFolder);
 
-        // Determine subfolder based on act
-        let targetFolder = sceneFolder;
-        if (sceneData.act !== undefined) {
-            targetFolder = normalizePath(`${sceneFolder}/Act ${sceneData.act}`);
+        // Determine subfolder based on act (only for scenes, not notes)
+        let targetFolder = baseFolder;
+        if (!isNote && sceneData.act !== undefined) {
+            targetFolder = normalizePath(`${baseFolder}/Act ${sceneData.act}`);
             await this.ensureFolder(targetFolder);
         }
 
@@ -643,6 +669,55 @@ export class SceneManager implements ISceneStore {
         if (scene) {
             this.scenes.set(filePath, scene);
         }
+    }
+
+    /**
+     * Move a corkboard note from the Notes/ folder to the Scenes/ folder,
+     * flipping corkboardNote to false.  Returns the new file path.
+     */
+    async moveNoteToSceneFolder(filePath: string): Promise<string> {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile)) {
+            new Notice('Note file not found');
+            return filePath;
+        }
+
+        const scene = this.scenes.get(filePath);
+
+        // Update frontmatter first (still at old path)
+        await this.updateScene(filePath, {
+            corkboardNote: false,
+            plotgridOrigin: undefined,
+        });
+
+        // Determine target location in the Scenes/ folder
+        const sceneFolder = this.getSceneFolder();
+        await this.ensureFolder(sceneFolder);
+
+        let targetFolder = sceneFolder;
+        if (scene?.act !== undefined) {
+            targetFolder = normalizePath(`${sceneFolder}/Act ${scene.act}`);
+            await this.ensureFolder(targetFolder);
+        }
+
+        const newPath = normalizePath(`${targetFolder}/${file.name}`);
+
+        // Only move if the file is actually in a different folder
+        if (normalizePath(filePath) !== newPath) {
+            // Remove old index entry
+            this.scenes.delete(filePath);
+            // Use fileManager.renameFile so vault links update
+            await this.app.fileManager.renameFile(file, newPath);
+            // Re-index at the new path
+            const movedFile = this.app.vault.getAbstractFileByPath(newPath);
+            if (movedFile && movedFile instanceof TFile) {
+                const updated = await MetadataParser.parseFile(this.app, movedFile);
+                if (updated) this.scenes.set(newPath, updated);
+            }
+            return newPath;
+        }
+
+        return filePath;
     }
 
     /**
@@ -712,8 +787,8 @@ export class SceneManager implements ISceneStore {
     async handleFileChange(file: TFile): Promise<void> {
         if (file.extension !== 'md') return;
 
-        // Check if file is in scene folder
-        if (!file.path.startsWith(this.getSceneFolder())) return;
+        // Check if file is in scene folder or notes folder
+        if (!file.path.startsWith(this.getSceneFolder()) && !file.path.startsWith(this.getNotesFolder())) return;
 
         const scene = await MetadataParser.parseFile(this.app, file);
         if (scene) {
@@ -735,7 +810,7 @@ export class SceneManager implements ISceneStore {
      */
     async handleFileRename(file: TFile, oldPath: string): Promise<void> {
         this.scenes.delete(oldPath);
-        if (file.extension === 'md' && file.path.startsWith(this.getSceneFolder())) {
+        if (file.extension === 'md' && (file.path.startsWith(this.getSceneFolder()) || file.path.startsWith(this.getNotesFolder()))) {
             const scene = await MetadataParser.parseFile(this.app, file);
             if (scene) {
                 this.scenes.set(file.path, scene);
