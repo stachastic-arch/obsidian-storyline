@@ -1,23 +1,25 @@
 # StoryLine — Changelog
 
 ---
+
 ## Version 1.8.3
 
 - **Scrivener Import** — Import a Scrivener project (.scriv folder) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research notes. Supports Scrivener 2 and 3 project formats. Results may vary depending on project complexity — review imported data carefully.
-
+  
   - Access via **Settings → Import** or command palette → **Import Scrivener Project**.
 
 - **Scene Inspector sidebar** now works from Board, Timeline, and Plotgrid views (previously Manuscript only).
 
-- **Research sidebar improvements** — Open and Edit buttons for all research post types. Web clips open their URL; all types support an edit modal.
+- **Research sidebar** — Open and Edit buttons for all research post types. Web clips open their URL; all types support an edit modal.
 
 - **View Snapshots** — Save and restore point-in-time snapshots of your project's view layout. Each snapshot captures corkboard card positions (including card heights), the full Plot Grid state (rows, columns, cells, zoom, styling), and scene layout metadata (act, chapter, status, POV, sequence). Create, rename, load, and delete snapshots from the toolbar button (clock icon) in Board or Plotgrid views, or via the command palette.
-
+  
   - **Auto-save** — When a snapshot is active, layout changes are automatically saved back to it after a 2-second debounce. No manual saving needed.
   - **Free-editing mode** — With no active snapshot, changes are saved normally without snapshot tracking.
   - **Per-project** — Each project has its own snapshot history, stored in `System/Snapshots/`.
 
 ---
+
 ## Version 1.8.2
 
 - **Separate Notes/ folder** — Corkboard sticky notes are now stored in a dedicated `Notes/` folder inside your project, keeping the `Scenes/` folder clean. Converting a note to a scene moves the file to `Scenes/` automatically.
@@ -31,10 +33,10 @@
 - **Research Sidebar** — A dedicated right-sidebar panel for storing and browsing research while you write. Supports four post types: **Note**, **Web Clip**, **Image**, and **Question** (with open/resolved tracking). Features include free-text search, tag chip filters, type filters, and an **Auto-suggest** mode that surfaces relevant research based on the active scene's characters, location, and tags. Create, read, edit, and delete posts without leaving your writing flow. Open the panel via command palette → *Open Research Sidebar*.
 
 ---
+
 ## Version 1.8.1
 
 Bug fixes to linkscanner and small UI improvements.
-
 
 ## Version 1.8.0
 
@@ -64,22 +66,20 @@ Bug fixes to linkscanner and small UI improvements.
 
 ### New Features
 
-
 - **Formatting Toolbar (Manuscript View)** — A built-in formatting toolbar appears above the manuscript when you click into any scene editor. Provides one-click access to common formatting commands without needing the third-party Editing Toolbar plugin (which cannot hook into embedded editors). The toolbar auto-hides when you click away from the editor.
 
 - **Formatting Toolbar in Scene Editors** — When the Editing Toolbar plugin is not installed, StoryLine now automatically opens a formatting toolbar into standard scene editor tabs (any markdown file inside the active project). This gives you formatting buttons everywhere without needing a third-party plugin. A new **Settings → Display Options → Formatting toolbar** toggle lets you turn this off if you prefer.
-
 
 ## Version 1.7.1
 
 ### New Features
 
 - **Cross-Entity References ("Referenced By" panel)** — Characters, Locations, and Codex entries now show a **Referenced By** section in their side panel. StoryLine scans all entity descriptions and scene text for `[[wikilinks]]`, `#tags`, and plain-text name mentions, then builds a reverse index so you can see at a glance which other characters, locations, codex entries, and scenes mention the entity you're viewing. References are grouped by type (characters, locations, codex category, scenes) and each is a clickable link that opens the source file.
-
+  
   Use standard Obsidian `[[wikilinks]]`, `#tags`, or just write entity names as plain text in any text field — scene prose, character backstory, location descriptions, codex entry notes — and StoryLine will automatically detect the cross-entity connection.
 
 - **Hide / Show Built-in Fields** — Declutter your character, location, and codex editors by hiding built-in fields you don't use. Every built-in field (except Name) now has a small **eye icon** that appears when you hover over the field label.
-
+  
   - **Hide a field** — hover over any field label and click the eye-off (👁‍🗨) icon. The field disappears from the form.
   - **Show hidden fields** — a "Show N hidden fields" link appears at the bottom of each category section. Click it to expand the hidden fields in a dimmed container.
   - **Unhide a field** — inside the hidden-fields container, hover over the field label and click the eye icon to restore it permanently.
@@ -109,7 +109,7 @@ Bug fixes to linkscanner and small UI improvements.
 ### New Features
 
 - **Series Mode** — Group multiple book projects into a shared series. Books in a series share a single Codex (characters, locations, and custom categories) so every entry is available across all books without duplication.
-
+  
   - **Create Series** — Command palette → **Create Series from Current Project**. Wraps the active book in a new series folder, moves its Codex to the series level, and writes a `series.json` manifest.
   - **Add to Series** — Command palette → **Add Current Project to Series**. Discovers existing series in your vault and lets you pick one. The book folder moves into the series folder and its Codex entries are migrated into the shared Codex.
   - **Remove from Series** — Command palette → **Remove Current Project from Series**. Copies the shared Codex back into the book's local folder and moves the book out of the series folder.
@@ -119,8 +119,9 @@ Bug fixes to linkscanner and small UI improvements.
   - **Safe file moves** — All file operations use Obsidian's `fileManager.renameFile()` to ensure links are updated vault-wide. Duplicate filenames in the destination are skipped with a notice.
   - **Settings → Project Management** — New section in the plugin settings tab with buttons for **Rename book**, **Create series from this book**, and **Manage series** — no need to use the command palette.
   - **Series Management Modal** — Accessible from Settings or the Open Project modal. View, rename, and reorder books within a series, add standalone books, or remove them.
-
+  
   Series folder structure:
+  
   ```
   StoryLine/
     My Series/
@@ -146,7 +147,7 @@ Bug fixes to linkscanner and small UI improvements.
 ### New Features
 
 - **Stats View Rewrite** — The Stats dashboard has been completely rebuilt with eight collapsible sections for a cleaner, more organized layout. Click any section header to expand or collapse it.
-
+  
   - **Overview** — Project word count with goal progress bar, estimated reading time, pace-to-deadline projection, and estimated completion date.
   - **Writing Sprint** — Session word count, duration, speed (wpm), streak, daily goal progress bar, and a 7-day sparkline.
   - **Writing History** — Daily bar chart with range selector (7d / 30d / 90d / All) showing words written per day.

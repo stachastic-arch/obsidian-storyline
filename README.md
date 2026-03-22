@@ -10,6 +10,14 @@ StoryLine transforms your Obsidian vault into a complete book planning and writi
 
 - **View Snapshots** — Save and restore point-in-time snapshots of your project's view layout (corkboard positions, Plot Grid state, scene ordering). Auto-saves changes while a snapshot is active. Manage from the Board/Plotgrid toolbar or the command palette.
 
+- **Scrivener Import** — Import a Scrivener project (.scriv folder) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research notes. Supports Scrivener 2 and 3 project formats. Results may vary depending on project complexity — review imported data carefully.
+  
+  - Access via **Settings → Import** or command palette → **Import Scrivener Project**.
+
+- **Scene Inspector sidebar** now works from Board, Timeline, and Plotgrid views (previously Manuscript only).
+
+- **Research sidebar** — Open and Edit buttons for all research post types. Web clips open their URL; all types support an edit modal.
+
 ---
 
 ## Quick Start
