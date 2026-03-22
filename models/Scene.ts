@@ -138,6 +138,8 @@ export interface Scene {
     timeline_mode?: TimelineMode;
     /** Named strand for parallel / frame narratives (e.g. "1943", "outer frame") */
     timeline_strand?: string;
+    /** Optional subtitle shown below the title (e.g. "Three years later", "Meanwhile, in Paris") */
+    subtitle?: string;
 }
 
 /**
@@ -185,7 +187,7 @@ export interface SortConfig {
 /**
  * Available view types
  */
-export type ViewType = 'board' | 'timeline' | 'storyline' | 'character' | 'stats';
+export type ViewType = 'board' | 'timeline' | 'storyline' | 'character' | 'stats' | 'plotgrid' | 'manuscript' | 'codex' | 'location';
 
 /**
  * A reusable scene template with pre-filled defaults and body text

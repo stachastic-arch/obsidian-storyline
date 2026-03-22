@@ -95,6 +95,13 @@ export class SceneManager implements ISceneStore {
         return `${root}/Notes`;
     }
 
+    /** Computed archive folder for the active project (cut / archived scenes) */
+    getArchiveFolder(): string {
+        if (this._activeProject) return this._activeProject.archiveFolder;
+        const root = this.plugin.settings.storyLineRoot;
+        return `${root}/Archive`;
+    }
+
     /**
      * Return the series-level Codex folder (parent of book folder + `/Codex`).
      * Only meaningful when the active project has a seriesId.
@@ -162,7 +169,7 @@ export class SceneManager implements ISceneStore {
                 for (const sub of listing.folders) {
                     // Skip internal folders that never contain project files
                     const folderName = sub.split('/').pop() ?? '';
-                    if (['System', 'Scenes', 'Characters', 'Locations', 'Codex', 'Notes'].includes(folderName)) continue;
+                    if (['System', 'Scenes', 'Characters', 'Locations', 'Codex', 'Notes', 'Archive', 'Research'].includes(folderName)) continue;
                     await scanFolder(sub);
                 }
             } catch { /* folder unreadable — skip */ }
@@ -246,6 +253,8 @@ export class SceneManager implements ISceneStore {
             await this.ensureFolder(folders.characterFolder);
             await this.ensureFolder(folders.locationFolder);
             await this.ensureFolder(folders.notesFolder);
+            await this.ensureFolder(folders.archiveFolder);
+            await this.ensureFolder(folders.researchFolder);
 
             // Create System folder for project data files
             const systemFolder = normalizePath(`${baseFolder}/System`);
@@ -367,6 +376,7 @@ export class SceneManager implements ISceneStore {
         project.locationFolder = newFolders.locationFolder;
         project.codexFolder = newFolders.codexFolder;
         project.notesFolder = newFolders.notesFolder;
+        project.archiveFolder = newFolders.archiveFolder;
         this.projects.set(newFilePath, project);
 
         // Update frontmatter
@@ -428,6 +438,18 @@ export class SceneManager implements ISceneStore {
             }
         }
 
+        // Copy archived scenes from source to new project
+        const sourceArchiveFolder = this.app.vault.getAbstractFileByPath(source.archiveFolder);
+        if (sourceArchiveFolder && sourceArchiveFolder instanceof TFolder) {
+            for (const child of sourceArchiveFolder.children) {
+                if (child instanceof TFile && child.extension === 'md') {
+                    const content = await this.app.vault.read(child);
+                    const newPath = normalizePath(`${newProject.archiveFolder}/${child.name}`);
+                    await this.app.vault.create(newPath, content);
+                }
+            }
+        }
+
         const sceneCount = sourceFolder instanceof TFolder ? sourceFolder.children.filter(c => c instanceof TFile).length : 0;
         new Notice(`Forked "${source.title}" → "${newTitle}" (${sceneCount} scenes copied)`);
         return newProject;
@@ -476,6 +498,7 @@ export class SceneManager implements ISceneStore {
                 filterPresets: Array.isArray(fm.filterPresets) ? fm.filterPresets : [],
                 corkboardPositions: {},
                 seriesId: fm.seriesId || undefined,
+                coverImage: fm.coverImage || undefined,
             };
         } catch {
             return null;
@@ -718,6 +741,102 @@ export class SceneManager implements ISceneStore {
         }
 
         return filePath;
+    }
+
+    /**
+     * Move a scene to the Archive/ folder (soft delete / cut scene).
+     */
+    async archiveScene(filePath: string): Promise<string> {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile)) {
+            new Notice('Scene file not found');
+            return filePath;
+        }
+
+        const scene = this.scenes.get(filePath);
+        const archiveFolder = this.getArchiveFolder();
+        await this.ensureFolder(archiveFolder);
+
+        const newPath = normalizePath(`${archiveFolder}/${file.name}`);
+
+        // Remove from active index
+        this.scenes.delete(filePath);
+
+        // Move the file
+        await this.app.fileManager.renameFile(file, newPath);
+
+        new Notice(`"${scene?.title || file.basename}" archived`);
+        return newPath;
+    }
+
+    /**
+     * Restore a scene from the Archive/ folder back to Scenes/.
+     * Handles filename collisions and assigns a new sequence number
+     * to avoid clashing with existing scenes.
+     */
+    async restoreScene(filePath: string): Promise<string> {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile)) {
+            new Notice('Archived file not found');
+            return filePath;
+        }
+
+        const sceneFolder = this.getSceneFolder();
+        await this.ensureFolder(sceneFolder);
+        let newPath = normalizePath(`${sceneFolder}/${file.name}`);
+
+        // Handle filename collision — append " (restored)" if needed
+        if (this.app.vault.getAbstractFileByPath(newPath)) {
+            const baseName = file.basename;
+            newPath = normalizePath(`${sceneFolder}/${baseName} (restored).md`);
+            // If even that exists, add a number
+            let counter = 2;
+            while (this.app.vault.getAbstractFileByPath(newPath)) {
+                newPath = normalizePath(`${sceneFolder}/${baseName} (restored ${counter}).md`);
+                counter++;
+            }
+        }
+
+        await this.app.fileManager.renameFile(file, newPath);
+
+        // Re-index at new path
+        const movedFile = this.app.vault.getAbstractFileByPath(newPath);
+        if (movedFile && movedFile instanceof TFile) {
+            const scene = await MetadataParser.parseFile(this.app, movedFile);
+            if (scene) {
+                // Assign a new sequence number at the end to avoid clashes
+                const newSeq = this.getNextSequence();
+                await MetadataParser.updateFrontmatter(this.app, movedFile, { sequence: newSeq });
+                scene.sequence = newSeq;
+                this.scenes.set(newPath, scene);
+            }
+        }
+
+        new Notice(`"${file.basename}" restored from archive (sequence renumbered)`);
+        return newPath;
+    }
+
+    /**
+     * List all archived scene files.
+     */
+    async getArchivedScenes(): Promise<{ filePath: string; title: string }[]> {
+        const archiveFolder = this.getArchiveFolder();
+        const adapter = this.app.vault.adapter;
+        if (!await adapter.exists(archiveFolder)) return [];
+
+        const results: { filePath: string; title: string }[] = [];
+        try {
+            const listing = await adapter.list(archiveFolder);
+            for (const f of listing.files) {
+                if (!f.endsWith('.md')) continue;
+                try {
+                    const content = await adapter.read(f);
+                    const scene = MetadataParser.parseContent(content, f);
+                    results.push({ filePath: f, title: scene?.title || f.split('/').pop()?.replace(/\.md$/, '') || f });
+                } catch { /* skip unreadable files */ }
+            }
+        } catch { /* folder unreadable */ }
+        return results;
     }
 
     /**
@@ -1088,7 +1207,7 @@ export class SceneManager implements ISceneStore {
     }
 
     /** Get persisted corkboard positions from System/board.json */
-    getCorkboardPositions(): Record<string, { x: number; y: number; z?: number }> {
+    getCorkboardPositions(): Record<string, { x: number; y: number; z?: number; h?: number }> {
         // Return the in-memory cache (populated by loadCorkboardPositions)
         return this._activeProject?.corkboardPositions ?? {};
     }
@@ -1105,7 +1224,7 @@ export class SceneManager implements ISceneStore {
                 return;
             }
             const raw = JSON.parse(await adapter.read(path));
-            const positions: Record<string, { x: number; y: number; z?: number }> = {};
+            const positions: Record<string, { x: number; y: number; z?: number; h?: number }> = {};
             if (raw.corkboardPositions && typeof raw.corkboardPositions === 'object') {
                 for (const [key, value] of Object.entries(raw.corkboardPositions)) {
                     const v = value as any;
@@ -1113,7 +1232,10 @@ export class SceneManager implements ISceneStore {
                     const y = Number(v?.y);
                     const z = Number(v?.z);
                     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
-                    positions[key] = Number.isFinite(z) ? { x, y, z } : { x, y };
+                    const entry: { x: number; y: number; z?: number; h?: number } = Number.isFinite(z) ? { x, y, z } : { x, y };
+                    const h = Number(v?.h);
+                    if (Number.isFinite(h) && h > 0) entry.h = h;
+                    positions[key] = entry;
                 }
             }
             this._activeProject.corkboardPositions = positions;
@@ -1123,16 +1245,19 @@ export class SceneManager implements ISceneStore {
     }
 
     /** Persist corkboard positions to System/board.json */
-    async setCorkboardPositions(positions: Record<string, { x: number; y: number; z?: number }>): Promise<void> {
+    async setCorkboardPositions(positions: Record<string, { x: number; y: number; z?: number; h?: number }>): Promise<void> {
         if (!this._activeProject) return;
 
-        const cleaned: Record<string, { x: number; y: number; z?: number }> = {};
+        const cleaned: Record<string, { x: number; y: number; z?: number; h?: number }> = {};
         for (const [path, pos] of Object.entries(positions)) {
             const x = Number(pos?.x);
             const y = Number(pos?.y);
             if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
             const z = Number(pos?.z);
-            cleaned[path] = Number.isFinite(z) ? { x, y, z } : { x, y };
+            const entry: { x: number; y: number; z?: number; h?: number } = Number.isFinite(z) ? { x, y, z } : { x, y };
+            const h = Number((pos as any)?.h);
+            if (Number.isFinite(h) && h > 0) entry.h = h;
+            cleaned[path] = entry;
         }
 
         this._activeProject.corkboardPositions = cleaned;
@@ -1236,6 +1361,13 @@ export class SceneManager implements ISceneStore {
             existingFm.seriesId = project.seriesId;
         } else {
             delete existingFm.seriesId;
+        }
+
+        // Cover image
+        if (project.coverImage) {
+            existingFm.coverImage = project.coverImage;
+        } else {
+            delete existingFm.coverImage;
         }
 
         const newContent = `---\n${stringifyYaml(existingFm)}---${body}`;

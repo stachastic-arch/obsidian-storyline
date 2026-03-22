@@ -1,9 +1,34 @@
 # StoryLine — Changelog
 
 ---
+## Version 1.8.3
+
+- **Scrivener Import** — Import a Scrivener project (.scriv folder) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research notes. Supports Scrivener 2 and 3 project formats. Results may vary depending on project complexity — review imported data carefully.
+
+  - Access via **Settings → Import** or command palette → **Import Scrivener Project**.
+
+- **Scene Inspector sidebar** now works from Board, Timeline, and Plotgrid views (previously Manuscript only).
+
+- **Research sidebar improvements** — Open and Edit buttons for all research post types. Web clips open their URL; all types support an edit modal.
+
+- **View Snapshots** — Save and restore point-in-time snapshots of your project's view layout. Each snapshot captures corkboard card positions (including card heights), the full Plot Grid state (rows, columns, cells, zoom, styling), and scene layout metadata (act, chapter, status, POV, sequence). Create, rename, load, and delete snapshots from the toolbar button (clock icon) in Board or Plotgrid views, or via the command palette.
+
+  - **Auto-save** — When a snapshot is active, layout changes are automatically saved back to it after a 2-second debounce. No manual saving needed.
+  - **Free-editing mode** — With no active snapshot, changes are saved normally without snapshot tracking.
+  - **Per-project** — Each project has its own snapshot history, stored in `System/Snapshots/`.
+
+---
 ## Version 1.8.2
 
 - **Separate Notes/ folder** — Corkboard sticky notes are now stored in a dedicated `Notes/` folder inside your project, keeping the `Scenes/` folder clean. Converting a note to a scene moves the file to `Scenes/` automatically.
+
+- **Scene Archive** — Right-click any scene in Board or Navigator and choose *Archive Scene* to move it to an `Archive/` folder. Archived scenes are removed from all views but preserved on disk. Restore them via the archive button (📦) in the Board toolbar.
+
+- **Scene Subtitles** — An optional subtitle field (e.g. *“Three years later”*, *“Meanwhile, in Paris”*) is shown below the title on scene cards and in the Manuscript view header. Edit it in the Inspector.
+
+- **Novel Covers / Project Art** — Click the cover thumbnail (or placeholder icon) in the toolbar to pick a cover image for your project. The thumbnail appears next to the project name in the toolbar selector.
+
+- **Research Sidebar** — A dedicated right-sidebar panel for storing and browsing research while you write. Supports four post types: **Note**, **Web Clip**, **Image**, and **Question** (with open/resolved tracking). Features include free-text search, tag chip filters, type filters, and an **Auto-suggest** mode that surfaces relevant research based on the active scene's characters, location, and tags. Create, read, edit, and delete posts without leaving your writing flow. Open the panel via command palette → *Open Research Sidebar*.
 
 ---
 ## Version 1.8.1

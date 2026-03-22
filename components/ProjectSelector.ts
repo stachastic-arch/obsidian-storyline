@@ -1,6 +1,8 @@
 import * as obsidian from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import type { StoryLineProject } from '../models/StoryLineProject';
+import { pickImage } from './ImagePicker';
+import { attachTooltip } from './Tooltip';
 
 /**
  * Renders a project selector dropdown into a toolbar container.
@@ -24,6 +26,36 @@ export function renderProjectSelector(
             text: active.seriesId,
         });
         obsidian.setIcon(seriesBadge.createSpan({ cls: 'project-selector-series-icon', prepend: true }), 'library');
+    }
+
+    // Cover image thumbnail — clickable to pick/change
+    if (active) {
+        const coverEl = wrapper.createDiv({ cls: 'project-selector-cover' });
+        attachTooltip(coverEl, 'Click to set cover image');
+        coverEl.style.cursor = 'pointer';
+
+        if (active.coverImage) {
+            const resourcePath = plugin.app.vault.adapter.getResourcePath(active.coverImage);
+            if (resourcePath) {
+                coverEl.createEl('img', {
+                    cls: 'project-selector-cover-img',
+                    attr: { src: resourcePath, alt: active.title },
+                });
+            }
+        } else {
+            // Placeholder icon
+            const placeholder = coverEl.createSpan({ cls: 'project-selector-cover-placeholder' });
+            obsidian.setIcon(placeholder, 'image');
+        }
+
+        coverEl.addEventListener('click', async () => {
+            const sceneFolder = plugin.sceneManager.getSceneFolder();
+            const result = await pickImage(plugin.app, sceneFolder, active.coverImage);
+            if (result === undefined) return; // cancelled
+            active.coverImage = result || undefined;
+            await plugin.sceneManager.saveProjectFrontmatter(active);
+            onSwitch(); // re-render toolbar
+        });
     }
 
     if (projects.length <= 1 && active) {

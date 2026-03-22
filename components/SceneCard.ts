@@ -69,6 +69,14 @@ export class SceneCardComponent {
             text: displayTitle
         });
 
+        // Subtitle (optional, shown below title)
+        if (scene.subtitle) {
+            card.createDiv({
+                cls: 'scene-card-subtitle',
+                text: scene.subtitle
+            });
+        }
+
         // Timeline mode badge (for non-linear scenes)
         const cardTlMode = scene.timeline_mode || 'linear';
         if (!options?.compact && cardTlMode !== 'linear') {

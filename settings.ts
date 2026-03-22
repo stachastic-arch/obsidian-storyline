@@ -555,7 +555,6 @@ export interface SceneCardsSettings {
     // Advanced
     enablePlotHoleDetection: boolean;
     showWarnings: boolean;
-    debugMode: boolean;
 
     // Scene templates
     sceneTemplates: SceneTemplate[];
@@ -625,8 +624,6 @@ export interface SceneCardsSettings {
     /** Show the built-in formatting toolbar in scene editors when Editing Toolbar plugin is not installed */
     showFormattingToolbar: boolean;
 
-    /** Focus mode: how much to dim inactive scenes (0–100, percentage opacity) */
-    focusDimOpacity: number;
     /** Focus mode: how much to darken the whole UI (0–100, percentage) */
     focusDarkenAmount: number;
     /** Focus mode: blur radius in px for everything outside the text area (0–20) */
@@ -666,7 +663,6 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     enablePlotHoleDetection: true,
     showWarnings: true,
-    debugMode: false,
 
     sceneTemplates: [],
 
@@ -710,7 +706,6 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     showFormattingToolbar: true,
 
-    focusDimOpacity: 25,
     focusDarkenAmount: 40,
     focusBlurAmount: 1,
 };
@@ -743,8 +738,10 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.openHelp();
                 }));
 
-        // --- StoryLine Root ---
-        containerEl.createEl('h2', { text: 'StoryLine Root' });
+        // ═══════════════════════════════════════════
+        //  General
+        // ═══════════════════════════════════════════
+        containerEl.createEl('h2', { text: 'General' });
 
         new Setting(containerEl)
             .setName('Root folder')
@@ -757,7 +754,31 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // --- Scene Defaults ---
+        new Setting(containerEl)
+            .setName('Auto-open Navigator')
+            .setDesc('Automatically open the StoryLine Navigator sidebar when a project loads')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.autoOpenNavigator ?? true)
+                .onChange(async (value) => {
+                    this.plugin.settings.autoOpenNavigator = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName('Hide frontmatter')
+            .setDesc('Hide the properties/frontmatter block in live preview and reading mode. Since all fields are editable from the Inspector, frontmatter can safely be hidden.')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.hideFrontmatter)
+                .onChange(async (value) => {
+                    this.plugin.settings.hideFrontmatter = value;
+                    await this.plugin.saveSettings();
+                    // Apply Obsidian\'s built-in "Properties in document" setting
+                    (this.app.vault as any).setConfig?.('propertiesInDocument', value ? 'hidden' : 'visible');
+                }));
+
+        // ═══════════════════════════════════════════
+        //  Scene Defaults & Templates
+        // ═══════════════════════════════════════════
         containerEl.createEl('h2', { text: 'Scene Defaults' });
 
         new Setting(containerEl)
@@ -794,7 +815,9 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // --- Display Options ---
+        // ═══════════════════════════════════════════
+        //  Display Options
+        // ═══════════════════════════════════════════
         containerEl.createEl('h2', { text: 'Display Options' });
 
         new Setting(containerEl)
@@ -802,9 +825,13 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .setDesc('Which view to open by default')
             .addDropdown(dropdown => {
                 dropdown.addOption('board', 'Board');
+                dropdown.addOption('manuscript', 'Manuscript');
+                dropdown.addOption('plotgrid', 'Plotgrid');
                 dropdown.addOption('timeline', 'Timeline');
-                dropdown.addOption('storyline', 'Storylines');
+                dropdown.addOption('storyline', 'Plotlines');
+                dropdown.addOption('codex', 'Codex');
                 dropdown.addOption('character', 'Characters');
+                dropdown.addOption('location', 'Locations');
                 dropdown.addOption('stats', 'Statistics');
                 dropdown.setValue(this.plugin.settings.defaultView);
                 dropdown.onChange(async (value) => {
@@ -828,14 +855,20 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             });
 
         new Setting(containerEl)
-            .setName('Auto-open Navigator')
-            .setDesc('Automatically open the StoryLine Navigator sidebar when a project loads')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.autoOpenNavigator ?? true)
-                .onChange(async (value) => {
-                    this.plugin.settings.autoOpenNavigator = value;
+            .setName('Color coding')
+            .setDesc('How to color-code scene cards')
+            .addDropdown(dropdown => {
+                dropdown.addOption('status', 'By Status');
+                dropdown.addOption('pov', 'By POV Character');
+                dropdown.addOption('emotion', 'By Emotion');
+                dropdown.addOption('act', 'By Act');
+                dropdown.addOption('tag', 'By Tag / Plotline');
+                dropdown.setValue(this.plugin.settings.colorCoding);
+                dropdown.onChange(async (value) => {
+                    this.plugin.settings.colorCoding = value as ColorCodingMode;
                     await this.plugin.saveSettings();
-                }));
+                });
+            });
 
         new Setting(containerEl)
             .setName('Show notes in Kanban')
@@ -858,22 +891,6 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     this.plugin.refreshOpenViews();
                 }));
-
-        new Setting(containerEl)
-            .setName('Color coding')
-            .setDesc('How to color-code scene cards')
-            .addDropdown(dropdown => {
-                dropdown.addOption('status', 'By Status');
-                dropdown.addOption('pov', 'By POV Character');
-                dropdown.addOption('emotion', 'By Emotion');
-                dropdown.addOption('act', 'By Act');
-                dropdown.addOption('tag', 'By Tag / Plotline');
-                dropdown.setValue(this.plugin.settings.colorCoding);
-                dropdown.onChange(async (value) => {
-                    this.plugin.settings.colorCoding = value as ColorCodingMode;
-                    await this.plugin.saveSettings();
-                });
-            });
 
         new Setting(containerEl)
             .setName('Show word counts')
@@ -905,7 +922,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        const imageDetails = containerEl.createEl('details', { cls: 'story-line-image-size-section' });
+        const imageDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         imageDetails.createEl('summary', { text: 'Image & frame sizes' });
         const imageBody = imageDetails.createDiv();
         imageBody.style.padding = '8px 0';
@@ -1006,41 +1023,9 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.display();
                 }));
 
-        // --- Project Management ---
-        containerEl.createEl('h2', { text: 'Project Management' });
-
-        const activeProject = this.plugin.sceneManager.activeProject;
-
-        new Setting(containerEl)
-            .setName('Rename book')
-            .setDesc(activeProject ? `Current: "${activeProject.title}"` : 'No active project')
-            .addButton(btn => btn
-                .setButtonText('Rename…')
-                .setDisabled(!activeProject)
-                .onClick(() => {
-                    (this.plugin.app as any).commands.executeCommandById('storyline:rename-project');
-                }));
-
-        new Setting(containerEl)
-            .setName('Create series from this book')
-            .setDesc(activeProject?.seriesId ? 'This book already belongs to a series.' : 'Wrap the current book in a new series.')
-            .addButton(btn => btn
-                .setButtonText('Create Series…')
-                .setDisabled(!activeProject || !!activeProject.seriesId)
-                .onClick(() => {
-                    (this.plugin.app as any).commands.executeCommandById('storyline:create-series');
-                }));
-
-        new Setting(containerEl)
-            .setName('Manage series')
-            .setDesc('View, rename, and reorder books in your series.')
-            .addButton(btn => btn
-                .setButtonText('Manage Series…')
-                .onClick(() => {
-                    (this.plugin as any).openSeriesManagementModal();
-                }));
-
-        // --- Writing Goals ---
+        // ═══════════════════════════════════════════
+        //  Writing Goals & Focus
+        // ═══════════════════════════════════════════
         containerEl.createEl('h2', { text: 'Writing Goals' });
 
         new Setting(containerEl)
@@ -1065,10 +1050,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                 }));
 
-        // --- Focus Mode ---
-        containerEl.createEl('h2', { text: 'Focus Mode' });
-
-        const focusDetails = containerEl.createEl('details', { cls: 'story-line-color-section', attr: { open: '' } });
+        const focusDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
         focusDetails.createEl('summary', { text: 'Focus Mode Settings' });
         const focusBody = focusDetails.createDiv();
         focusBody.style.padding = '12px 16px';
@@ -1076,16 +1058,6 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         const focusDesc = focusBody.createDiv({ cls: 'setting-item-description' });
         focusDesc.style.marginBottom = '16px';
         focusDesc.setText('Control how the UI changes when Focus mode is enabled in Manuscript view.');
-
-        // ── Inactive scenes group ──
-        const scenesLabel = focusBody.createDiv();
-        scenesLabel.style.fontSize = '11px';
-        scenesLabel.style.fontWeight = '600';
-        scenesLabel.style.color = 'var(--text-muted)';
-        scenesLabel.style.textTransform = 'uppercase';
-        scenesLabel.style.letterSpacing = '0.05em';
-        scenesLabel.style.marginBottom = '6px';
-        scenesLabel.textContent = 'Inactive Scenes';
 
         const createFocusSlider = (
             parent: HTMLElement,
@@ -1136,24 +1108,7 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             });
         };
 
-        createFocusSlider(
-            focusBody, 'Dim amount',
-            'Opacity of inactive scenes (lower = more faded)',
-            this.plugin.settings.focusDimOpacity,
-            0, 100, 5, '%',
-            (v) => { this.plugin.settings.focusDimOpacity = v; },
-        );
-
         // ── Environment group ──
-        const envLabel = focusBody.createDiv();
-        envLabel.style.fontSize = '11px';
-        envLabel.style.fontWeight = '600';
-        envLabel.style.color = 'var(--text-muted)';
-        envLabel.style.textTransform = 'uppercase';
-        envLabel.style.letterSpacing = '0.05em';
-        envLabel.style.marginTop = '14px';
-        envLabel.style.marginBottom = '6px';
-        envLabel.textContent = 'Environment';
 
         createFocusSlider(
             focusBody, 'Darken',
@@ -1178,7 +1133,6 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         focusResetBtn.style.fontSize = '11px';
         focusResetBtn.style.padding = '2px 10px';
         focusResetBtn.addEventListener('click', async () => {
-            this.plugin.settings.focusDimOpacity = 25;
             this.plugin.settings.focusDarkenAmount = 40;
             this.plugin.settings.focusBlurAmount = 1;
             await this.plugin.saveSettings();
@@ -1186,122 +1140,10 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             this.display();
         });
 
-        // --- Advanced ---
-        containerEl.createEl('h2', { text: 'Advanced' });
-
-        // --- Extra source folders (collapsible, experimental) ---
-        const extraDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
-        extraDetails.createEl('summary', { text: 'Additional Source Folders (Experimental)' });
-        const extraBody = extraDetails.createDiv();
-        extraBody.style.padding = '8px 0';
-
-        const extraWarn = extraBody.createDiv({ cls: 'setting-item-description' });
-        extraWarn.style.color = 'var(--text-warning, orange)';
-        extraWarn.style.marginBottom = '12px';
-        extraWarn.setText('⚠ Experimental — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine.');
-
-        const extraDesc = extraBody.createDiv({ cls: 'setting-item-description' });
-        extraDesc.style.marginBottom = '12px';
-        extraDesc.setText('Point StoryLine to any folder in your vault. All .md files inside will be scanned and automatically sorted by their frontmatter type: field.');
-
-        // Render the current list of folders
-        const listContainer = extraBody.createDiv();
-        const renderFolderList = () => {
-            listContainer.empty();
-            const folders = this.plugin.settings.extraFolders || [];
-            for (let i = 0; i < folders.length; i++) {
-                const row = listContainer.createDiv();
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.gap = '6px';
-                row.style.marginBottom = '4px';
-
-                const label = row.createSpan({ text: folders[i] });
-                label.style.flex = '1';
-                label.style.fontFamily = 'var(--font-monospace)';
-                label.style.fontSize = '12px';
-
-                const removeBtn = row.createEl('button', { text: '×', cls: 'clickable-icon' });
-                removeBtn.style.color = 'var(--text-error)';
-                removeBtn.style.fontSize = '16px';
-                removeBtn.addEventListener('click', async () => {
-                    this.plugin.settings.extraFolders.splice(i, 1);
-                    await this.plugin.saveSettings();
-                    renderFolderList();
-                });
-            }
-        };
-        renderFolderList();
-
-        // Add-folder row with folder suggest
-        const addRow = extraBody.createDiv();
-        addRow.style.display = 'flex';
-        addRow.style.alignItems = 'center';
-        addRow.style.gap = '6px';
-        addRow.style.marginTop = '8px';
-
-        const folderInput = addRow.createEl('input', { type: 'text', placeholder: 'Type or browse for a folder...' });
-        folderInput.style.flex = '1';
-        folderInput.addClass('sl-folder-suggest-input');
-
-        // Attach folder autocomplete
-        new FolderSuggest(this.app, folderInput);
-
-        const addBtn = addRow.createEl('button', { text: 'Add', cls: 'mod-cta' });
-        addBtn.style.flexShrink = '0';
-        addBtn.addEventListener('click', async () => {
-            const val = folderInput.value.trim();
-            if (!val) return;
-            if (!this.plugin.settings.extraFolders) this.plugin.settings.extraFolders = [];
-            if (!this.plugin.settings.extraFolders.includes(val)) {
-                this.plugin.settings.extraFolders.push(val);
-                await this.plugin.saveSettings();
-            }
-            folderInput.value = '';
-            renderFolderList();
-        });
-
-        new Setting(containerEl)
-            .setName('Enable plot hole detection')
-            .setDesc('Show warnings for potential plot holes')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.enablePlotHoleDetection)
-                .onChange(async (value) => {
-                    this.plugin.settings.enablePlotHoleDetection = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Show warnings')
-            .setDesc('Display warning notifications')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.showWarnings)
-                .onChange(async (value) => {
-                    this.plugin.settings.showWarnings = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Debug mode')
-            .setDesc('Enable debug logging in console')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.debugMode)
-                .onChange(async (value) => {
-                    this.plugin.settings.debugMode = value;
-                    await this.plugin.saveSettings();
-                }));
-
-        new Setting(containerEl)
-            .setName('Hide frontmatter')
-            .setDesc('Hide the properties/frontmatter block in live preview and reading mode. Since all fields are editable from the Inspector, frontmatter can safely be hidden.')
-            .addToggle(toggle => toggle
-                .setValue(this.plugin.settings.hideFrontmatter)
-                .onChange(async (value) => {
-                    this.plugin.settings.hideFrontmatter = value;
-                    await this.plugin.saveSettings();
-                    // Apply Obsidian\'s built-in "Properties in document" setting
-                    (this.app.vault as any).setConfig?.('propertiesInDocument', value ? 'hidden' : 'visible');
-                }));
+        // ═══════════════════════════════════════════
+        //  Colors
+        // ═══════════════════════════════════════════
+        containerEl.createEl('h2', { text: 'Colors' });
 
         // --- Tag / Plotline Colors (collapsible) ---
         const colorDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
@@ -1600,7 +1442,45 @@ export class SceneCardsSettingTab extends PluginSettingTab {
         noteColorBody.style.padding = '8px 0';
         this.renderStickyNoteSettings(noteColorBody);
 
-        // --- Scene Templates ---
+        // ═══════════════════════════════════════════
+        //  Project Management
+        // ═══════════════════════════════════════════
+        containerEl.createEl('h2', { text: 'Project Management' });
+
+        const activeProject = this.plugin.sceneManager.activeProject;
+
+        new Setting(containerEl)
+            .setName('Rename book')
+            .setDesc(activeProject ? `Current: "${activeProject.title}"` : 'No active project')
+            .addButton(btn => btn
+                .setButtonText('Rename…')
+                .setDisabled(!activeProject)
+                .onClick(() => {
+                    (this.plugin.app as any).commands.executeCommandById('storyline:rename-project');
+                }));
+
+        new Setting(containerEl)
+            .setName('Create series from this book')
+            .setDesc(activeProject?.seriesId ? 'This book already belongs to a series.' : 'Wrap the current book in a new series.')
+            .addButton(btn => btn
+                .setButtonText('Create Series…')
+                .setDisabled(!activeProject || !!activeProject.seriesId)
+                .onClick(() => {
+                    (this.plugin.app as any).commands.executeCommandById('storyline:create-series');
+                }));
+
+        new Setting(containerEl)
+            .setName('Manage series')
+            .setDesc('View, rename, and reorder books in your series.')
+            .addButton(btn => btn
+                .setButtonText('Manage Series…')
+                .onClick(() => {
+                    (this.plugin as any).openSeriesManagementModal();
+                }));
+
+        // ═══════════════════════════════════════════
+        //  Scene Templates
+        // ═══════════════════════════════════════════
         containerEl.createEl('h2', { text: 'Scene Templates' });
         containerEl.createEl('p', {
             text: 'Custom templates pre-fill fields and body text when creating new scenes. Built-in templates are always available.',
@@ -1623,11 +1503,118 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     }).open();
                 }));
 
+        // ═══════════════════════════════════════════
+        //  Export & Import
+        // ═══════════════════════════════════════════
+        containerEl.createEl('h2', { text: 'Export & Import' });
+
         // --- DOCX Export Settings (collapsible) ---
         this.renderDocxSettings(containerEl);
 
         // --- PDF Export Settings (collapsible) ---
         this.renderPdfSettings(containerEl);
+
+        // --- Import (desktop-only) ---
+        this.renderImportSettings(containerEl);
+
+        // ═══════════════════════════════════════════
+        //  Advanced
+        // ═══════════════════════════════════════════
+        const advancedDetails = containerEl.createEl('details', { cls: 'story-line-color-section' });
+        advancedDetails.createEl('summary', { text: 'Advanced' });
+        const advancedBody = advancedDetails.createDiv();
+
+        new Setting(advancedBody)
+            .setName('Enable plot hole detection')
+            .setDesc('Show warnings for potential plot holes')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.enablePlotHoleDetection)
+                .onChange(async (value) => {
+                    this.plugin.settings.enablePlotHoleDetection = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(advancedBody)
+            .setName('Show warnings')
+            .setDesc('Display warning notifications')
+            .addToggle(toggle => toggle
+                .setValue(this.plugin.settings.showWarnings)
+                .onChange(async (value) => {
+                    this.plugin.settings.showWarnings = value;
+                    await this.plugin.saveSettings();
+                }));
+
+        // --- Extra source folders (collapsible, experimental) ---
+        const extraDetails = advancedBody.createEl('details', { cls: 'story-line-color-section' });
+        extraDetails.createEl('summary', { text: 'Additional Source Folders (Experimental)' });
+        const extraBody = extraDetails.createDiv();
+        extraBody.style.padding = '8px 0';
+
+        const extraWarn = extraBody.createDiv({ cls: 'setting-item-description' });
+        extraWarn.style.color = 'var(--text-warning, orange)';
+        extraWarn.style.marginBottom = '12px';
+        extraWarn.setText('⚠ Experimental — back up your files before linking external folders. Files in linked folders may be modified when you edit entities in StoryLine.');
+
+        const extraDesc = extraBody.createDiv({ cls: 'setting-item-description' });
+        extraDesc.style.marginBottom = '12px';
+        extraDesc.setText('Point StoryLine to any folder in your vault. All .md files inside will be scanned and automatically sorted by their frontmatter type: field.');
+
+        // Render the current list of folders
+        const listContainer = extraBody.createDiv();
+        const renderFolderList = () => {
+            listContainer.empty();
+            const folders = this.plugin.settings.extraFolders || [];
+            for (let i = 0; i < folders.length; i++) {
+                const row = listContainer.createDiv();
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '6px';
+                row.style.marginBottom = '4px';
+
+                const label = row.createSpan({ text: folders[i] });
+                label.style.flex = '1';
+                label.style.fontFamily = 'var(--font-monospace)';
+                label.style.fontSize = '12px';
+
+                const removeBtn = row.createEl('button', { text: '×', cls: 'clickable-icon' });
+                removeBtn.style.color = 'var(--text-error)';
+                removeBtn.style.fontSize = '16px';
+                removeBtn.addEventListener('click', async () => {
+                    this.plugin.settings.extraFolders.splice(i, 1);
+                    await this.plugin.saveSettings();
+                    renderFolderList();
+                });
+            }
+        };
+        renderFolderList();
+
+        // Add-folder row with folder suggest
+        const addRow = extraBody.createDiv();
+        addRow.style.display = 'flex';
+        addRow.style.alignItems = 'center';
+        addRow.style.gap = '6px';
+        addRow.style.marginTop = '8px';
+
+        const folderInput = addRow.createEl('input', { type: 'text', placeholder: 'Type or browse for a folder...' });
+        folderInput.style.flex = '1';
+        folderInput.addClass('sl-folder-suggest-input');
+
+        // Attach folder autocomplete
+        new FolderSuggest(this.app, folderInput);
+
+        const addBtn = addRow.createEl('button', { text: 'Add', cls: 'mod-cta' });
+        addBtn.style.flexShrink = '0';
+        addBtn.addEventListener('click', async () => {
+            const val = folderInput.value.trim();
+            if (!val) return;
+            if (!this.plugin.settings.extraFolders) this.plugin.settings.extraFolders = [];
+            if (!this.plugin.settings.extraFolders.includes(val)) {
+                this.plugin.settings.extraFolders.push(val);
+                await this.plugin.saveSettings();
+            }
+            folderInput.value = '';
+            renderFolderList();
+        });
     }
 
     /** Render the tag-color assignment list with color pickers */
@@ -2318,6 +2305,108 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.pdfSettings.includePageNumbers = value;
                     await this.plugin.saveSettings();
                 }));
+    }
+
+    /** Render the Import section (desktop-only Scrivener import) */
+    private renderImportSettings(containerEl: HTMLElement): void {
+        const nodeFsAvailable = !!(window as any).require?.('fs');
+        if (!nodeFsAvailable) return;   // hide entirely on mobile
+
+        const details = containerEl.createEl('details', { cls: 'story-line-import-settings' });
+        details.createEl('summary', { text: 'Import' });
+
+        const body = details.createDiv();
+
+        body.createEl('p', {
+            text: 'Import a Scrivener project (.scriv folder) as a new StoryLine project. Converts scenes, characters, locations, and research notes. Desktop only.',
+            cls: 'setting-item-description',
+        });
+
+        new Setting(body)
+            .setName('Import Scrivener project')
+            .setDesc('Select a .scriv folder to import.')
+            .addButton(btn => btn
+                .setButtonText('Import .scriv')
+                .setCta()
+                .onClick(async () => {
+                    try {
+                        await this.pickAndImportScrivener();
+                    } catch (err: any) {
+                        new Notice('Import failed: ' + (err?.message || String(err)));
+                    }
+                }));
+    }
+
+    /** Open a folder picker and run the Scrivener import. */
+    private async pickAndImportScrivener(): Promise<void> {
+        const { ScrivenerImporter } = await import('./services/ScrivenerImporter');
+        if (!ScrivenerImporter.isAvailable()) {
+            new Notice('Scrivener import is only available on desktop.');
+            return;
+        }
+
+        // Use Electron dialog to pick a .scriv folder
+        let remote: any;
+        try {
+            remote = (window as any).require('@electron/remote');
+        } catch {
+            try {
+                remote = (window as any).require('electron').remote;
+            } catch {
+                new Notice('Could not access the file dialog. Desktop only.');
+                return;
+            }
+        }
+
+        const result = await remote.dialog.showOpenDialog({
+            title: 'Select Scrivener Project (.scriv)',
+            properties: ['openDirectory', 'openFile'],
+            filters: [
+                { name: 'Scrivener Project', extensions: ['scriv'] },
+            ],
+        });
+
+        if (result.canceled || !result.filePaths?.length) return;
+
+        const scrivPath = result.filePaths[0];
+        if (!scrivPath.endsWith('.scriv')) {
+            new Notice('Please select a .scriv folder.');
+            return;
+        }
+
+        new Notice('Importing Scrivener project…');
+
+        const importer = new ScrivenerImporter(this.app, this.plugin);
+        const importResult = await importer.import(scrivPath);
+
+        // Summary notice
+        const lines = [
+            `✓ Project "${importResult.projectTitle}" imported`,
+            `  Scenes: ${importResult.scenesImported}`,
+            `  Characters: ${importResult.charactersImported}`,
+            `  Locations: ${importResult.locationsImported}`,
+            `  Research: ${importResult.researchImported}`,
+            `  Notes: ${importResult.notesImported}`,
+        ];
+        if (importResult.codexImported > 0) {
+            lines.push(`  Codex: ${importResult.codexImported} (${importResult.codexCategoriesCreated.join(', ')})`);
+        }
+        if (importResult.filesImported > 0) {
+            lines.push(`  Files (images/PDFs): ${importResult.filesImported}`);
+        }
+        if (importResult.warnings.length) {
+            const missingContent = importResult.warnings.filter(w => w.includes('No content file'));
+            if (missingContent.length > 0) {
+                lines.push(`  ⚠ ${missingContent.length} item(s) had no content file`);
+            }
+            const otherWarnings = importResult.warnings.length - missingContent.length;
+            if (otherWarnings > 0) {
+                lines.push(`  ⚠ ${otherWarnings} other warning(s)`);
+            }
+            // Log full warnings to console for debugging
+            console.warn('[StoryLine] Import warnings:', importResult.warnings);
+        }
+        new Notice(lines.join('\n'), 10000);
     }
 }
 

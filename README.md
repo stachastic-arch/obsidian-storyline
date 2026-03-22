@@ -1,10 +1,14 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.0** · By Jan Sandström
+**Version 1.8.3** · By Jan Sandström
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
+
+### New in 1.8.3
+
+- **View Snapshots** — Save and restore point-in-time snapshots of your project's view layout (corkboard positions, Plot Grid state, scene ordering). Auto-saves changes while a snapshot is active. Manage from the Board/Plotgrid toolbar or the command palette.
 
 ---
 
@@ -156,9 +160,12 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 
 ## Key Features
 
+- **Scrivener Import** — Import a .scriv project (Scrivener 2 & 3) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research. Results may vary — review imported data carefully. Access via Settings → Import or the command palette.
 - **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages. Two-way change detection flags scenes that reference modified codex entries.
 - **Manuscript View** — Scrivenings-style continuous document with embedded Live Preview editors. Read and edit your whole story in one scrollable page. Plain Text, Lock Links, and Focus Mode toggles for distraction-free writing.
-- **Scene Management** — Full metadata, six-stage status pipeline, drag-and-drop, multi-select bulk edits, notes, snapshots, and reusable templates.
+- **Scene Management** — Full metadata, six-stage status pipeline, drag-and-drop, multi-select bulk edits, notes, snapshots, and reusable templates. Optional **subtitle** field for scene headings.
+- **View Snapshots** — Save and restore project-wide layout snapshots (corkboard positions, Plot Grid state, scene ordering). Auto-saves while active. Per-project, stored in `System/Snapshots/`.
+- **Scene Archive** — Right-click a scene to archive it. Archived scenes are moved to an `Archive/` folder and hidden from all views. Restore them via the archive button in the Board toolbar.
 - **Corkboard Mode** — Freeform spatial canvas with text and image sticky notes for brainstorming. Drag images from vault or desktop, add captions with wikilinks, open lightbox previews. Convert notes into scenes when ready.
 - **DOCX / PDF / HTML Export** — Export manuscripts and outlines to Word, PDF, and standalone HTML. DOCX includes configurable page size, margins, and font settings.
 - **Timeline Modes** — Ten non-linear narrative modes: flashback, flash-forward, parallel, frame, simultaneous, time skip, dream, mythic, circular, and linear.
@@ -176,6 +183,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Writing Sprint** — Built-in countdown timer for focused writing sessions.
 - **Story Navigator** — Compact sidebar panel with search, sort, plotline filter, act grouping, pinned scenes, progress bar, and a **Scene Details** button. Auto-opens on project load.
 - **Scene Details Sidebar** — Standalone Inspector panel that follows the active editor file. Edit scene metadata side-by-side with your writing.
+- **Research Sidebar** — Right-sidebar panel for storing research notes, web clips, images, and open questions. Search, tag filter, type filter, and auto-suggest mode that surfaces relevant posts based on the active scene's metadata.
 - **Series Mode** — Group multiple books into a series with a shared Codex. Characters, locations, and custom categories are stored once and shared across all books.
 - **Additional Source Folders** *(Experimental)* — Point StoryLine at any vault folder and it will scan all `.md` files, routing each to the correct manager by its frontmatter `type:` field. Supports any folder structure.
 - **Color Coding** — Color by status, POV, emotion, act, or tag. **16 built-in color schemes** (4 Catppuccin + 12 mood-based palettes) or custom. Per-tag overrides from Plotlines view or Settings. HSL fine-tuning sliders for plotline and sticky note palettes. Dark/light mode aware.
@@ -208,6 +216,9 @@ StoryLine/
   My Novel.md              ← Project file (Markdown + YAML frontmatter)
   My Novel/
     Scenes/                ← Scene files (Markdown + frontmatter)
+    Notes/                 ← Corkboard sticky notes
+    Archive/               ← Archived (cut) scenes
+    Research/              ← Research posts (notes, web clips, questions)
     Codex/                 ← Codex hub folder
       Characters/          ← Character profiles (Markdown + frontmatter)
       Locations/           ← Location & world profiles (Markdown + frontmatter)
@@ -272,7 +283,7 @@ StoryLine/
 
 ---
 
-*StoryLine v1.7.0 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.8.3 — Transform your vault into a powerful book planning tool.*
 
 ---
 

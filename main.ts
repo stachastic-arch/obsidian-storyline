@@ -14,6 +14,7 @@ import {
     CODEX_VIEW_TYPE,
     SCENE_INSPECTOR_VIEW_TYPE,
     MANUSCRIPT_VIEW_TYPE,
+    RESEARCH_VIEW_TYPE,
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
@@ -29,6 +30,8 @@ import { NavigatorView } from './views/NavigatorView';
 import { CodexView } from './views/CodexView';
 import { SceneInspectorView } from './views/SceneInspectorView';
 import { ManuscriptView } from './views/ManuscriptView';
+import { ResearchView } from './views/ResearchView';
+import { ResearchManager } from './services/ResearchManager';
 import { LocationManager } from './services/LocationManager';
 import { CharacterManager } from './services/CharacterManager';
 import { CodexManager } from './services/CodexManager';
@@ -37,6 +40,8 @@ import { QuickAddModal } from './components/QuickAddModal';
 import { ExportModal } from './components/ExportModal';
 import { WritingTracker } from './services/WritingTracker';
 import { SnapshotManager } from './services/SnapshotManager';
+import { ViewSnapshotService } from './services/ViewSnapshotService';
+import { openManageSnapshotsModal } from './components/ViewSnapshotModal';
 import { LinkScanner } from './services/LinkScanner';
 import { CascadeRenameService } from './services/CascadeRenameService';
 import { FieldTemplateService } from './services/FieldTemplateService';
@@ -53,8 +58,6 @@ export default class SceneCardsPlugin extends Plugin {
     sceneManager: SceneManager;
     /** Set to true once System/ migration is confirmed — guards saveSettings stripping */
     private _systemMigrationDone = false;
-    /** Set to true after initial bootstrap — prevents navigator auto-open on startup */
-    private _startupComplete = false;
     /** Snapshot of colour settings from data.json (global defaults) */
     private _globalColorDefaults: Record<string, any> = {};
     locationManager: LocationManager;
@@ -62,10 +65,12 @@ export default class SceneCardsPlugin extends Plugin {
     codexManager: CodexManager;
     writingTracker: WritingTracker = new WritingTracker();
     snapshotManager: SnapshotManager;
+    viewSnapshotService: ViewSnapshotService;
     linkScanner: LinkScanner;
     cascadeRename: CascadeRenameService;
     fieldTemplates: FieldTemplateService;
     seriesManager: SeriesManager;
+    researchManager: ResearchManager;
     /** The leaf currently hosting a StoryLine view */
     storyLeaf: WorkspaceLeaf | null = null;
     /** Removes native browser tooltips (`title`) inside StoryLine UI */
@@ -80,11 +85,13 @@ export default class SceneCardsPlugin extends Plugin {
         this.characterManager = new CharacterManager(this.app);
         this.codexManager = new CodexManager(this.app);
         this.snapshotManager = new SnapshotManager(this.app);
+        this.viewSnapshotService = new ViewSnapshotService(this);
         this.linkScanner = new LinkScanner(this.characterManager, this.locationManager);
         this.linkScanner.setCodexManager(this.codexManager);
         this.cascadeRename = new CascadeRenameService(this.app, this.sceneManager, this.characterManager, this.locationManager);
         this.fieldTemplates = new FieldTemplateService(this.app, () => this.getProjectSystemFolder());
         this.seriesManager = new SeriesManager(this.app, this);
+        this.researchManager = new ResearchManager(this.app, this);
 
         // Wire up undo/redo to refresh views + re-index
         this.sceneManager.undoManager.onAfterUndoRedo = async () => {
@@ -157,6 +164,10 @@ export default class SceneCardsPlugin extends Plugin {
         this.registerView(MANUSCRIPT_VIEW_TYPE, (leaf) =>
             new ManuscriptView(leaf, this, this.sceneManager)
         );
+        this.registerView(RESEARCH_VIEW_TYPE, (leaf) =>
+            new ResearchView(leaf, this, this.researchManager)
+        );
+
 
         // Wait for the workspace layout to be ready, then bootstrap projects
         this.app.workspace.onLayoutReady(async () => {
@@ -175,6 +186,8 @@ export default class SceneCardsPlugin extends Plugin {
             await this.fieldTemplates.load();
             // Load corkboard layout from System/board.json
             await this.sceneManager.loadCorkboardPositions();
+            // Load active view snapshot state
+            await this.viewSnapshotService.loadActiveState();
             // Load locations and characters for the active project
             try {
                 const locFolder = this.sceneManager.getLocationFolder();
@@ -200,7 +213,6 @@ export default class SceneCardsPlugin extends Plugin {
             // PlotGrid and other views that opened before bootstrapProjects reload
             // their data from the correct project folder.
             this.refreshOpenViews();
-            this._startupComplete = true;
             } catch (startupErr) {
                 console.error('[StoryLine] Startup error:', startupErr);
             }
@@ -332,6 +344,12 @@ export default class SceneCardsPlugin extends Plugin {
         });
 
         this.addCommand({
+            id: 'open-research',
+            name: 'Open Research Sidebar',
+            callback: () => this.openResearch(),
+        });
+
+        this.addCommand({
             id: 'create-series',
             name: 'Create New Series from Current Project',
             callback: () => this.openCreateSeriesModal(),
@@ -365,6 +383,57 @@ export default class SceneCardsPlugin extends Plugin {
             id: 'rename-project',
             name: 'Rename Current Project',
             callback: () => this.openRenameProjectModal(),
+        });
+
+        this.addCommand({
+            id: 'manage-view-snapshots',
+            name: 'Manage View Snapshots',
+            callback: () => {
+                if (!this.sceneManager.activeProject) {
+                    new Notice('No active project.');
+                    return;
+                }
+                openManageSnapshotsModal(this.app, this.viewSnapshotService);
+            },
+        });
+
+        this.addCommand({
+            id: 'import-scrivener',
+            name: 'Import Scrivener Project',
+            callback: async () => {
+                const { ScrivenerImporter } = await import('./services/ScrivenerImporter');
+                if (!ScrivenerImporter.isAvailable()) {
+                    new Notice('Scrivener import is only available on desktop.');
+                    return;
+                }
+                let remote: any;
+                try { remote = (window as any).require('@electron/remote'); }
+                catch { try { remote = (window as any).require('electron').remote; } catch { /* */ } }
+                if (!remote) { new Notice('File dialog not available.'); return; }
+
+                const result = await remote.dialog.showOpenDialog({
+                    title: 'Select Scrivener Project (.scriv)',
+                    properties: ['openDirectory', 'openFile'],
+                    filters: [
+                        { name: 'Scrivener Project', extensions: ['scriv'] },
+                    ],
+                });
+                if (result.canceled || !result.filePaths?.length) return;
+                const scrivPath = result.filePaths[0];
+                if (!scrivPath.endsWith('.scriv')) {
+                    new Notice('Please select a .scriv folder.'); return;
+                }
+                new Notice('Importing Scrivener project…');
+                try {
+                    const importer = new ScrivenerImporter(this.app, this);
+                    const r = await importer.import(scrivPath);
+                    const parts = [`${r.scenesImported} scenes`, `${r.charactersImported} characters`, `${r.locationsImported} locations`];
+                    if (r.filesImported > 0) parts.push(`${r.filesImported} files`);
+                    new Notice(`Imported "${r.projectTitle}": ${parts.join(', ')}`, 8000);
+                } catch (err: any) {
+                    new Notice('Import failed: ' + (err?.message || String(err)));
+                }
+            },
         });
 
         // Settings tab
@@ -1080,6 +1149,41 @@ export default class SceneCardsPlugin extends Plugin {
         }
     }
 
+    /** Returns true when the Scene Inspector sidebar is open and visible. */
+    isSceneInspectorOpen(): boolean {
+        const leaves = this.app.workspace.getLeavesOfType(SCENE_INSPECTOR_VIEW_TYPE);
+        if (leaves.length === 0) return false;
+        const leaf = leaves[0];
+        // Check the sidebar containing this leaf is not collapsed
+        const root = leaf.getRoot();
+        if ((root as any).collapsed) return false;
+        // Check this leaf is the active tab in its parent (not hidden behind another tab)
+        const parent = (leaf as any).parentSplit ?? (leaf as any).parent;
+        if (parent && typeof parent.children !== 'undefined') {
+            const activeChild = (parent as any).currentTab ?? (parent as any).activeTab;
+            if (activeChild !== undefined && activeChild !== leaf) {
+                // parent tracks a numeric index — compare by index
+                const idx = (parent.children as any[]).indexOf(leaf);
+                if (typeof activeChild === 'number' ? activeChild !== idx : true) return false;
+            }
+        }
+        return true;
+    }
+
+    async openResearch(): Promise<void> {
+        const { workspace } = this.app;
+        const existing = workspace.getLeavesOfType(RESEARCH_VIEW_TYPE);
+        if (existing.length > 0) {
+            workspace.revealLeaf(existing[0]);
+            return;
+        }
+        const leaf = workspace.getRightLeaf(false);
+        if (leaf) {
+            await leaf.setViewState({ type: RESEARCH_VIEW_TYPE, active: true });
+            workspace.revealLeaf(leaf);
+        }
+    }
+
     /**
      * Switch the current StoryLine leaf in-place to a different view type.
      * Kept as a utility; the ViewSwitcher now uses the leaf reference directly.
@@ -1173,6 +1277,35 @@ export default class SceneCardsPlugin extends Plugin {
     }
 
     /**
+     * Force all open Board views to reload corkboard positions from SceneManager
+     * on their next refresh. Call this after programmatically updating board.json
+     * (e.g. snapshot restore) so the local map picks up the new data.
+     */
+    invalidateCorkboardCache(): void {
+        const leaves = this.app.workspace.getLeavesOfType(BOARD_VIEW_TYPE);
+        for (const leaf of leaves) {
+            const view = leaf.view as unknown as Record<string, unknown>;
+            if (typeof view?.invalidateCorkboardLayout === 'function') {
+                (view as unknown as { invalidateCorkboardLayout(): void }).invalidateCorkboardLayout();
+            }
+        }
+    }
+
+    /**
+     * Flush any pending corkboard position writes so SceneManager has the
+     * latest positions. Call before capturing a snapshot.
+     */
+    async flushCorkboardPositions(): Promise<void> {
+        const leaves = this.app.workspace.getLeavesOfType(BOARD_VIEW_TYPE);
+        for (const leaf of leaves) {
+            const view = leaf.view as unknown as Record<string, unknown>;
+            if (typeof view?.flushPendingCorkboardPersist === 'function') {
+                await (view as unknown as { flushPendingCorkboardPersist(): Promise<void> }).flushPendingCorkboardPersist();
+            }
+        }
+    }
+
+    /**
      * Refresh all open Scene Cards views
      */
     async refreshOpenViews(): Promise<void> {
@@ -1212,6 +1345,7 @@ export default class SceneCardsPlugin extends Plugin {
             STATS_VIEW_TYPE,
             NAVIGATOR_VIEW_TYPE,
             MANUSCRIPT_VIEW_TYPE,
+            RESEARCH_VIEW_TYPE,
         ];
 
         for (const viewType of viewTypes) {
@@ -1221,16 +1355,6 @@ export default class SceneCardsPlugin extends Plugin {
                 if (view && 'refresh' in view && typeof (view as Record<string, unknown>).refresh === 'function') {
                     (view as unknown as { refresh(): void }).refresh();
                 }
-            }
-        }
-
-        // Auto-open the Navigator sidebar if enabled and a project is active
-        // Skip during initial plugin load — only open on explicit user action
-        if (this._startupComplete && this.settings.autoOpenNavigator && this.sceneManager.activeProject) {
-            const navLeaves = this.app.workspace.getLeavesOfType(NAVIGATOR_VIEW_TYPE);
-            if (navLeaves.length === 0) {
-                // Use setTimeout so we don't block the current refresh cycle
-                setTimeout(() => this.openNavigator(), 100);
             }
         }
     }
@@ -1654,6 +1778,7 @@ export default class SceneCardsPlugin extends Plugin {
                             }
 
                             this.refreshOpenViews();
+                            if (this.settings.autoOpenNavigator) this.openNavigator();
                             try { await this.activateView(BOARD_VIEW_TYPE); } catch { /* non-critical */ }
                             modal.close();
                             resolve(project);
@@ -1702,6 +1827,7 @@ export default class SceneCardsPlugin extends Plugin {
                     const forked = await this.sceneManager.forkProject(activeProject, newTitle.trim());
                     await this.sceneManager.setActiveProject(forked);
                     this.refreshOpenViews();
+                    if (this.settings.autoOpenNavigator) this.openNavigator();
                     try { await this.activateView(BOARD_VIEW_TYPE); } catch { /* non-critical */ }
                     modal.close();
                 });
@@ -1888,6 +2014,7 @@ class ProjectSelectModal extends Modal {
             try {
                 await this.plugin.sceneManager.setActiveProject(selected);
                 this.plugin.refreshOpenViews();
+                if (this.plugin.settings.autoOpenNavigator) this.plugin.openNavigator();
                 try { await this.plugin.activateView(BOARD_VIEW_TYPE); } catch { /* non-critical */ }
                 this.close();
             } catch (err) {
@@ -2017,6 +2144,7 @@ class ProjectSelectModal extends Modal {
                         if (project) {
                             await this.plugin.sceneManager.setActiveProject(project);
                             this.plugin.refreshOpenViews();
+                            if (this.plugin.settings.autoOpenNavigator) this.plugin.openNavigator();
                             try { await this.plugin.activateView(BOARD_VIEW_TYPE); } catch { /* */ }
                             browseModal.close();
                             this.close();

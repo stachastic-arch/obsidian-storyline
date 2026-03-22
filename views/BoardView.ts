@@ -13,6 +13,7 @@ import { enableDragToPan } from '../components/DragToPan';
 import { SplitSceneModal, MergeSceneModal } from '../components/SplitMergeModals';
 import { isMobile, applyMobileClass, enableTouchDrag } from '../components/MobileAdapter';
 import { BOARD_VIEW_TYPE } from '../constants';
+import { openManageSnapshotsModal } from '../components/ViewSnapshotModal';
 import { resolveStickyNoteColors } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 import { resolveImagePath } from '../components/ImagePicker';
@@ -42,6 +43,7 @@ export class BoardView extends ItemView {
     private corkboardJustDragged: Set<string> = new Set();
     private corkboardPersistTimer: ReturnType<typeof setTimeout> | null = null;
     private corkboardLoadedProjectFile: string | null = null;
+    private _corkboardProjectLoaded = false;
     private dragToPanCleanup: (() => void) | null = null;
     private corkboardInteractionCleanup: (() => void) | null = null;
     private corkboardCamera = { x: 220, y: 140, zoom: 1 };
@@ -372,6 +374,22 @@ export class BoardView extends ItemView {
             await this.sceneManager.initialize();
             this.refreshBoard();
         });
+
+        // Archive button
+        const archiveBtn = iconGroup.createEl('button', {
+            cls: 'clickable-icon',
+        });
+        obsidian.setIcon(archiveBtn, 'archive');
+        attachTooltip(archiveBtn, 'Archived Scenes');
+        archiveBtn.addEventListener('click', () => this.openArchiveModal());
+
+        // ── View Snapshots ──
+        const snapManage = iconGroup.createDiv({ cls: 'clickable-icon' });
+        obsidian.setIcon(snapManage, 'history');
+        attachTooltip(snapManage, 'Manage View Snapshots');
+        snapManage.addEventListener('click', () => {
+            openManageSnapshotsModal(this.plugin.app, this.plugin.viewSnapshotService);
+        });
     }
 
     /**
@@ -504,11 +522,11 @@ export class BoardView extends ItemView {
             };
             if (!existing) {
                 this.corkboardPositions.set(scene.filePath, pos);
-                this.schedulePersistCorkboardLayout();
+                if (this._corkboardProjectLoaded) this.schedulePersistCorkboardLayout();
             } else if (!Number.isFinite(existing.z)) {
                 pos.z = currentMaxZ() + 1;
                 this.corkboardPositions.set(scene.filePath, pos);
-                this.schedulePersistCorkboardLayout();
+                if (this._corkboardProjectLoaded) this.schedulePersistCorkboardLayout();
             }
 
             const node = canvas.createDiv('story-line-corkboard-node');
@@ -822,7 +840,7 @@ export class BoardView extends ItemView {
     }
 
     private isCorkboardNoteScene(scene: Scene): boolean {
-        const value = (scene as Scene & { corkboardNote?: unknown }).corkboardNote;
+        const value: unknown = (scene as Scene & { corkboardNote?: unknown }).corkboardNote;
         if (value === true) return true;
         if (value === false || value === undefined || value === null) return false;
         if (typeof value === 'string') return value.trim().toLowerCase() === 'true';
@@ -1203,12 +1221,34 @@ export class BoardView extends ItemView {
         };
     }
 
+    /** Force BoardView to reload corkboard positions from SceneManager on next refresh. */
+    invalidateCorkboardLayout(): void {
+        this.corkboardLoadedProjectFile = '__invalidated__';
+    }
+
+    /** Flush any pending corkboard position writes to SceneManager immediately. */
+    async flushPendingCorkboardPersist(): Promise<void> {
+        if (this.corkboardPersistTimer) {
+            clearTimeout(this.corkboardPersistTimer);
+            this.corkboardPersistTimer = null;
+            await this.persistCorkboardLayout();
+        }
+    }
+
     private ensureCorkboardLayoutLoaded(): void {
         const projectPath = this.sceneManager.activeProject?.filePath ?? null;
         if (projectPath === this.corkboardLoadedProjectFile) return;
 
+        // Cancel pending persist from a prior render to prevent auto-layout
+        // defaults from overwriting real positions loaded from board.json.
+        if (this.corkboardPersistTimer) {
+            clearTimeout(this.corkboardPersistTimer);
+            this.corkboardPersistTimer = null;
+        }
+
         this.corkboardLoadedProjectFile = projectPath;
         this.corkboardPositions.clear();
+        this._corkboardProjectLoaded = !!projectPath;
 
         const saved = this.sceneManager.getCorkboardPositions();
         for (const [path, pos] of Object.entries(saved)) {
@@ -1237,6 +1277,7 @@ export class BoardView extends ItemView {
             payload[path] = { x: pos.x, y: pos.y, z: pos.z, ...(pos.h ? { h: pos.h } : {}) };
         }
         await this.sceneManager.setCorkboardPositions(payload);
+        this.plugin.viewSnapshotService.scheduleAutoSave();
     }
 
     private showCorkboardNoteMenu(scene: Scene, event: MouseEvent): void {
@@ -1665,6 +1706,7 @@ export class BoardView extends ItemView {
         }
 
         await this.sceneManager.updateScene(draggedPath, updates);
+        this.plugin.viewSnapshotService.scheduleAutoSave();
 
         this.refreshBoard();
     }
@@ -1705,6 +1747,7 @@ export class BoardView extends ItemView {
         updates.sequence = maxSeq + 1;
 
         await this.sceneManager.updateScene(filePath, updates);
+        this.plugin.viewSnapshotService.scheduleAutoSave();
         this.refreshBoard();
     }
 
@@ -1742,7 +1785,12 @@ export class BoardView extends ItemView {
         }
 
         // Show inspector for last clicked scene
-        this.inspectorComponent?.show(scene);
+        if (this.plugin.isSceneInspectorOpen()) {
+            this.inspectorComponent?.hide();
+            this.app.workspace.trigger('storyline:scene-focus', scene.filePath);
+        } else {
+            this.inspectorComponent?.show(scene);
+        }
 
         // Show/hide bulk action bar
         this.updateBulkBar();
@@ -2070,7 +2118,8 @@ export class BoardView extends ItemView {
             });
             for (const act of definedActs) {
                 menu.addItem(item => {
-                    const actLabel = this.sceneManager.getActLabel(act);
+                    const rawActLabel = this.sceneManager.getActLabel(act);
+                    const actLabel = rawActLabel?.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
                     const display = actLabel ? `Act ${act} — ${actLabel}` : `Act ${act}`;
                     item.setTitle(display)
                         .setChecked(scene.act === act)
@@ -2088,7 +2137,8 @@ export class BoardView extends ItemView {
             menu.addSeparator();
             for (const ch of definedChapters) {
                 menu.addItem(item => {
-                    const chLabel = this.sceneManager.getChapterLabel(ch);
+                    const rawChLabel = this.sceneManager.getChapterLabel(ch);
+                    const chLabel = rawChLabel?.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '');
                     const display = chLabel ? `Ch ${ch} — ${chLabel}` : `Chapter ${ch}`;
                     item.setTitle(display)
                         .setChecked(scene.chapter === ch)
@@ -2101,6 +2151,15 @@ export class BoardView extends ItemView {
         }
 
         menu.addSeparator();
+
+        menu.addItem(item => {
+            item.setTitle('Archive Scene')
+                .setIcon('archive')
+                .onClick(async () => {
+                    await this.sceneManager.archiveScene(scene.filePath);
+                    this.refreshBoard();
+                });
+        });
 
         menu.addItem(item => {
             item.setTitle('Delete Scene')
@@ -2119,6 +2178,46 @@ export class BoardView extends ItemView {
     }
 
     /**
+     * Open a modal listing archived scenes with restore buttons.
+     */
+    private async openArchiveModal(): Promise<void> {
+        const modal = new Modal(this.app);
+        modal.titleEl.setText('Archived Scenes');
+
+        const archived = await this.sceneManager.getArchivedScenes();
+        if (archived.length === 0) {
+            modal.contentEl.createEl('p', { text: 'No archived scenes.', cls: 'setting-item-description' });
+        } else {
+            for (const item of archived) {
+                const row = modal.contentEl.createDiv();
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.justifyContent = 'space-between';
+                row.style.padding = '6px 0';
+                row.style.borderBottom = '1px solid var(--background-modifier-border)';
+                row.createSpan({ text: item.title });
+                const restoreBtn = row.createEl('button', { text: 'Restore', cls: 'mod-cta' });
+                restoreBtn.style.fontSize = '11px';
+                restoreBtn.style.padding = '2px 10px';
+                restoreBtn.addEventListener('click', async () => {
+                    await this.sceneManager.restoreScene(item.filePath);
+                    await this.sceneManager.initialize();
+                    this.refreshBoard();
+                    row.remove();
+                    // Check if list is now empty
+                    if (modal.contentEl.querySelectorAll('div').length === 0) {
+                        modal.contentEl.empty();
+                        modal.contentEl.createEl('p', { text: 'No archived scenes.', cls: 'setting-item-description' });
+                    }
+                    new Notice('Scene restored');
+                });
+            }
+        }
+
+        modal.open();
+    }
+
+    /**
      * Build a display title for a column header, including labels if available.
      */
     private getColumnDisplayTitle(groupKey: string): string {
@@ -2127,13 +2226,13 @@ export class BoardView extends ItemView {
         if (actMatch) {
             const actNum = parseInt(actMatch[1], 10);
             const label = this.sceneManager.getActLabel(actNum);
-            return label ? `Act ${actNum} — ${label}` : groupKey;
+            return label ? label : groupKey;
         }
         const chMatch = groupKey.match(/^Chapter\s+(\d+)$/);
         if (chMatch) {
             const chNum = parseInt(chMatch[1], 10);
             const label = this.sceneManager.getChapterLabel(chNum);
-            return label ? `Ch ${chNum} — ${label}` : groupKey;
+            return label ? label : groupKey;
         }
         return groupKey;
     }
@@ -2371,9 +2470,13 @@ export class BoardView extends ItemView {
      */
     private openAssignScenesModal(field: 'chapter' | 'act', value: number): void {
         const modal = new Modal(this.app);
+        const rawChLbl = this.sceneManager.getChapterLabel(value);
+        const cleanChLbl = rawChLbl?.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '');
+        const rawActLbl = this.sceneManager.getActLabel(value);
+        const cleanActLbl = rawActLbl?.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
         const label = field === 'chapter'
-            ? `Chapter ${value}` + (this.sceneManager.getChapterLabel(value) ? ` — ${this.sceneManager.getChapterLabel(value)}` : '')
-            : `Act ${value}` + (this.sceneManager.getActLabel(value) ? ` — ${this.sceneManager.getActLabel(value)}` : '');
+            ? `Chapter ${value}` + (cleanChLbl ? ` — ${cleanChLbl}` : '')
+            : `Act ${value}` + (cleanActLbl ? ` — ${cleanActLbl}` : '');
         modal.titleEl.setText(`Add scenes to ${label}`);
 
         const { contentEl } = modal;
@@ -2514,7 +2617,8 @@ export class BoardView extends ItemView {
                 const count = scenesPerAct.get(act) || 0;
                 const label = actLabels[act];
                 const row = actsList.createDiv('structure-row');
-                const labelText = label ? `Act ${act} — ${label}` : `Act ${act}`;
+                const cleanLabel = label?.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
+                const labelText = cleanLabel ? `Act ${act} — ${cleanLabel}` : `Act ${act}`;
                 row.createSpan({ cls: 'structure-label', text: labelText });
                 row.createSpan({ cls: 'structure-count', text: `${count} scene${count !== 1 ? 's' : ''}` });
                 const removeBtn = row.createEl('button', {
@@ -2585,7 +2689,8 @@ export class BoardView extends ItemView {
                 const count = scenesPerChapter.get(ch) || 0;
                 const chLabel = chLabels[ch];
                 const row = chaptersList.createDiv('structure-row');
-                const labelText = chLabel ? `Chapter ${ch} — ${chLabel}` : `Chapter ${ch}`;
+                const cleanChLabel = chLabel?.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '');
+                const labelText = cleanChLabel ? `Chapter ${ch} — ${cleanChLabel}` : `Chapter ${ch}`;
                 row.createSpan({ cls: 'structure-label', text: labelText });
                 row.createSpan({ cls: 'structure-count', text: `${count} scene${count !== 1 ? 's' : ''}` });
                 const removeBtn = row.createEl('button', {
@@ -2736,6 +2841,7 @@ export class BoardView extends ItemView {
     refreshBoard(): void {
         this.configureDragToPan();
         if (this.boardMode === 'corkboard') {
+            this.ensureCorkboardLayoutLoaded();
             this.renderCorkboard();
         } else {
             this.saveColumnScrollPositions();
@@ -3039,7 +3145,7 @@ export class BoardView extends ItemView {
      * Open ImagePicker and create a new image sticky note with the selected image.
      */
     private async openImageNotePicker(): Promise<void> {
-        const sceneFolder = this.sceneManager.sceneFolder ?? '';
+        const sceneFolder = this.sceneManager.getSceneFolder() ?? '';
         const { pickImage } = await import('../components/ImagePicker');
         const imagePath = await pickImage(this.app, sceneFolder);
         if (!imagePath) return;
@@ -3064,7 +3170,7 @@ export class BoardView extends ItemView {
      * Open ImagePicker to set or change the image on an existing sticky note.
      */
     private async changeNoteImage(scene: Scene): Promise<void> {
-        const sceneFolder = this.sceneManager.sceneFolder ?? '';
+        const sceneFolder = this.sceneManager.getSceneFolder() ?? '';
         const { pickImage } = await import('../components/ImagePicker');
         const imagePath = await pickImage(this.app, sceneFolder, scene.corkboardNoteImage);
         if (!imagePath) return;
@@ -3099,7 +3205,7 @@ export class BoardView extends ItemView {
      * Import a file dropped from outside the vault into Images/ and create an image note.
      */
     private async importExternalImageAndCreate(file: File, worldX: number, worldY: number): Promise<void> {
-        const sceneFolder = this.sceneManager.sceneFolder ?? '';
+        const sceneFolder = this.sceneManager.getSceneFolder() ?? '';
         const projectRoot = sceneFolder.replace(/\\/g, '/').replace(/\/Scenes\/?$/, '');
         const imagesFolder = `${projectRoot}/Images`;
 

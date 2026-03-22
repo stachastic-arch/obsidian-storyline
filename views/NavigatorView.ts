@@ -81,10 +81,17 @@ export class NavigatorView extends ItemView {
 
         // ── Scene Details button (right-aligned above sort) ──
         const detailsRow = container.createDiv('sl-nav-details-row');
+
+        const researchBtn = detailsRow.createDiv('sl-nav-details-btn');
+        setIcon(researchBtn, 'library-big');
+        attachTooltip(researchBtn, 'Research');
+        researchBtn.addEventListener('click', () => {
+            this.plugin.openResearch();
+        });
+
         const detailsBtn = detailsRow.createDiv('sl-nav-details-btn');
-        detailsBtn.createSpan({ text: 'Scene Details', cls: 'sl-nav-details-label' });
-        const detailsIcon = detailsBtn.createSpan('sl-nav-details-icon');
-        setIcon(detailsIcon, 'panel-right');
+        setIcon(detailsBtn, 'panel-right');
+        attachTooltip(detailsBtn, 'Scene Details');
         detailsBtn.addEventListener('click', () => {
             this.plugin.openSceneInspector();
         });
@@ -404,6 +411,16 @@ export class NavigatorView extends ItemView {
             });
 
             menu.addSeparator();
+
+            // Archive
+            menu.addItem((item) => {
+                item.setTitle('Archive Scene');
+                item.setIcon('archive');
+                item.onClick(async () => {
+                    await this.sceneManager.archiveScene(scene.filePath);
+                    this.renderList();
+                });
+            });
 
             // Status submenu
             const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];

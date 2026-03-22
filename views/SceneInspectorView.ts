@@ -120,6 +120,18 @@ export class SceneInspectorView extends ItemView {
             })
         );
 
+        // Listen for scene-focus from any StoryLine view (Board, Timeline, Plotgrid, etc.)
+        this.registerEvent(
+            (this.app.workspace as any).on('storyline:scene-focus', (filePath: string) => {
+                if (Date.now() - this.lastEditTime < 2000) return;
+                const scene = this.sceneManager.getScene(filePath);
+                if (scene) {
+                    if (this.emptyEl) this.emptyEl.style.display = 'none';
+                    this.inspectorComponent?.show(scene);
+                }
+            })
+        );
+
         // Initial update
         this.updateForActiveFile();
     }

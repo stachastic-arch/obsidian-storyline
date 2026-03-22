@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.0** · By Jan Sandström
+**Version 1.8.3** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -23,7 +23,10 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
   - [Stats View](#stats-view)
   - [Navigator View](#navigator-view)
   - [Scene Details Sidebar](#scene-details-sidebar)
+  - [Research Sidebar](#research-sidebar)
 - [Scene Cards](#scene-cards)
+- [Scene Subtitles](#scene-subtitles)
+- [Scene Archive](#scene-archive)
 - [Inspector Panel](#inspector-panel)
 - [Filtering & Presets](#filtering--presets)
 - [Multi-Select & Bulk Edit](#multi-select--bulk-edit)
@@ -34,6 +37,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Beat Sheet Templates](#beat-sheet-templates)
 - [Scene Notes](#scene-notes)
 - [Scene Snapshots](#scene-snapshots)
+- [View Snapshots](#view-snapshots)
 - [Scene Templates](#scene-templates)
 - [Color Coding & Tag Colors](#color-coding--tag-colors)
 - [Plotline HSL Sliders](#plotline-hsl-sliders)
@@ -50,12 +54,14 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Hide / Show Built-in Fields](#hide--show-built-in-fields)
 - [Tag Type Overrides](#tag-type-overrides)
 - [Export](#export)
+- [Import (Scrivener)](#import-scrivener)
 - [Custom Field Templates](#custom-field-templates)
 - [Image Galleries](#image-galleries)
 - [Additional Source Folders](#additional-source-folders)
 - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Settings](#settings)
 - [Project Management](#project-management)
+- [Novel Covers / Project Art](#novel-covers--project-art)
 - [Series Mode](#series-mode)
 - [File Structure](#file-structure)
 - [Tips & Workflow](#tips--workflow)
@@ -386,6 +392,34 @@ A standalone sidebar panel that shows the full Inspector for the currently activ
 - **Refresh on save** — when you modify a scene file in the editor, the sidebar refreshes to reflect changes (with a short delay to avoid conflicts).
 - **Non-intrusive** — lives in the right sidebar and doesn’t interfere with your main views.
 
+### Research Sidebar
+
+A right-sidebar panel for collecting and browsing research material alongside your writing. Research posts are stored as Markdown files in the `Research/` folder inside your project.
+
+#### Post Types
+
+| Type | Purpose |
+|------|---------|
+| **Note** | Free-form research notes |
+| **Web Clip** | Content clipped from the web, with source URL |
+| **Image** | Image-based reference material |
+| **Question** | Open questions that need answering, with resolved/unresolved tracking |
+
+#### Features
+
+- **Search** - type in the search box to filter posts by title, body text, and tags.
+- **Tag filter** - click any tag chip to filter results to that tag. Click again to clear.
+- **Type filter** - filter by post type (Note, Web Clip, Image, Question) or show all.
+- **Auto-suggest** - click the sparkle button to switch to auto-suggest mode. The panel surfaces research posts relevant to the active scene's characters, location, and tags.
+- **Open question badge** - shows a red badge with the count of unresolved questions.
+- **Inline detail** - click a card to expand it and read the full content, source URL, and action buttons.
+- **Create** - click the + button to create a new research post with title, type, tags, optional source URL, and content.
+- **Open / Resolve / Delete** - expanded cards include buttons to open the file in the editor, toggle question resolved status, or delete the post.
+
+#### How to Open
+
+Use the command palette: **Open Research Sidebar**.
+
 ---
 
 ## Scene Cards
@@ -412,12 +446,40 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 | `target_wordcount` | Target word count | `800` |
 | `tags` | Plotlines and themes | `["romance", "betrayal"]` |
 | `notes` | Editorial / author notes | `"Needs more tension"` || `timeline_mode` | Non-linear narrative technique | `"flashback"` |
-| `timeline_strand` | Parallel/frame strand group | `"1985"` || `setup_scenes` | Scenes this sets up | `["path/to/scene.md"]` |
+| `timeline_strand` | Parallel/frame strand group | `"1985"` |
+| `subtitle` | Optional subtitle below the title | `"Three years later"` |
+| `setup_scenes` | Scenes this sets up | `["path/to/scene.md"]` |
 | `payoff_scenes` | Scenes that pay off this one | `["path/to/scene.md"]` |
 
 **Status progression:** `idea` → `outlined` → `draft` → `written` → `revised` → `final`
 
 Write your scene content below the frontmatter as normal Markdown.
+
+---
+
+## Scene Subtitles
+
+Scenes can have an optional **subtitle** field — a short phrase displayed below the title. Use it for things like:
+
+- *"Three years later"*
+- *"Meanwhile, in Paris"*
+- *"Interlude: Letters from the front"*
+
+Subtitles appear on scene cards (Board view) and in the Manuscript view header. Edit them in the Inspector panel just below the title input.
+
+Set the `subtitle` field in frontmatter, or type it directly in the Inspector. Leave it blank to hide.
+
+---
+
+## Scene Archive
+
+Archive a scene to remove it from all views without deleting it. Archived scenes are moved to the `Archive/` folder inside your project.
+
+- **Archive** — right-click any scene in the Board or Navigator and choose **Archive Scene**. The file moves to `Archive/` and disappears from the index.
+- **Restore** — click the **archive button** (📦) in the Board view toolbar. This opens a modal listing all archived scenes, each with a **Restore** button that moves the file back to `Scenes/` and re-indexes it.
+- **Forking** — when you fork a project, archived scenes are copied to the new project's `Archive/` folder.
+
+Archived scenes stay as regular `.md` files and can be reviewed or edited at any time through Obsidian's file explorer.
 
 ---
 
@@ -606,6 +668,29 @@ Save point-in-time snapshots of a scene for version tracking:
 - **Restore** — revert a scene to any previous snapshot.
 
 Useful for experimenting with rewrites without losing your earlier work.
+
+---
+
+## View Snapshots
+
+Save and restore point-in-time snapshots of your entire project's **view layout** — corkboard positions, Plot Grid state, and scene ordering — without affecting scene content.
+
+### What a snapshot captures
+- **Corkboard layout** — card x/y positions and individual card heights.
+- **Plot Grid state** — rows, columns, cells, zoom level, styling, and linked scenes.
+- **Scene layout metadata** — act, chapter, status, POV, and sequence numbers.
+
+### How to use
+1. Click the **clock icon** (🕓) in the Board or Plotgrid toolbar, or run **Manage View Snapshots** from the command palette.
+2. Click **+** to create a new snapshot. It becomes the active snapshot immediately.
+3. Rearrange your corkboard, edit the Plot Grid, or reorder scenes — changes are **auto-saved** back to the active snapshot after a 2-second pause.
+4. To compare different layouts, load a different snapshot from the list.
+5. Rename or delete snapshots from the same modal.
+
+### Key details
+- **Free-editing mode** — when no snapshot is active, changes are saved normally without snapshot tracking.
+- **Per-project** — each project has its own snapshot history, stored in `System/Snapshots/`.
+- **Layout only** — snapshots do not capture scene prose or frontmatter content. Use **Scene Snapshots** for that.
 
 ---
 
@@ -1100,6 +1185,50 @@ Export your project in six formats. Access via the **Export** button in the view
 
 ---
 
+## Import (Scrivener)
+
+Import an existing Scrivener project (.scriv) as a new StoryLine project. Desktop only.
+
+### How to Import
+
+1. Open **Settings → Import** and click **Import .scriv**, or run **Import Scrivener Project** from the command palette.
+2. Select your `.scriv` folder in the file picker.
+3. If any top-level Scrivener folders don’t match a known category (Characters, Locations, Research, Notes), a **classification modal** appears asking how each should be imported:
+   - **Codex category** — creates a new custom Codex category (e.g. “Magic”, “Factions”)
+   - **Notes** / **Research** / **Scenes** — routes items to the corresponding StoryLine folder
+   - **Skip** — excludes the folder from import
+4. A new StoryLine project is created with all converted files.
+
+### What Gets Imported
+
+| Scrivener | StoryLine | Details |
+|---|---|---|
+| Draft / Manuscript folder | Scenes | RTF converted to Markdown. Part/chapter folder names written to `part` and `chapter` frontmatter. |
+| Character Sketches | Characters | Synopsis → tagline, keywords → tags, custom metadata → custom fields |
+| Places / Locations | Locations | Synopsis → description, keywords → tags, custom metadata → custom fields |
+| Research folder | Research | Imported as research notes |
+| Notes / Front Matter / Back Matter | Notes | Plain markdown notes |
+| Unknown folders | User’s choice | Classification modal (see above) |
+| Images & PDFs | Binary files | Copied to vault with a companion .md that embeds them |
+| Labels | Tags | Scrivener label → tag |
+| Status | Status | Mapped to StoryLine’s 6-stage pipeline (idea → outlined → draft → written → revised → final) |
+| Custom metadata | Custom fields | Field definitions are read from the project; values written to `custom:` in frontmatter |
+| Include in Compile | `compile` field | Items marked as non-compiled get `compile: false` |
+
+### Supported Formats
+
+- **Scrivener 3** (Mac & Windows) — fully supported
+- **Scrivener 2** (Mac) / **1.9** (Windows) — supported (file layout: `Files/Docs/`)
+- **Scrivener 1.x** (Mac, `binder.scrivproj` format) — **not supported**. Open the project in Scrivener 3 to convert it first.
+
+### Tips
+
+- The importer reads RTF files and converts formatting (bold, italic, paragraphs, Unicode). Complex RTF features like tables or embedded images within RTF are not converted.
+- A summary notice shows how many scenes, characters, locations, research notes, files, and warnings were produced.
+- Warnings are listed for any items that had no content file (e.g. from sync corruption or missing data).
+
+---
+
 ## Custom Field Templates
 
 Define your own reusable fields for character and location profiles. If the built-in fields don't cover everything you need, custom field templates let you add any fields you want — and they'll appear automatically in every character or location editor.
@@ -1236,6 +1365,24 @@ StoryLine supports **multiple projects** in the same vault.
 Create a copy of an existing project (useful for alternate drafts or backups):
 1. Command palette → **Fork Current StoryLine Project**.
 2. Enter a new title. All scenes are duplicated.
+
+---
+
+## Novel Covers / Project Art
+
+Add a cover image to your project by clicking the **cover thumbnail** (or the dashed placeholder icon) in the toolbar, next to the project name. This opens the image picker where you can import an image from your computer, choose one from your vault, or remove the current cover.
+
+Alternatively, set the `coverImage` field manually in the project frontmatter:
+
+```yaml
+---
+type: storyline
+title: My Novel
+coverImage: StoryLine/My Novel/cover.jpg
+---
+```
+
+The path should be vault-relative. Once set, a small thumbnail (24 × 32 px) appears next to the project name in the toolbar selector. This works with any image format supported by Obsidian (PNG, JPG, WebP, SVG).
 
 ---
 

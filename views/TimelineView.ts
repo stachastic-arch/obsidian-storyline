@@ -364,8 +364,9 @@ export class TimelineView extends ItemView {
             if (currentAct !== lastRenderedAct) {
                 // Insert act divider
                 const beatLabel = currentAct !== undefined ? this.sceneManager.getActLabel(currentAct) : undefined;
+                const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
                 const actLabel = currentAct !== undefined
-                    ? (beatLabel ? `Act ${currentAct} — ${beatLabel}` : `Act ${currentAct}`)
+                    ? (cleanBeat ? `Act ${currentAct} — ${cleanBeat}` : `Act ${currentAct}`)
                     : 'No Act';
                 const divider = track.createDiv('timeline-act-divider');
                 divider.createSpan({ cls: 'timeline-act-label', text: actLabel });
@@ -391,7 +392,8 @@ export class TimelineView extends ItemView {
         for (const actNum of sortedActs) {
             if (!actsWithScenes.has(Number(actNum))) {
                 const beatLabel = this.sceneManager.getActLabel(actNum);
-                const actLabel = beatLabel ? `Act ${actNum} — ${beatLabel}` : `Act ${actNum}`;
+                const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
+                const actLabel = cleanBeat ? `Act ${actNum} — ${cleanBeat}` : `Act ${actNum}`;
                 const divider = track.createDiv('timeline-act-divider');
                 divider.createSpan({ cls: 'timeline-act-label', text: actLabel });
                 const addInAct = divider.createEl('button', {
@@ -466,8 +468,9 @@ export class TimelineView extends ItemView {
             const currentAct = scene.act !== undefined ? Number(scene.act) : undefined;
             if (currentAct !== lastAct) {
                 const beatLabel = currentAct !== undefined ? this.sceneManager.getActLabel(currentAct) : undefined;
+                const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
                 const label = currentAct !== undefined
-                    ? (beatLabel ? `Act ${currentAct} — ${beatLabel}` : `Act ${currentAct}`)
+                    ? (cleanBeat ? `Act ${currentAct} — ${cleanBeat}` : `Act ${currentAct}`)
                     : 'No Act';
                 rows.push({ type: 'act-divider', actLabel: label, actNum: currentAct });
                 lastAct = currentAct;
@@ -978,7 +981,12 @@ export class TimelineView extends ItemView {
         if (entry) entry.addClass('selected');
 
         // Show inspector
-        this.inspectorComponent?.show(scene);
+        if (this.plugin.isSceneInspectorOpen()) {
+            this.inspectorComponent?.hide();
+            this.app.workspace.trigger('storyline:scene-focus', scene.filePath);
+        } else {
+            this.inspectorComponent?.show(scene);
+        }
     }
 
     /**
@@ -1154,7 +1162,8 @@ export class TimelineView extends ItemView {
                 const desc = actDescriptions[act] || '';
                 const wrapper = actsList.createDiv('structure-item-wrapper');
                 const row = wrapper.createDiv('structure-row');
-                const labelText = label ? `Act ${act} — ${label}` : `Act ${act}`;
+                const cleanLabel = label?.replace(/^Act\s*\d+\s*—\s*/i, '');
+                const labelText = cleanLabel ? `Act ${act} — ${cleanLabel}` : `Act ${act}`;
                 row.createSpan({ cls: 'structure-label', text: labelText });
                 row.createSpan({ cls: 'structure-count', text: `${count} scene${count !== 1 ? 's' : ''}` });
 
@@ -1527,7 +1536,9 @@ export class TimelineView extends ItemView {
                 const updated = this.sceneManager.getScene(prevSelectedPath);
                 if (updated) {
                     this.selectedScene = updated;
-                    this.inspectorComponent?.show(updated);
+                    if (!this.plugin.isSceneInspectorOpen()) {
+                        this.inspectorComponent?.show(updated);
+                    }
                 }
             }
         }

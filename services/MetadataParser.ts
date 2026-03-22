@@ -59,6 +59,7 @@ export class MetadataParser {
             plotgridOrigin: frontmatter.plotgridOrigin ?? frontmatter.plotgrid_origin,
             timeline_mode: this.parseTimelineMode(frontmatter.timeline_mode),
             timeline_strand: frontmatter.timeline_strand,
+            subtitle: frontmatter.subtitle,
         };
     }
 
@@ -105,6 +106,7 @@ export class MetadataParser {
             if (key === 'corkboardNoteImage' && !value) { delete frontmatter[key]; continue; }
             if (key === 'corkboardNoteCaption' && !value) { delete frontmatter[key]; continue; }
             if (key === 'plotgridOrigin' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'subtitle' && !value) { delete frontmatter[key]; continue; }
             if (value !== undefined) {
                 frontmatter[key] = value;
             } else {
@@ -156,6 +158,7 @@ export class MetadataParser {
         if (scene.plotgridOrigin) fm.plotgridOrigin = scene.plotgridOrigin;
         if (scene.timeline_mode && scene.timeline_mode !== 'linear') fm.timeline_mode = scene.timeline_mode;
         if (scene.timeline_strand) fm.timeline_strand = scene.timeline_strand;
+        if (scene.subtitle) fm.subtitle = scene.subtitle;
         fm.wordcount = scene.body ? this.countWords(scene.body) : 0;
         fm.created = new Date().toISOString().split('T')[0];
         fm.modified = new Date().toISOString().split('T')[0];

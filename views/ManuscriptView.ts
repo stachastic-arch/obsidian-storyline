@@ -379,6 +379,12 @@ export class ManuscriptView extends ItemView {
                     text: scene.status,
                 });
             }
+            if (scene.subtitle) {
+                header.createEl('span', {
+                    cls: 'sl-manuscript-scene-subtitle',
+                    text: scene.subtitle,
+                });
+            }
 
             // Editor container — track for eager mounting, observe for lazy loading
             const editorWrap = block.createDiv('sl-manuscript-editor-wrap');
@@ -639,7 +645,7 @@ export class ManuscriptView extends ItemView {
     /** Apply focus-mode effects via a dynamic <style> targeting specific UI elements */
     private applyFocusCssVars(container: HTMLElement): void {
         const s = this.plugin.settings;
-        const opacity = (s.focusDimOpacity ?? 25) / 100;
+        const opacity = 0.25;
         const darken = (s.focusDarkenAmount ?? 0) / 100;
         const blur = s.focusBlurAmount ?? 0;
 

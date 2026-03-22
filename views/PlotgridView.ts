@@ -8,6 +8,7 @@ import type { SceneFilter, SortConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
 import { InspectorComponent } from '../components/Inspector';
+import { openManageSnapshotsModal } from '../components/ViewSnapshotModal';
 import { QuickAddModal } from '../components/QuickAddModal';
 import { LinkScanner } from '../services/LinkScanner';
 import * as lucide from 'lucide';
@@ -135,6 +136,7 @@ export class PlotgridView extends ItemView {
         this.saveDebounce = window.setTimeout(async () => {
             try {
                 if (typeof plugin.savePlotGrid === 'function') await plugin.savePlotGrid(this.data);
+                plugin.viewSnapshotService.scheduleAutoSave();
             } catch (e) {
                 // ignore save errors
             }
@@ -430,6 +432,14 @@ export class PlotgridView extends ItemView {
         attachTooltip(zoomIn, 'Zoom in');
         zoomIn.addEventListener('click', () => this.setZoom(Math.min(2.0, this.data.zoom + 0.1)));
 
+        // ── View Snapshots ──
+        const snapManage = actions.createDiv({ cls: 'clickable-icon' });
+        obsidian.setIcon(snapManage, 'history');
+        attachTooltip(snapManage, 'Manage View Snapshots');
+        snapManage.addEventListener('click', () => {
+            if (this.plugin) openManageSnapshotsModal(this.plugin.app, this.plugin.viewSnapshotService);
+        });
+
         actions.appendChild(zoomOut);
         actions.appendChild(zoomLabel);
         actions.appendChild(zoomIn);
@@ -570,14 +580,16 @@ export class PlotgridView extends ItemView {
                 const dividers: Array<{type: 'act'|'chapter', label: string}> = [];
                 if (scene.act !== undefined && String(scene.act) !== String(prevAct)) {
                     const actNum = typeof scene.act === 'number' ? scene.act : parseInt(String(scene.act), 10);
-                    const actLabel = !isNaN(actNum) ? (activeProject as any)?.actLabels?.[actNum] || '' : '';
-                    dividers.push({ type: 'act', label: actLabel ? `Act ${scene.act}: ${actLabel}` : `Act ${scene.act}` });
+                    const rawActLabel = !isNaN(actNum) ? (activeProject as any)?.actLabels?.[actNum] || '' : '';
+                    const cleanActLabel = rawActLabel.replace(/^Act\s*\d+\s*[—:]\s*/i, '');
+                    dividers.push({ type: 'act', label: cleanActLabel ? `Act ${scene.act}: ${cleanActLabel}` : `Act ${scene.act}` });
                     prevChapter = undefined;
                 }
                 if (scene.chapter !== undefined && String(scene.chapter) !== String(prevChapter)) {
                     const chNum = typeof scene.chapter === 'number' ? scene.chapter : parseInt(String(scene.chapter), 10);
-                    const chLabel = !isNaN(chNum) ? (activeProject as any)?.chapterLabels?.[chNum] || '' : '';
-                    dividers.push({ type: 'chapter', label: chLabel ? `Ch ${scene.chapter}: ${chLabel}` : `Chapter ${scene.chapter}` });
+                    const rawChLabel = !isNaN(chNum) ? (activeProject as any)?.chapterLabels?.[chNum] || '' : '';
+                    const cleanChLabel = rawChLabel.replace(/^Ch(?:apter)?\s*\d+\s*[—:]\s*/i, '');
+                    dividers.push({ type: 'chapter', label: cleanChLabel ? `Ch ${scene.chapter}: ${cleanChLabel}` : `Chapter ${scene.chapter}` });
                 }
                 if (dividers.length > 0) dividersBefore.set(ri, dividers);
                 prevAct = scene.act;
@@ -943,6 +955,20 @@ export class PlotgridView extends ItemView {
                     void MarkdownRenderer.render(this.app, cell.content, contentEl, '', cellComp);
                 }
 
+                // Make plain-text cells (no linked scene) draggable
+                if (cell.content && !cell.linkedSceneId) {
+                    cellEl.draggable = true;
+                    cellEl.style.cursor = 'grab';
+                    cellEl.style.userSelect = 'none';
+                    cellEl.addEventListener('dragstart', (ev) => {
+                        ev.dataTransfer?.setData('text/cell-source', key);
+                        cellEl.addClass('dragging');
+                    });
+                    cellEl.addEventListener('dragend', () => {
+                        cellEl.removeClass('dragging');
+                    });
+                }
+
                 // linked scene: render mini card or badge
                 if (cell.linkedSceneId) {
                     const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
@@ -988,6 +1014,19 @@ export class PlotgridView extends ItemView {
                                 const noteComp = new Component(); noteComp.load();
                                 void MarkdownRenderer.render(this.app, scene.body.trim(), noteBody, scene.filePath, noteComp);
                             }
+
+                            // Make the note draggable so it can be moved between cells
+                            cellEl.draggable = true;
+                            cellEl.style.cursor = 'grab';
+                            cellEl.style.userSelect = 'none';
+                            cellEl.addEventListener('dragstart', (ev) => {
+                                ev.dataTransfer?.setData('text/scene-path', scene.filePath);
+                                ev.dataTransfer?.setData('text/cell-source', key);
+                                cellEl.addClass('dragging');
+                            });
+                            cellEl.addEventListener('dragend', () => {
+                                cellEl.removeClass('dragging');
+                            });
                         } else {
                         // Render mini scene card inside the cell
                         const miniCard = cellEl.createDiv('plot-grid-mini-card');
@@ -1021,6 +1060,17 @@ export class PlotgridView extends ItemView {
                         } else {
                             contentEl.style.display = 'none';
                         }
+
+                        // Make the mini card draggable so it can be moved between cells
+                        miniCard.draggable = true;
+                        miniCard.addEventListener('dragstart', (ev) => {
+                            ev.dataTransfer?.setData('text/scene-path', scene.filePath);
+                            ev.dataTransfer?.setData('text/cell-source', key);
+                            miniCard.addClass('dragging');
+                        });
+                        miniCard.addEventListener('dragend', () => {
+                            miniCard.removeClass('dragging');
+                        });
                         } // end else (regular scene mini-card)
                     } else {
                         // Scene not found — show simple badge
@@ -1173,7 +1223,12 @@ export class PlotgridView extends ItemView {
                         // ── Regular Scene actions ──
                         menu.addItem((it) => it.setTitle('Open Scene').setIcon('file-text').onClick(() => this.openScene(linkedScene)));
                         menu.addItem((it) => it.setTitle('Show in Inspector').setIcon('info').onClick(() => {
-                            this.inspectorComponent?.show(linkedScene);
+                            if (this.plugin?.isSceneInspectorOpen()) {
+                                this.inspectorComponent?.hide();
+                                this.app.workspace.trigger('storyline:scene-focus', linkedScene.filePath);
+                            } else {
+                                this.inspectorComponent?.show(linkedScene);
+                            }
                         }));
                         menu.addSeparator();
                         // Status submenu
@@ -1244,8 +1299,22 @@ export class PlotgridView extends ItemView {
                 cellEl.addEventListener('drop', (ev) => {
                     ev.preventDefault();
                     cellEl.removeClass('plot-grid-drop-target');
+                    const sourceKey = ev.dataTransfer?.getData('text/cell-source');
                     const scenePath = ev.dataTransfer?.getData('text/scene-path');
-                    if (scenePath) {
+                    if (sourceKey && sourceKey !== key) {
+                        // Cell-to-cell move: transfer content from source to target
+                        const src = this.data.cells[sourceKey];
+                        const tgt = this.data.cells[key];
+                        if (src && tgt) {
+                            tgt.linkedSceneId = src.linkedSceneId;
+                            tgt.content = src.content;
+                            src.linkedSceneId = undefined;
+                            src.content = '';
+                            this.scheduleSave();
+                            this.renderGrid();
+                        }
+                    } else if (scenePath) {
+                        // External scene drop (e.g., from scene list)
                         const c = this.data.cells[key]; if (c) c.linkedSceneId = scenePath;
                         this.scheduleSave();
                         this.renderGrid();

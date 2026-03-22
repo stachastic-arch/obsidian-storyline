@@ -33,6 +33,10 @@ export interface StoryLineProject {
     codexFolder: string;
     /** Derived notes folder path (corkboard sticky notes live here) */
     notesFolder: string;
+    /** Derived archive folder path (archived / cut scenes) */
+    archiveFolder: string;
+    /** Derived research folder path (research posts) */
+    researchFolder: string;
 
     // ── Project-specific structure ──────────────────────
     /** Defined act numbers (persisted in project frontmatter) */
@@ -49,12 +53,14 @@ export interface StoryLineProject {
     chapterDescriptions: Record<number, string>;
     /** Saved filter presets (persisted in project frontmatter) */
     filterPresets: FilterPreset[];
-    /** Corkboard free-position layout (scene file path -> coordinates + layer order) */
-    corkboardPositions: Record<string, { x: number; y: number; z?: number }>;
+    /** Corkboard free-position layout (scene file path -> coordinates + layer order + optional height) */
+    corkboardPositions: Record<string, { x: number; y: number; z?: number; h?: number }>;
 
     // ── Series ──────────────────────────────────────
     /** Optional series ID — links this project to a series (matches series.json name) */
     seriesId?: string;
+    /** Vault-relative path to a cover image for the project */
+    coverImage?: string;
 }
 
 // ── Series metadata ────────────────────────────────
@@ -78,7 +84,7 @@ export interface SeriesMetadata {
 export function deriveProjectFolders(
     rootFolder: string,
     title: string
-): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string } {
+): { sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string; archiveFolder: string; researchFolder: string } {
     const base = `${rootFolder}/${title}`;
     return {
         sceneFolder: `${base}/Scenes`,
@@ -86,6 +92,8 @@ export function deriveProjectFolders(
         locationFolder: `${base}/Codex/Locations`,
         codexFolder: `${base}/Codex`,
         notesFolder: `${base}/Notes`,
+        archiveFolder: `${base}/Archive`,
+        researchFolder: `${base}/Research`,
     };
 }
 
@@ -99,7 +107,7 @@ export function deriveProjectFolders(
  */
 export function deriveProjectFoldersFromFilePath(
     filePath: string
-): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string } {
+): { baseFolder: string; sceneFolder: string; characterFolder: string; locationFolder: string; codexFolder: string; notesFolder: string; archiveFolder: string; researchFolder: string } {
     const lastSlash = filePath.lastIndexOf('/');
     const parentDir = lastSlash >= 0 ? filePath.substring(0, lastSlash) : '';
     const basename = (filePath.split('/').pop() ?? '').replace(/\.md$/i, '');
@@ -114,5 +122,7 @@ export function deriveProjectFoldersFromFilePath(
         locationFolder: `${baseFolder}/Codex/Locations`,
         codexFolder: `${baseFolder}/Codex`,
         notesFolder: `${baseFolder}/Notes`,
+        archiveFolder: `${baseFolder}/Archive`,
+        researchFolder: `${baseFolder}/Research`,
     };
 }

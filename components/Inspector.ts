@@ -176,6 +176,20 @@ export class InspectorComponent {
             }
         });
 
+        // ── Subtitle (optional) ──
+        const subtitleInput = titleSection.createEl('input', {
+            cls: 'inspector-subtitle-input',
+            attr: { type: 'text', placeholder: 'Subtitle (optional)…' },
+        });
+        subtitleInput.value = scene.subtitle || '';
+        styleInput(subtitleInput);
+        subtitleInput.style.fontStyle = 'italic';
+        subtitleInput.addEventListener('change', async () => {
+            const val = subtitleInput.value.trim() || undefined;
+            await this.sceneManager.updateScene(scene.filePath, { subtitle: val } as any);
+            scene.subtitle = val;
+        });
+
         // ── Act / Chapter / Sequence row ──
         const acRow = this.container.createDiv('inspector-section');
         acRow.style.display = 'grid';
