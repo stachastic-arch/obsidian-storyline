@@ -332,8 +332,17 @@ export class BoardView extends ItemView {
                     undefined,
                     { field: 'sequence', direction: 'asc' }
                 );
-                for (let i = 0; i < scenes.length; i++) {
-                    await this.sceneManager.updateScene(scenes[i].filePath, { sequence: i + 1 });
+                // Group by act and resequence within each act starting from 1
+                const byAct = new Map<number | string | undefined, Scene[]>();
+                for (const s of scenes) {
+                    const key = s.act;
+                    if (!byAct.has(key)) byAct.set(key, []);
+                    byAct.get(key)!.push(s);
+                }
+                for (const group of byAct.values()) {
+                    for (let i = 0; i < group.length; i++) {
+                        await this.sceneManager.updateScene(group[i].filePath, { sequence: i + 1 });
+                    }
                 }
                 await this.sceneManager.initialize();
                 this.refreshBoard();
@@ -2088,6 +2097,15 @@ export class BoardView extends ItemView {
                 .setIcon('scissors')
                 .onClick(() => {
                     new SplitSceneModal(this.plugin, scene, () => this.refreshBoard()).open();
+                });
+        });
+
+        // Scene color picker
+        menu.addItem(item => {
+            item.setTitle(scene.color ? 'Change Color' : 'Set Color')
+                .setIcon('palette')
+                .onClick(() => {
+                    SceneCardComponent.openColorPicker(this.app, scene, this.sceneManager, () => this.refreshBoard());
                 });
         });
 

@@ -78,6 +78,8 @@ export interface CodexCategoryDef {
     fieldKeys: string[];
     /** Whether this is a built-in category (cannot be removed, only hidden) */
     builtIn?: boolean;
+    /** Whether this category appears as a linkable section in the Scene Inspector sidebar */
+    showInSidebar?: boolean;
 }
 
 // ── Built-in: Items ────────────────────────────────

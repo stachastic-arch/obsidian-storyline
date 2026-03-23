@@ -610,7 +610,9 @@ export interface SceneCardsSettings {
     /** IDs of enabled codex categories (e.g. ['items', 'creatures']) */
     codexEnabledCategories: string[];
     /** User-created custom codex category definitions */
-    codexCustomCategories: Array<{ id: string; label: string; icon: string }>;
+    codexCustomCategories: Array<{ id: string; label: string; icon: string; showInSidebar?: boolean }>;
+    /** Which codex category IDs should appear in the Scene Inspector sidebar */
+    codexSidebarCategories: string[];
     /** Series name — groups projects that share a common universe / codex */
     series: string;
     /** Optional vault-relative path to a shared codex folder for series */
@@ -698,6 +700,8 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     codexEnabledCategories: ['items'],
     codexCustomCategories: [],
+    /** Which codex category IDs should appear in the Scene Inspector sidebar */
+    codexSidebarCategories: [] as string[],
     series: '',
     sharedCodex: '',
     extraFolders: [],

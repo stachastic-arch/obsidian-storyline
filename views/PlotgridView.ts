@@ -2000,6 +2000,19 @@ export class PlotgridView extends ItemView {
             }
         }
 
+        // Codex categories
+        if (col.sourceKind?.startsWith('codex:')) {
+            const catId = col.sourceKind.slice(6);
+            const codexMgr = this.plugin?.codexManager;
+            if (codexMgr) {
+                const entry = codexMgr.findByName(catId, col.sourceId || '');
+                if (entry) {
+                    const file = this.app.vault.getAbstractFileByPath(entry.filePath) as TFile | null;
+                    if (file) { this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } }); return; }
+                }
+            }
+        }
+
         // Tags have no backing file to navigate to
     }
 
@@ -2278,6 +2291,17 @@ export class PlotgridView extends ItemView {
                 colSourceSelect.createEl('option', { text: 'Characters', value: 'characters' });
                 colSourceSelect.createEl('option', { text: 'Plotlines (tags)', value: 'tags' });
                 colSourceSelect.createEl('option', { text: 'Locations', value: 'locations' });
+                // Add codex categories that appear in sidebar
+                const codexMgr = view.plugin?.codexManager;
+                const sidebarCats = (view.plugin as any)?.settings?.codexSidebarCategories as string[] | undefined;
+                if (codexMgr && sidebarCats) {
+                    for (const catId of sidebarCats) {
+                        const catDef = codexMgr.getCategoryDef(catId);
+                        if (catDef) {
+                            colSourceSelect.createEl('option', { text: catDef.label, value: `codex:${catId}` });
+                        }
+                    }
+                }
 
                 // Row sorting info
                 const sortInfo = contentEl.createEl('p', {
@@ -2308,7 +2332,7 @@ export class PlotgridView extends ItemView {
 
                 const syncBtn = btns.createEl('button', { text: 'Sync', cls: 'mod-cta' });
                 syncBtn.addEventListener('click', () => {
-                    const colSource = colSourceSelect.value as 'characters' | 'tags' | 'locations';
+                    const colSource = colSourceSelect.value;
                     const mode = modeSelect.value as 'merge' | 'replace';
                     view.performSync(colSource, mode);
                     this.close();
@@ -2324,7 +2348,7 @@ export class PlotgridView extends ItemView {
      * Perform the actual sync: create rows from scenes, columns from the chosen
      * dimension, and fill cells where data exists.
      */
-    private performSync(colSource: 'characters' | 'tags' | 'locations', mode: 'merge' | 'replace') {
+    private performSync(colSource: string, mode: 'merge' | 'replace') {
         const scMgr = this.plugin?.sceneManager as SceneManager | undefined;
         if (!scMgr) return;
 
@@ -2381,6 +2405,9 @@ export class PlotgridView extends ItemView {
                 for (const t of scene.tags || []) colSet.add(t);
             } else if (colSource === 'locations') {
                 if (scene.location) colSet.add(scene.location);
+            } else if (colSource.startsWith('codex:')) {
+                const catId = colSource.slice(6);
+                for (const n of scene.codexLinks?.[catId] || []) colSet.add(n);
             }
         }
         const colValues = Array.from(colSet).sort();
@@ -2452,6 +2479,9 @@ export class PlotgridView extends ItemView {
                 sceneColValues = [...(scene.tags || [])];
             } else if (colSource === 'locations') {
                 sceneColValues = scene.location ? [scene.location] : [];
+            } else if (colSource.startsWith('codex:')) {
+                const catId = colSource.slice(6);
+                sceneColValues = [...(scene.codexLinks?.[catId] || [])];
             }
 
             for (const val of sceneColValues) {
@@ -2497,7 +2527,7 @@ export class PlotgridView extends ItemView {
     }
 
     /** Build cell content: a short summary for the intersection */
-    private buildCellContent(scene: Scene, colSource: 'characters' | 'tags' | 'locations', colValue: string, resolve?: (n: string) => string): string {
+    private buildCellContent(scene: Scene, colSource: string, colValue: string, resolve?: (n: string) => string): string {
         if (colSource === 'characters') {
             // If this character is the POV, mark it
             const resolvedPov = scene.pov ? (resolve ? resolve(scene.pov) : scene.pov) : '';
@@ -2508,7 +2538,8 @@ export class PlotgridView extends ItemView {
         } else if (colSource === 'locations') {
             return '✓';
         }
-        return '';
+        // codex categories and any unknown source
+        return '✓';
     }
 
     // ── End sync helpers ────────────────────────────────────────────

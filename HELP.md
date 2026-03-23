@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.3** · By Jan Sandström
+**Version 1.8.4** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -40,6 +40,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [View Snapshots](#view-snapshots)
 - [Scene Templates](#scene-templates)
 - [Color Coding & Tag Colors](#color-coding--tag-colors)
+- [Scene Colors](#scene-colors)
 - [Plotline HSL Sliders](#plotline-hsl-sliders)
 - [Sticky Note Themes](#sticky-note-themes)
 - [Per-Project Color Overrides](#per-project-color-overrides)
@@ -51,6 +52,7 @@ StoryLine transforms your Obsidian vault into a full-featured book planning and 
 - [Story Graph](#story-graph)
 - [Link Scanner & Detected Links](#link-scanner--detected-links)
 - [Cross-Entity References](#cross-entity-references)
+- [Codex Linking](#codex-linking)
 - [Hide / Show Built-in Fields](#hide--show-built-in-fields)
 - [Tag Type Overrides](#tag-type-overrides)
 - [Export](#export)
@@ -150,6 +152,7 @@ A spreadsheet-like grid for detailed scene planning.
   - **Scene tab** — the full scene editor (status, POV, characters, location, tags, conflict, synopsis, etc.) so you can edit scene details without leaving the grid.
 - **Auto-Note** — When the Auto-Note toggle is on (enabled by default), typing text into an empty, unlinked cell automatically creates a corkboard note and links it back to the cell. The note is saved as an *idea* with a `plotgridOrigin` label built from the row and column names, so you can always trace it back to where it started. Toggle Auto-Note on or off with the sticky-note icon in the Plotgrid toolbar — the icon turns accent-colored when active.
 - **Codex entity tags** — Each cell automatically displays small color-coded pills at the bottom showing characters (blue), locations (green), and codex entries (purple) detected in the cell text and/or the linked scene's prose. Entity detection uses the same LinkScanner engine — no manual tagging needed.
+- **Sync from Scenes** — Click the sync button in the toolbar to auto-populate the grid. Choose a column source: Characters, Plotlines (tags), Locations, or any Codex category enabled for the Inspector. Rows are created from scenes (sorted by act → chapter → sequence) and cells are filled where data exists. Manual edits are preserved in merge mode. Click a Codex column header to open the linked entry file.
 
 ### Timeline View
 
@@ -280,6 +283,7 @@ The Codex is a unified hub that brings Characters, Locations, and custom categor
 
 - **Tab navigation** — Switch between Characters, Locations, and any custom categories using the tab bar at the top of the Codex.
 - **Custom categories** — Add your own categories (for example: Props, Factions, Magic Systems, Creatures) from the Codex toolbar. Each category gets its own folder inside `Codex/`, its own search, and individual detail pages with editable fields.
+- **Inspector toggle** — In the Manage Categories modal, each category has an **Inspector** checkbox. When enabled, that category appears as a tag-pill section in the Scene Inspector sidebar, letting you link Codex entries to scenes just like Characters and Locations. Linked entries are stored in the scene’s `codexLinks` frontmatter field.
 - **Search** — A search bar at the top of the hub filters across all entries, including Characters and Locations.
 - **Back navigation** — From any detail page, click the back arrow to return to the Codex hub.
 - **Change detection** — When a codex entry's content has been modified since it was last reviewed, an amber warning banner appears on the detail page listing all scenes that reference the entry. Click any scene name to open it. Click **"Mark as reviewed"** to clear the warning and update the stored digest. Digests are stored per-project in `System/codex-digests.json`.
@@ -448,6 +452,8 @@ Each scene is a Markdown file with YAML frontmatter. StoryLine manages these fie
 | `notes` | Editorial / author notes | `"Needs more tension"` || `timeline_mode` | Non-linear narrative technique | `"flashback"` |
 | `timeline_strand` | Parallel/frame strand group | `"1985"` |
 | `subtitle` | Optional subtitle below the title | `"Three years later"` |
+| `color` | Custom scene card background color (hex) | `"#FF6B6B"` |
+| `codexLinks` | Linked Codex entries per category | `{ items: ["Sword"], factions: ["Rebels"] }` |
 | `setup_scenes` | Scenes this sets up | `["path/to/scene.md"]` |
 | `payoff_scenes` | Scenes that pay off this one | `["path/to/scene.md"]` |
 
@@ -489,6 +495,7 @@ Click any scene card to open the **Inspector Panel** on the right side. It provi
 
 - **Metadata editing** — title, act, chapter, sequence, status, POV, location, conflict, emotion, intensity.
 - **Characters** — add/remove characters with autocomplete and tag-pill inputs.
+- **Codex sections** — any Codex category enabled for the Inspector (via Codex → Manage Categories) appears as a tag-pill input below the Location field. Add or remove linked Codex entries with autocomplete from your category’s entries.
 - **Tags** — manage plotline tags with autocomplete, color-coded tag badges when tag colors are configured.
 - **Notes** — editorial notes field for author comments and reminders.
 - **Snapshots** — save and restore point-in-time versions of the scene.
@@ -744,6 +751,18 @@ Override individual tag colors without changing the whole scheme:
 Overrides persist across sessions and take priority over the active scheme.
 
 All color coding is **theme-aware** — colors automatically adapt to your current Obsidian theme (dark or light mode).
+
+---
+
+## Scene Colors
+
+Assign a custom background color to individual scene cards, independent of the color-coding system.
+
+- **Set color** — right-click any scene card in Board, Timeline, or Navigator view and choose **Set color**. A color picker opens where you can select any color.
+- **Background tint** — the color is applied as a subtle background wash (18% blend), so the card text remains readable. On hover, the tint intensifies slightly (26%).
+- **Independent from color-coding** — the scene color tints the card background, while the left-edge stripe continues to show the active color-coding mode (status, POV, emotion, etc.).
+- **Clear color** — right-click the card and choose **Clear color** to remove the custom background.
+- **Stored in frontmatter** — the color is saved as a hex value in the `color` field (e.g., `color: "#FF6B6B"`).
 
 ---
 
@@ -1070,6 +1089,40 @@ Each reference is a clickable link that opens the source file.
 
 ---
 
+## Codex Linking
+
+Link Codex entries directly to scenes, making custom categories (Items, Factions, Creatures, etc.) first-class metadata on your scene cards — just like Characters and Locations.
+
+### Enabling Categories for the Inspector
+
+1. Open the **Codex** view and click **Manage Categories** (gear icon in the toolbar).
+2. Each category row has an **Inspector** checkbox on the right side.
+3. Check it to make that category appear in the Scene Inspector sidebar.
+4. Click **Save**.
+
+Enabled categories appear as tag-pill input sections in the Inspector, right below the Location field. Each section shows the category icon and label, with autocomplete suggestions pulled from your Codex entries for that category.
+
+### Linking Entries to Scenes
+
+- **From the Inspector** — type an entry name in the tag-pill input for any enabled Codex category. Autocomplete suggests existing entries. Press Enter to add.
+- **From Detected Links** — right-click any detected link pill in the "Detected in text" section and choose a Codex category from the context menu. The entry is added to the scene's `codexLinks` and removed from the detected links list.
+
+### Where Codex Links Appear
+
+- **Scene Inspector** — tag-pill inputs for each enabled category.
+- **Plot Grid** — the "Sync from Scenes" modal includes enabled Codex categories in the "Columns from" dropdown. Sync your grid against Items, Factions, or any custom category. Click a Codex column header to open the entry file.
+- **Frontmatter** — stored as `codexLinks` in scene YAML:
+  ```yaml
+  codexLinks:
+    items:
+      - Magic Sword
+      - Shield
+    factions:
+      - Rebels
+  ```
+
+---
+
 ## Hide / Show Built-in Fields
 
 Every character, location, and codex detail editor comes with a set of built-in fields (e.g., Fears, Belief, Atmosphere, Significance). If you don't use all of them, you can **hide** the ones you don't need to keep your editor clean.
@@ -1115,6 +1168,7 @@ When StoryLine auto-classifies `#hashtags` or detected `[[wikilinks]]`, it may s
    - **Location** — reclassify as a location
    - **Character** — reclassify as a character
    - **Other** — reclassify as unclassified
+   - **Codex categories** — any Codex category enabled for the Inspector appears as an option. Selecting one adds the entity to the scene’s `codexLinks` for that category and removes it from the detected links.
    - **Reset** — remove the override and revert to auto-classification
 
 ### Details

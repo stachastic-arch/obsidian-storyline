@@ -692,6 +692,62 @@ export class SceneManager implements ISceneStore {
         if (scene) {
             this.scenes.set(filePath, scene);
         }
+
+        // If the act changed, relocate the file to the correct Act folder and
+        // update the act prefix in the filename.
+        if (updates.act !== undefined && oldSnap && updates.act !== oldSnap.act) {
+            await this.relocateSceneForAct(filePath, updates.act);
+        }
+    }
+
+    /**
+     * Move a scene file to the correct Act subfolder and update the act/sequence
+     * prefix in the filename (e.g. `01-05 Title.md` → `02-03 Title.md`).
+     * Returns the new file path, or the original path if no move was needed.
+     */
+    private async relocateSceneForAct(filePath: string, newAct: number | string | undefined): Promise<string> {
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof TFile)) return filePath;
+
+        const sceneFolder = this.getSceneFolder();
+
+        // Determine target folder
+        let targetFolder = sceneFolder;
+        if (newAct !== undefined) {
+            targetFolder = normalizePath(`${sceneFolder}/Act ${newAct}`);
+        }
+        await this.ensureFolder(targetFolder);
+
+        // Update act (and optionally sequence) prefix in filename
+        let newName = file.name;
+        const actStr = newAct !== undefined ? String(newAct).padStart(2, '0') : '00';
+        const prefixMatch = file.name.match(/^(\d{2})-(\d{2})\s/);
+        if (prefixMatch) {
+            // Read the updated sequence from the freshly-written YAML
+            const updatedScene = this.scenes.get(filePath);
+            const seqStr = updatedScene?.sequence !== undefined
+                ? String(updatedScene.sequence).padStart(2, '0')
+                : prefixMatch[2];  // keep existing if unknown
+            newName = file.name.replace(/^\d{2}-\d{2}(\s)/, `${actStr}-${seqStr}$1`);
+        }
+
+        const newPath = normalizePath(`${targetFolder}/${newName}`);
+        if (normalizePath(filePath) === newPath) return filePath;
+
+        // Remove old index
+        this.scenes.delete(filePath);
+
+        // Rename/move via fileManager so vault links update
+        await this.app.fileManager.renameFile(file, newPath);
+
+        // Re-index at new path
+        const movedFile = this.app.vault.getAbstractFileByPath(newPath);
+        if (movedFile && movedFile instanceof TFile) {
+            const updated = await MetadataParser.parseFile(this.app, movedFile);
+            if (updated) this.scenes.set(newPath, updated);
+        }
+
+        return newPath;
     }
 
     /**

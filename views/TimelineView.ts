@@ -314,6 +314,44 @@ export class TimelineView extends ItemView {
         // For drag & drop
         let dragIndex: number | null = null;
         let dropIndex: number | null = null;
+        let autoScrollRAF: number | null = null;
+        let lastDragClientY = 0;
+
+        // Auto-scroll when dragging near viewport edges
+        const AUTO_SCROLL_ZONE = 60; // px from edge
+        const AUTO_SCROLL_SPEED = 8; // px per frame
+        const startAutoScroll = (clientY: number) => {
+            lastDragClientY = clientY;
+            if (autoScrollRAF) return; // already running
+            const scrollEl = track.closest('.story-line-main-area') || track.parentElement;
+            if (!scrollEl) return;
+            const loop = () => {
+                const rect = scrollEl.getBoundingClientRect();
+                if (lastDragClientY < rect.top + AUTO_SCROLL_ZONE) {
+                    scrollEl.scrollTop -= AUTO_SCROLL_SPEED;
+                } else if (lastDragClientY > rect.bottom - AUTO_SCROLL_ZONE) {
+                    scrollEl.scrollTop += AUTO_SCROLL_SPEED;
+                } else {
+                    autoScrollRAF = null;
+                    return;
+                }
+                autoScrollRAF = requestAnimationFrame(loop);
+            };
+            autoScrollRAF = requestAnimationFrame(loop);
+        };
+        const stopAutoScroll = () => {
+            if (autoScrollRAF) { cancelAnimationFrame(autoScrollRAF); autoScrollRAF = null; }
+        };
+
+        // Attach auto-scroll helpers to the main-area element so entries can call them
+        const mainArea = track.closest('.story-line-main-area');
+        if (mainArea) {
+            (mainArea as any)._slAutoScroll = startAutoScroll;
+            (mainArea as any)._slStopAutoScroll = stopAutoScroll;
+        }
+
+        // Store dropIndex on the track so drop handlers in child entries can read it
+        (track as any)._slDropIndex = null;
 
         const refreshDropIndicators = () => {
             const entries = track.querySelectorAll('.timeline-entry');
@@ -326,6 +364,10 @@ export class TimelineView extends ItemView {
         const handleDrop = async (fromIdx: number, toIdx: number) => {
             if (fromIdx === toIdx || fromIdx === toIdx - 1) return;
 
+            // Save scroll position to restore after refresh
+            const scrollEl = track.closest('.story-line-main-area') || track.parentElement;
+            const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
+
             const moved = scenes.splice(fromIdx, 1)[0];
             const insertAt = toIdx > fromIdx ? toIdx - 1 : toIdx;
             scenes.splice(insertAt, 0, moved);
@@ -336,6 +378,11 @@ export class TimelineView extends ItemView {
                 await this.sceneManager.updateScene(scenes[i].filePath, { [field]: i + 1 } as Partial<Scene>);
             }
             this.refresh();
+
+            // Restore scroll position after DOM rebuild
+            requestAnimationFrame(() => {
+                if (scrollEl) scrollEl.scrollTop = savedScroll;
+            });
         };
 
         // Build a combined list: scenes + empty act placeholders
@@ -385,7 +432,7 @@ export class TimelineView extends ItemView {
                 lastRenderedAct = currentAct;
             }
 
-            this.renderTimelineEntry(track, scene, globalIdx, scenes, dragIndex, dropIndex, refreshDropIndicators, handleDrop, (di) => { dragIndex = di; }, (di) => { dropIndex = di; }, dateInvalidFlags[globalIdx], timeInvalidFlags[globalIdx]);
+            this.renderTimelineEntry(track, scene, globalIdx, scenes, dragIndex, dropIndex, refreshDropIndicators, handleDrop, (di) => { dragIndex = di; }, (di) => { dropIndex = di; (track as any)._slDropIndex = di; }, dateInvalidFlags[globalIdx], timeInvalidFlags[globalIdx]);
         }
 
         // Render any defined acts that have no scenes (as empty placeholders)
@@ -692,13 +739,18 @@ export class TimelineView extends ItemView {
             setDropIndex(null);
             entry.classList.remove('dragging');
             refreshDropIndicators();
+            // Stop auto-scroll on drag end
+            (entry.closest('.story-line-main-area') as any)?._slStopAutoScroll?.();
         });
         entry.addEventListener('dragover', (e) => {
             e.preventDefault();
             const rect = entry.getBoundingClientRect();
             const midY = rect.top + rect.height / 2;
-            setDropIndex((e.clientY < midY) ? i : i + 1);
+            const computed = (e.clientY < midY) ? i : i + 1;
+            setDropIndex(computed);
             refreshDropIndicators();
+            // Auto-scroll near edges
+            (entry.closest('.story-line-main-area') as any)?._slAutoScroll?.(e.clientY);
         });
         entry.addEventListener('dragleave', () => {
             setDropIndex(null);
@@ -706,10 +758,14 @@ export class TimelineView extends ItemView {
         });
         entry.addEventListener('drop', async (e) => {
             e.preventDefault();
+            // Stop auto-scroll
+            (entry.closest('.story-line-main-area') as any)?._slStopAutoScroll?.();
             const fromStr = e.dataTransfer?.getData('text/plain');
             if (fromStr !== undefined && fromStr !== null) {
                 const from = Number(fromStr);
-                await handleDrop(from, i);
+                // Use the computed dropIndex (midpoint-aware) instead of entry index
+                const actualDrop = (entry.closest('.timeline-track') as any)?._slDropIndex ?? i;
+                await handleDrop(from, actualDrop);
             }
         });
 
@@ -749,6 +805,12 @@ export class TimelineView extends ItemView {
         // Right column: card
         const cardCol = entry.createDiv('timeline-entry-card');
         const card = cardCol.createDiv('timeline-card');
+
+        // Apply custom scene color as background tint
+        if (scene.color && /^#[0-9a-fA-F]{6}$/.test(scene.color)) {
+            card.addClass('sl-scene-colored');
+            card.style.setProperty('--sl-scene-bg', scene.color);
+        }
 
         card.createDiv({ cls: 'timeline-card-title', text: scene.title || 'Untitled' });
 
@@ -1007,6 +1069,15 @@ export class TimelineView extends ItemView {
                 .onClick(() => this.openTimeEditModal(scene));
         });
 
+        // Scene color picker
+        menu.addItem(item => {
+            item.setTitle(scene.color ? 'Change Color' : 'Set Color')
+                .setIcon('palette')
+                .onClick(() => {
+                    SceneCardComponent.openColorPicker(this.app, scene, this.sceneManager, () => this.refresh());
+                });
+        });
+
         menu.addItem(item => {
             item.setTitle('Duplicate Scene')
                 .setIcon('copy')
@@ -1075,6 +1146,15 @@ export class TimelineView extends ItemView {
                 }
                 const file = await this.sceneManager.createScene(sceneData);
                 this.refresh();
+                // Scroll to the newly created scene card
+                requestAnimationFrame(() => {
+                    const newEntry = this.rootContainer?.querySelector(
+                        `[data-path="${CSS.escape(file.path)}"]`
+                    );
+                    if (newEntry) {
+                        newEntry.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
                 if (openAfter) {
                     await this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
                 }

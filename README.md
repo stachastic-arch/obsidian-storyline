@@ -1,22 +1,18 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.3** · By Jan Sandström
+**Version 1.8.4** · By Jan Sandström
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
-### New in 1.8.3
+### New in 1.8.4
 
-- **View Snapshots** — Save and restore point-in-time snapshots of your project's view layout (corkboard positions, Plot Grid state, scene ordering). Auto-saves changes while a snapshot is active. Manage from the Board/Plotgrid toolbar or the command palette.
+- **Scene Colors** — Right-click any scene in Board, Timeline, or Navigator to assign a custom background tint color, independent of the color-coding edge stripe.
 
-- **Scrivener Import** — Import a Scrivener project (.scriv folder) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research notes. Supports Scrivener 2 and 3 project formats. Results may vary depending on project complexity — review imported data carefully.
-  
-  - Access via **Settings → Import** or command palette → **Import Scrivener Project**.
+- **Codex Linking** — Link Codex entries (Items, Factions, custom categories) directly to scenes. Enable categories for the Inspector via Codex → Manage Categories → Inspector checkbox. Entries appear as tag-pill inputs with autocomplete. Right-click detected links to assign them to a Codex category. Plot Grid sync now includes Codex categories as column sources.
 
-- **Scene Inspector sidebar** now works from Board, Timeline, and Plotgrid views (previously Manuscript only).
-
-- **Research sidebar** — Open and Edit buttons for all research post types. Web clips open their URL; all types support an edit modal.
+- **Bug fixes** — Act reassignment now moves scene files to the correct subfolder. Board resequencing numbers within each act. Timeline drag-and-drop, auto-scroll, and scroll-to-new-scene fixes.
 
 ---
 
@@ -170,6 +166,8 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 
 - **Scrivener Import** — Import a .scriv project (Scrivener 2 & 3) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research. Results may vary — review imported data carefully. Access via Settings → Import or the command palette.
 - **Codex Hub** — A unified hub for Characters, Locations, and your own custom categories (Props, Factions, Magic Systems — whatever you need). Each category gets its own folder, search, and detail pages. Two-way change detection flags scenes that reference modified codex entries.
+- **Codex Linking** — Associate Codex entries with scenes via tag-pill inputs in the Inspector and right-click assignment from detected links. Codex categories also appear as column sources in Plot Grid sync.
+- **Scene Colors** — Assign a custom background tint to any scene card from the right-click menu in Board, Timeline, or Navigator views.
 - **Manuscript View** — Scrivenings-style continuous document with embedded Live Preview editors. Read and edit your whole story in one scrollable page. Plain Text, Lock Links, and Focus Mode toggles for distraction-free writing.
 - **Scene Management** — Full metadata, six-stage status pipeline, drag-and-drop, multi-select bulk edits, notes, snapshots, and reusable templates. Optional **subtitle** field for scene headings.
 - **View Snapshots** — Save and restore project-wide layout snapshots (corkboard positions, Plot Grid state, scene ordering). Auto-saves while active. Per-project, stored in `System/Snapshots/`.
@@ -291,7 +289,7 @@ StoryLine/
 
 ---
 
-*StoryLine v1.8.3 — Transform your vault into a powerful book planning tool.*
+*StoryLine v1.8.4 — Transform your vault into a powerful book planning tool.*
 
 ---
 

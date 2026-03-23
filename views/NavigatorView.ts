@@ -6,6 +6,7 @@ import { NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE, MANUSCRIPT_VIEW_TYPE } 
 import { ManuscriptView } from './ManuscriptView';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
+import { SceneCardComponent } from '../components/SceneCard';
 
 /**
  * Sort modes available in the navigator.
@@ -411,6 +412,15 @@ export class NavigatorView extends ItemView {
             });
 
             menu.addSeparator();
+
+            // Scene color picker
+            menu.addItem((item) => {
+                item.setTitle(scene.color ? 'Change Color' : 'Set Color');
+                item.setIcon('palette');
+                item.onClick(() => {
+                    SceneCardComponent.openColorPicker(this.app, scene, this.sceneManager, () => this.renderList());
+                });
+            });
 
             // Archive
             menu.addItem((item) => {

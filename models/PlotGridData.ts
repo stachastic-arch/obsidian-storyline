@@ -25,8 +25,8 @@ export interface ColumnMeta {
     sourceType?: 'auto' | 'manual';
     /** For auto columns: the character name, tag, or location this column represents */
     sourceId?: string;
-    /** What dimension auto columns represent */
-    sourceKind?: 'characters' | 'tags' | 'locations';
+    /** What dimension auto columns represent (codex categories use 'codex:catId') */
+    sourceKind?: 'characters' | 'tags' | 'locations' | string;
 }
 
 export interface RowMeta {

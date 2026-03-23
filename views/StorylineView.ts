@@ -25,6 +25,8 @@ export class StorylineView extends ItemView {
     private rootContainer: HTMLElement | null = null;
     private sortMode: SortMode = 'book-order';
     private plotlineViewMode: PlotlineViewMode = 'subway';
+    /** Set of plotline tag names that are hidden in the subway view */
+    private hiddenPlotlines: Set<string> = new Set();
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -109,6 +111,47 @@ export class StorylineView extends ItemView {
         });
         addPlotlineBtn.addEventListener('click', () => this.openNewPlotlineModal());
 
+        // Plotline filter button (show/hide individual plotlines)
+        if (this.plotlineViewMode === 'subway') {
+            const filterBtn = controls.createEl('button', {
+                cls: `clickable-icon${this.hiddenPlotlines.size > 0 ? ' is-active' : ''}`,
+            });
+            const filterIcon = filterBtn.createSpan();
+            obsidian.setIcon(filterIcon, 'filter');
+            attachTooltip(filterBtn, this.hiddenPlotlines.size > 0
+                ? `Filtering: ${this.hiddenPlotlines.size} hidden`
+                : 'Filter plotlines');
+            filterBtn.addEventListener('click', (e) => {
+                const allTags = this.sceneManager.getAllTags().sort();
+                const menu = new Menu();
+                // Show All / Hide All
+                menu.addItem((item: any) => {
+                    item.setTitle('Show all')
+                        .setIcon('eye')
+                        .onClick(() => {
+                            this.hiddenPlotlines.clear();
+                            this.refresh();
+                        });
+                });
+                menu.addSeparator();
+                for (const tag of allTags) {
+                    const isHidden = this.hiddenPlotlines.has(tag);
+                    menu.addItem((item: any) => {
+                        item.setTitle(`${isHidden ? '   ' : '✓ '}${this.formatPlotlineName(tag)}`)
+                            .onClick(() => {
+                                if (isHidden) {
+                                    this.hiddenPlotlines.delete(tag);
+                                } else {
+                                    this.hiddenPlotlines.add(tag);
+                                }
+                                this.refresh();
+                            });
+                    });
+                }
+                menu.showAtPosition({ x: e.clientX, y: e.clientY });
+            });
+        }
+
         // View mode toggle (list vs subway)
         const viewToggle = controls.createDiv('storyline-view-toggle');
         const listBtn = viewToggle.createEl('button', {
@@ -164,7 +207,9 @@ export class StorylineView extends ItemView {
         }
 
         if (this.plotlineViewMode === 'subway') {
-            this.renderSubwayMap(content, scenes, plotlines, plotlineKeys);
+            // Apply plotline visibility filter in subway mode
+            const visibleKeys = plotlineKeys.filter(k => !this.hiddenPlotlines.has(k));
+            this.renderSubwayMap(content, scenes, plotlines, visibleKeys);
         } else {
             this.renderListView(content, scenes, plotlines, plotlineKeys);
         }

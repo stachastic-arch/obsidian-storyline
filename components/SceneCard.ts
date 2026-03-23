@@ -1,9 +1,10 @@
 import { Scene, STATUS_CONFIG, SceneStatus, ColorCodingMode, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode } from '../models/Scene';
 import * as obsidian from 'obsidian';
-import { MarkdownRenderer, Component } from 'obsidian';
+import { MarkdownRenderer, Component, Modal, App } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { resolveTagColor, getPlotlineHSL, resolveStickyNoteColors } from '../settings';
 import type { LinkScanResult } from '../services/LinkScanner';
+import type { SceneManager } from '../services/SceneManager';
 
 /**
  * Renders a single scene card element
@@ -41,10 +42,15 @@ export class SceneCardComponent {
             card.addClass('story-line-kanban-note');
             this.applyNoteColor(card, scene);
         } else {
-            // Color stripe based on coding mode
+            // Color stripe based on coding mode (always applied as border-left)
             const colorMode = options?.colorCoding || this.plugin.settings.colorCoding as ColorCodingMode;
             const color = this.getCardColor(scene, colorMode);
             card.style.borderLeftColor = color;
+
+            // Custom per-scene color applied as background overlay (independent of edge color)
+            if (scene.color && /^#[0-9a-fA-F]{6}$/.test(scene.color)) {
+                this.applySceneColor(card, scene.color);
+            }
         }
 
         // Header
@@ -344,6 +350,15 @@ export class SceneCardComponent {
      * Format sequence number for display
      */
     /**
+     * Apply custom background color to a regular scene card
+     */
+    private applySceneColor(card: HTMLElement, hex: string): void {
+        card.addClass('sl-scene-colored');
+        card.style.setProperty('--sl-scene-bg', hex);
+        card.style.setProperty('--sl-scene-bg-accent', this.darken(hex, 0.24));
+    }
+
+    /**
      * Apply sticky-note background color to a kanban note card
      */
     private applyNoteColor(card: HTMLElement, scene: Scene): void {
@@ -370,5 +385,45 @@ export class SceneCardComponent {
         const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
         const seq = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
         return `${act}-${seq}`;
+    }
+
+    /**
+     * Open a color picker modal to set/change/clear the scene background color.
+     * Call from any view's context menu.
+     */
+    static openColorPicker(app: App, scene: Scene, sceneManager: SceneManager, onDone: () => void): void {
+        const modal = new Modal(app);
+        modal.titleEl.setText('Scene Color');
+        const colorInput = modal.contentEl.createEl('input', {
+            type: 'color',
+        }) as HTMLInputElement;
+        colorInput.value = scene.color || '#6366F1';
+        colorInput.style.width = '100%';
+        colorInput.style.height = '50px';
+        colorInput.style.cursor = 'pointer';
+        colorInput.style.border = 'none';
+
+        const btnRow = modal.contentEl.createDiv();
+        btnRow.style.display = 'flex';
+        btnRow.style.gap = '8px';
+        btnRow.style.marginTop = '12px';
+
+        const saveBtn = btnRow.createEl('button', { text: 'Save', cls: 'mod-cta' });
+        saveBtn.addEventListener('click', async () => {
+            await sceneManager.updateScene(scene.filePath, { color: colorInput.value } as Partial<Scene>);
+            modal.close();
+            onDone();
+        });
+
+        if (scene.color) {
+            const clearBtn = btnRow.createEl('button', { text: 'Clear Color' });
+            clearBtn.addEventListener('click', async () => {
+                await sceneManager.updateScene(scene.filePath, { color: undefined } as Partial<Scene>);
+                modal.close();
+                onDone();
+            });
+        }
+
+        modal.open();
     }
 }

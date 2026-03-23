@@ -2,6 +2,35 @@
 
 ---
 
+## Version 1.8.4
+
+### New Features
+
+- **Scene Colors** — Assign a custom background color to any scene card. Right-click a scene in Board, Timeline, or Navigator and choose **Set color**. The color tints the card background using a subtle wash, independent of the color-coding edge stripe. Clear it with **Clear color** from the same menu. Color is stored in the `color` field in frontmatter.
+
+- **Codex Linking** — Link Codex entries directly to scenes. Any enabled Codex category (Items, Creatures, Factions, or your own custom categories) can appear as a tag-pill section in the Scene Inspector sidebar, letting you associate entries with scenes just like Characters and Locations.
+
+  - **Inspector sections** — Enable a Codex category for the Inspector via **Codex → Manage Categories → Inspector** checkbox. Enabled categories appear as tag-pill inputs in the Inspector with autocomplete from your Codex entries.
+  - **Assign from detected links** — Right-click any detected link in the "Detected in text" section to assign it to a Codex category. The entry is added to the scene's `codexLinks` frontmatter automatically.
+  - **Plot Grid sync** — The "Sync from Scenes" modal now includes enabled Codex categories in the "Columns from" dropdown. Sync scenes against your Items, Factions, or any custom category. Click a Codex column header to open the entry file.
+  - **Stored in frontmatter** — Codex links are saved as `codexLinks` in scene YAML (e.g., `codexLinks: { items: ['Magic Sword', 'Shield'], factions: ['Rebels'] }`).
+
+- **Plotline Filtering (Plotlines View)** — Filter the subway map and list view to show only selected plotlines.
+
+### Bug Fixes
+
+- **Act reassignment** — Changing a scene's act in the Inspector now moves the file to the correct `Act N/` subfolder and updates the filename prefix. Previously, only the frontmatter was updated while the file stayed in the old location.
+
+- **Board resequencing** — The resequence button now numbers scenes within each act starting from 1, rather than numbering globally across all acts. Scenes in Act 2 no longer continue the numbering from Act 1.
+
+- **Timeline drag-and-drop** — Fixed drag-and-drop scene reordering in Timeline view.
+
+- **Timeline auto-scroll** — The Timeline now auto-scrolls when dragging a scene near the edges.
+
+- **Timeline scroll-to-new** — Creating a new scene in Timeline view now scrolls to show it.
+
+---
+
 ## Version 1.8.3
 
 - **Scrivener Import** — Import a Scrivener project (.scriv folder) as a new StoryLine project. Attempts to convert scenes, characters, locations, and research notes. Supports Scrivener 2 and 3 project formats. Results may vary depending on project complexity — review imported data carefully.

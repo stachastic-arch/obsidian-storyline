@@ -373,6 +373,9 @@ export class InspectorComponent {
             placeholder: 'Search locations…',
         });
 
+        // ── Dynamic Codex sections (categories with showInSidebar) ──
+        this.renderCodexSections(scene);
+
         // ── Timeline Mode / Strand ──
         const tmRow = this.container.createDiv('inspector-section');
         tmRow.style.display = 'grid';
@@ -786,6 +789,47 @@ export class InspectorComponent {
     }
 
     /**
+     * Render dynamic Codex sections for categories that have showInSidebar enabled.
+     * Each enabled category gets a tag-pill input populated with codex entry names.
+     */
+    private renderCodexSections(scene: Scene): void {
+        const codexMgr = this.plugin.codexManager;
+        if (!codexMgr) return;
+
+        const sidebarCatIds = this.plugin.settings.codexSidebarCategories || [];
+        if (sidebarCatIds.length === 0) return;
+
+        for (const catId of sidebarCatIds) {
+            const catDef = codexMgr.getCategoryDef(catId);
+            if (!catDef) continue;
+
+            const section = this.container.createDiv('inspector-section');
+            const labelRow = section.createDiv();
+            labelRow.style.display = 'flex';
+            labelRow.style.alignItems = 'center';
+            labelRow.style.gap = '4px';
+            const iconEl = labelRow.createSpan();
+            obsidian.setIcon(iconEl, catDef.icon);
+            labelRow.createSpan({ cls: 'inspector-label', text: `${catDef.label}:` });
+
+            const pillContainer = section.createDiv('inspector-chip-list');
+
+            const currentLinks = scene.codexLinks?.[catId] || [];
+            renderTagPillInput({
+                container: pillContainer,
+                values: currentLinks,
+                getSuggestions: () => codexMgr.getEntries(catId).map(e => e.name),
+                onChange: async (values) => {
+                    if (!scene.codexLinks) scene.codexLinks = {};
+                    scene.codexLinks[catId] = values;
+                    await this.sceneManager.updateScene(scene.filePath, { codexLinks: scene.codexLinks } as any);
+                },
+                placeholder: `Add ${catDef.label.toLowerCase()}…`,
+            });
+        }
+    }
+
+    /**
      * Render detected wikilinks from scene body text (via LinkScanner).
      */
     private renderDetectedLinks(scene: Scene): void {
@@ -796,13 +840,20 @@ export class InspectorComponent {
 
         const overrides = this.plugin.settings.tagTypeOverrides;
 
-        // Exclude links that are already listed in frontmatter characters / location
+        // Exclude links that are already listed in frontmatter characters / location / codexLinks
         const fmChars = new Set((scene.characters || []).map(c => c.toLowerCase()));
         const fmLoc = scene.location?.toLowerCase();
+        const fmCodex = new Set<string>();
+        if (scene.codexLinks) {
+            for (const names of Object.values(scene.codexLinks)) {
+                for (const n of names) fmCodex.add(n.toLowerCase());
+            }
+        }
         const novel = result.links.filter(l => {
             const key = l.name.toLowerCase();
             if (l.type === 'character' && fmChars.has(key)) return false;
             if (l.type === 'location' && key === fmLoc) return false;
+            if (fmCodex.has(key)) return false;
             return true;
         });
 
@@ -821,6 +872,13 @@ export class InspectorComponent {
             prop: 'gem',
             other: 'file-text',
         };
+        // Add codex category icons
+        const codexMgr = this.plugin.codexManager;
+        if (codexMgr) {
+            for (const cat of codexMgr.getCategories()) {
+                typeIcons[`codex:${cat.id}`] = cat.icon;
+            }
+        }
 
         for (const link of novel) {
             const low = link.name.toLowerCase();
@@ -854,8 +912,21 @@ export class InspectorComponent {
             { label: 'Location', value: 'location', icon: 'map-pin' },
             { label: 'Character', value: 'character', icon: 'user' },
             { label: 'Other', value: 'other', icon: 'file-text' },
-            { label: 'Reset to Auto', value: null, icon: 'rotate-ccw' },
         ];
+
+        // Add codex categories that are shown in sidebar
+        const codexMgr = this.plugin.codexManager;
+        const sidebarCatIds = this.plugin.settings.codexSidebarCategories || [];
+        if (codexMgr) {
+            for (const catId of sidebarCatIds) {
+                const catDef = codexMgr.getCategoryDef(catId);
+                if (catDef) {
+                    types.push({ label: catDef.label, value: `codex:${catId}`, icon: catDef.icon });
+                }
+            }
+        }
+
+        types.push({ label: 'Reset to Auto', value: null, icon: 'rotate-ccw' });
 
         const menu = new obsidian.Menu();
         menu.addItem(item => item.setTitle(tagName).setDisabled(true));
@@ -868,6 +939,21 @@ export class InspectorComponent {
                     .onClick(async () => {
                         if (t.value === null) {
                             delete this.plugin.settings.tagTypeOverrides[low];
+                        } else if (t.value.startsWith('codex:')) {
+                            // Add to scene.codexLinks for this category
+                            const catId = t.value.slice(6);
+                            const scene = this.currentScene;
+                            if (scene) {
+                                if (!scene.codexLinks) scene.codexLinks = {};
+                                const arr = scene.codexLinks[catId] || [];
+                                if (!arr.some(n => n.toLowerCase() === low)) {
+                                    arr.push(tagName);
+                                    scene.codexLinks[catId] = arr;
+                                    await this.sceneManager.updateScene(scene.filePath, { codexLinks: scene.codexLinks } as any);
+                                }
+                            }
+                            // Also set the type override for display
+                            this.plugin.settings.tagTypeOverrides[low] = t.value;
                         } else {
                             this.plugin.settings.tagTypeOverrides[low] = t.value;
                         }

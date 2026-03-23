@@ -140,6 +140,10 @@ export interface Scene {
     timeline_strand?: string;
     /** Optional subtitle shown below the title (e.g. "Three years later", "Meanwhile, in Paris") */
     subtitle?: string;
+    /** Optional custom scene card color (hex, e.g. #FF6B6B) — overrides color-coding when set */
+    color?: string;
+    /** Linked Codex entries per category — e.g. { animals: ['Dogs', 'Cats'], factions: ['Rebels'] } */
+    codexLinks?: Record<string, string[]>;
 }
 
 /**

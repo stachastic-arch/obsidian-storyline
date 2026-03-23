@@ -60,6 +60,8 @@ export class MetadataParser {
             timeline_mode: this.parseTimelineMode(frontmatter.timeline_mode),
             timeline_strand: frontmatter.timeline_strand,
             subtitle: frontmatter.subtitle,
+            color: frontmatter.color,
+            codexLinks: this.parseCodexLinks(frontmatter.codexLinks),
         };
     }
 
@@ -107,6 +109,15 @@ export class MetadataParser {
             if (key === 'corkboardNoteCaption' && !value) { delete frontmatter[key]; continue; }
             if (key === 'plotgridOrigin' && !value) { delete frontmatter[key]; continue; }
             if (key === 'subtitle' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'color' && !value) { delete frontmatter[key]; continue; }
+            if (key === 'codexLinks') {
+                if (value && typeof value === 'object' && Object.keys(value).some(k => Array.isArray((value as any)[k]) && (value as any)[k].length > 0)) {
+                    frontmatter[key] = value;
+                } else {
+                    delete frontmatter[key];
+                }
+                continue;
+            }
             if (value !== undefined) {
                 frontmatter[key] = value;
             } else {
@@ -159,6 +170,10 @@ export class MetadataParser {
         if (scene.timeline_mode && scene.timeline_mode !== 'linear') fm.timeline_mode = scene.timeline_mode;
         if (scene.timeline_strand) fm.timeline_strand = scene.timeline_strand;
         if (scene.subtitle) fm.subtitle = scene.subtitle;
+        if (scene.color) fm.color = scene.color;
+        if (scene.codexLinks && Object.keys(scene.codexLinks).some(k => scene.codexLinks![k]?.length)) {
+            fm.codexLinks = scene.codexLinks;
+        }
         fm.wordcount = scene.body ? this.countWords(scene.body) : 0;
         fm.created = new Date().toISOString().split('T')[0];
         fm.modified = new Date().toISOString().split('T')[0];
@@ -225,6 +240,26 @@ export class MetadataParser {
             return status as SceneStatus;
         }
         return undefined;
+    }
+
+    /**
+     * Parse codexLinks: Record<string, string[]> from frontmatter.
+     * Accepts { categoryId: ['EntryName', ...] } or undefined.
+     */
+    private static parseCodexLinks(raw: any): Record<string, string[]> | undefined {
+        if (!raw || typeof raw !== 'object') return undefined;
+        const result: Record<string, string[]> = {};
+        let hasAny = false;
+        for (const [key, val] of Object.entries(raw)) {
+            if (Array.isArray(val)) {
+                const arr = val.map(String).filter(Boolean);
+                if (arr.length > 0) {
+                    result[key] = arr;
+                    hasAny = true;
+                }
+            }
+        }
+        return hasAny ? result : undefined;
     }
 
     /**

@@ -1252,9 +1252,10 @@ export class CodexView extends ItemView {
         el.addClass('codex-category-manager');
 
         el.createEl('h4', { text: 'Enabled Categories' });
-        el.createEl('p', { cls: 'setting-item-description', text: 'Toggle categories to show in the Codex. Characters and Locations are always available.' });
+        el.createEl('p', { cls: 'setting-item-description', text: 'Toggle categories to show in the Codex. Use the sidebar toggle to also show them in the Scene Inspector.' });
 
         const enabled = new Set(this.plugin.settings.codexEnabledCategories);
+        const sidebarSet = new Set(this.plugin.settings.codexSidebarCategories || []);
 
         // Built-in categories
         for (const cat of BUILTIN_CODEX_CATEGORIES) {
@@ -1265,11 +1266,29 @@ export class CodexView extends ItemView {
             obsidian.setIcon(iconSpan, cat.icon);
             row.createSpan({ text: cat.label });
 
+            // Sidebar toggle
+            const sidebarLabel = row.createEl('label', { cls: 'codex-sidebar-toggle' });
+            sidebarLabel.style.marginLeft = 'auto';
+            sidebarLabel.style.display = 'flex';
+            sidebarLabel.style.alignItems = 'center';
+            sidebarLabel.style.gap = '4px';
+            sidebarLabel.style.fontSize = '11px';
+            sidebarLabel.style.opacity = '0.7';
+            const sidebarCheck = sidebarLabel.createEl('input', { attr: { type: 'checkbox' } }) as HTMLInputElement;
+            sidebarCheck.checked = sidebarSet.has(cat.id);
+            sidebarLabel.createSpan({ text: 'Inspector' });
+            sidebarCheck.addEventListener('change', () => {
+                if (sidebarCheck.checked) sidebarSet.add(cat.id);
+                else sidebarSet.delete(cat.id);
+            });
+
             toggle.addEventListener('change', () => {
                 if (toggle.checked) {
                     enabled.add(cat.id);
                 } else {
                     enabled.delete(cat.id);
+                    sidebarSet.delete(cat.id);
+                    sidebarCheck.checked = false;
                 }
             });
         }
@@ -1286,11 +1305,29 @@ export class CodexView extends ItemView {
                 obsidian.setIcon(iconSpan, cc.icon);
                 row.createSpan({ text: cc.label });
 
+                // Sidebar toggle
+                const sidebarLabel = row.createEl('label', { cls: 'codex-sidebar-toggle' });
+                sidebarLabel.style.marginLeft = 'auto';
+                sidebarLabel.style.display = 'flex';
+                sidebarLabel.style.alignItems = 'center';
+                sidebarLabel.style.gap = '4px';
+                sidebarLabel.style.fontSize = '11px';
+                sidebarLabel.style.opacity = '0.7';
+                const sidebarCheck = sidebarLabel.createEl('input', { attr: { type: 'checkbox' } }) as HTMLInputElement;
+                sidebarCheck.checked = sidebarSet.has(cc.id);
+                sidebarLabel.createSpan({ text: 'Inspector' });
+                sidebarCheck.addEventListener('change', () => {
+                    if (sidebarCheck.checked) sidebarSet.add(cc.id);
+                    else sidebarSet.delete(cc.id);
+                });
+
                 toggle.addEventListener('change', () => {
                     if (toggle.checked) {
                         enabled.add(cc.id);
                     } else {
                         enabled.delete(cc.id);
+                        sidebarSet.delete(cc.id);
+                        sidebarCheck.checked = false;
                     }
                 });
 
@@ -1364,6 +1401,7 @@ export class CodexView extends ItemView {
                 .setCta()
                 .onClick(async () => {
                     this.plugin.settings.codexEnabledCategories = Array.from(enabled);
+                    this.plugin.settings.codexSidebarCategories = Array.from(sidebarSet);
                     await this.plugin.saveSettings();
                     // Reinitialise codex manager with new categories
                     this.codexManager.initCategories(

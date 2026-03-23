@@ -1223,6 +1223,17 @@ body.theme-dark {
     transform: translateY(-1px);
 }
 
+/* Custom scene color (background fill, independent of border-left edge color) */
+.scene-card.sl-scene-colored,
+.timeline-card.sl-scene-colored {
+    background: color-mix(in srgb, var(--sl-scene-bg) 18%, var(--sc-card-bg, var(--background-primary))) !important;
+    border-color: color-mix(in srgb, var(--sl-scene-bg) 30%, var(--sc-card-border, var(--background-modifier-border)));
+}
+.scene-card.sl-scene-colored:hover,
+.timeline-card.sl-scene-colored:hover {
+    background: color-mix(in srgb, var(--sl-scene-bg) 26%, var(--sc-card-bg, var(--background-primary))) !important;
+}
+
 .scene-card.selected {
     outline: 2px solid var(--sc-accent);
     outline-offset: -1px;
