@@ -10,6 +10,8 @@ export interface ISceneStore {
     getScene(filePath: string): Scene | undefined;
     /** Raw iterator over all scenes */
     sceneValues(): Iterable<Scene>;
+    /** Monotonically increasing version — bumped on every mutation */
+    readonly cacheVersion: number;
 }
 
 /**
@@ -19,12 +21,27 @@ export interface ISceneStore {
  * and statistics over the scene data. Has no vault write access.
  */
 export class SceneQueryService {
+    private _lastFilterKey = '';
+    private _lastVersion = -1;
+    private _lastResult: Scene[] = [];
+
     constructor(private sceneStore: ISceneStore) {}
 
+    /** Build a cheap cache key from filter+sort objects */
+    private computeFilterKey(filter?: SceneFilter, sort?: SortConfig): string {
+        return JSON.stringify([filter ?? null, sort ?? null]);
+    }
+
     /**
-     * Apply filters and sorting to scenes
+     * Apply filters and sorting to scenes (memoized by filter+sort+version)
      */
     getFilteredScenes(filter?: SceneFilter, sort?: SortConfig): Scene[] {
+        const version = this.sceneStore.cacheVersion;
+        const key = this.computeFilterKey(filter, sort);
+        if (key === this._lastFilterKey && version === this._lastVersion) {
+            return this._lastResult;
+        }
+
         let scenes = this.sceneStore.getAllScenes();
 
         if (filter) {
@@ -34,10 +51,12 @@ export class SceneQueryService {
         if (sort) {
             scenes = this.sortScenes(scenes, sort);
         } else {
-            // Default sort by sequence
             scenes.sort((a, b) => (a.sequence ?? 9999) - (b.sequence ?? 9999));
         }
 
+        this._lastFilterKey = key;
+        this._lastVersion = version;
+        this._lastResult = scenes;
         return scenes;
     }
 

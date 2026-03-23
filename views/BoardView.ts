@@ -38,6 +38,8 @@ export class BoardView extends ItemView {
     private boardEl: HTMLElement | null = null;
     private bulkBarEl: HTMLElement | null = null;
     private rootContainer: HTMLElement | null = null;
+    private _pendingRefresh: number | null = null;
+    private _lastCacheVersion = -1;
     private boardMode: BoardMode = 'corkboard';
     private corkboardPositions: Map<string, { x: number; y: number; z: number; h?: number }> = new Map();
     private corkboardJustDragged: Set<string> = new Set();
@@ -2881,12 +2883,17 @@ export class BoardView extends ItemView {
      * Full refresh called by the plugin on file changes
      */
     refresh(): void {
-        if (this.rootContainer) {
+        if (!this.rootContainer) return;
+        const version = this.sceneManager.cacheVersion;
+        if (version === this._lastCacheVersion) return;
+        if (this._pendingRefresh) return;
+        this._pendingRefresh = requestAnimationFrame(() => {
+            this._pendingRefresh = null;
+            if (!this.rootContainer) return;
+            this._lastCacheVersion = this.sceneManager.cacheVersion;
             const prevSelectedPath = this.selectedScene?.filePath ?? null;
             const inspectorWasVisible = this.inspectorComponent?.isVisible() ?? false;
 
-            // If the board is already rendered, do a lightweight refresh
-            // instead of rebuilding toolbar/filters from scratch.
             if (this.boardEl) {
                 this.refreshBoard();
             } else {
@@ -2895,8 +2902,6 @@ export class BoardView extends ItemView {
                 requestAnimationFrame(() => this.restoreColumnScrollPositions());
             }
 
-            // Restore scene selection & inspector after re-render
-            // (only re-show inspector if it was already visible)
             if (prevSelectedPath) {
                 const updated = this.sceneManager.getScene(prevSelectedPath);
                 if (updated) {
@@ -2907,7 +2912,7 @@ export class BoardView extends ItemView {
                     }
                 }
             }
-        }
+        });
     }
 
     private configureDragToPan(): void {

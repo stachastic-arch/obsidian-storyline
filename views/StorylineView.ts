@@ -23,10 +23,14 @@ export class StorylineView extends ItemView {
     private plugin: SceneCardsPlugin;
     private sceneManager: SceneManager;
     private rootContainer: HTMLElement | null = null;
+    private _pendingRefresh: number | null = null;
     private sortMode: SortMode = 'book-order';
     private plotlineViewMode: PlotlineViewMode = 'subway';
     /** Set of plotline tag names that are hidden in the subway view */
     private hiddenPlotlines: Set<string> = new Set();
+    /** Cache key for skip-if-unchanged optimization */
+    private _lastRenderKey = '';
+    private _lastCacheVersion = -1;
 
     constructor(leaf: WorkspaceLeaf, plugin: SceneCardsPlugin, sceneManager: SceneManager) {
         super(leaf);
@@ -1132,8 +1136,17 @@ export class StorylineView extends ItemView {
      * Public refresh called by the plugin on file changes
      */
     refresh(): void {
-        if (this.rootContainer) {
-            this.renderView(this.rootContainer);
-        }
+        if (!this.rootContainer) return;
+        // Skip if scene data hasn't changed (external refresh with no mutations)
+        const version = this.sceneManager.cacheVersion;
+        if (version === this._lastCacheVersion) return;
+        if (this._pendingRefresh) return;
+        this._pendingRefresh = requestAnimationFrame(() => {
+            this._pendingRefresh = null;
+            if (this.rootContainer) {
+                this._lastCacheVersion = this.sceneManager.cacheVersion;
+                this.renderView(this.rootContainer);
+            }
+        });
     }
 }

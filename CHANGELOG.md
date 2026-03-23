@@ -29,6 +29,18 @@
 
 - **Timeline scroll-to-new** — Creating a new scene in Timeline view now scrolls to show it.
 
+### Performance
+
+- **Query memoization** — Scene filtering and sorting results are now cached and only recomputed when scene data actually changes. Views that haven't changed skip re-rendering entirely.
+
+- **Debounced re-renders** — Board, Timeline, and Plotlines views now coalesce rapid refresh calls using requestAnimationFrame, preventing redundant DOM rebuilds during batch operations.
+
+- **Progressive timeline rendering** — Projects with 40+ scenes now render the timeline in batches (first 20 immediately, then 10 per frame), keeping the UI responsive during initial load.
+
+- **CSS layout containment** — Scene cards and timeline cards use `contain: content` to isolate browser layout recalculations, reducing paint cost as scene count grows.
+
+- **Reverse tag index** — SceneManager maintains a tag → scenes lookup index, updated incrementally on each mutation, for O(1) plotline-to-scene queries.
+
 ---
 
 ## Version 1.8.3

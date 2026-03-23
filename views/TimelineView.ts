@@ -35,6 +35,8 @@ export class TimelineView extends ItemView {
     private selectedScene: Scene | null = null;
     private zoomLevel = 1;
     private rootContainer: HTMLElement | null = null;
+    private _pendingRefresh: number | null = null;
+    private _lastCacheVersion = -1;
     /** When true, display multi-lane swimlane view instead of single-column */
     private swimlaneMode = false;
     /** How to group lanes in swimlane mode */
@@ -403,62 +405,106 @@ export class TimelineView extends ItemView {
         const allActs = new Set([...definedActs, ...actsWithScenes]);
         const sortedActs = Array.from(allActs).sort((a, b) => a - b);
 
-        // Render scenes in sequence order and insert act dividers when act changes
+        // Render scenes in sequence order and insert act dividers when act changes.
+        // For large projects (40+ scenes), use progressive/chunked rendering to avoid
+        // blocking the main thread with 1500+ DOM nodes in a single frame.
+        type TLItem =
+            | { kind: 'divider'; actLabel: string; actNum: number | undefined }
+            | { kind: 'scene'; scene: Scene; globalIdx: number; dateInvalid: boolean; timeInvalid: boolean }
+            | { kind: 'empty-act'; actLabel: string; actNum: number };
+
+        const tlItems: TLItem[] = [];
         let lastRenderedAct: number | undefined = undefined;
         for (let globalIdx = 0; globalIdx < scenes.length; globalIdx++) {
             const scene = scenes[globalIdx];
             const currentAct = scene.act !== undefined ? Number(scene.act) : undefined;
             if (currentAct !== lastRenderedAct) {
-                // Insert act divider
                 const beatLabel = currentAct !== undefined ? this.sceneManager.getActLabel(currentAct) : undefined;
                 const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
                 const actLabel = currentAct !== undefined
                     ? (cleanBeat ? `Act ${currentAct} — ${cleanBeat}` : `Act ${currentAct}`)
                     : 'No Act';
-                const divider = track.createDiv('timeline-act-divider');
-                divider.createSpan({ cls: 'timeline-act-label', text: actLabel });
-
-                if (currentAct !== undefined) {
-                    const addInAct = divider.createEl('button', {
-                        cls: 'timeline-act-add-btn clickable-icon',
-                        attr: { 'aria-label': `Add scene to ${actLabel}` }
-                    });
-                    obsidian.setIcon(addInAct, 'plus');
-                    addInAct.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.openQuickAdd(currentAct);
-                    });
-                }
+                tlItems.push({ kind: 'divider', actLabel, actNum: currentAct });
                 lastRenderedAct = currentAct;
             }
-
-            this.renderTimelineEntry(track, scene, globalIdx, scenes, dragIndex, dropIndex, refreshDropIndicators, handleDrop, (di) => { dragIndex = di; }, (di) => { dropIndex = di; (track as any)._slDropIndex = di; }, dateInvalidFlags[globalIdx], timeInvalidFlags[globalIdx]);
+            tlItems.push({ kind: 'scene', scene, globalIdx, dateInvalid: dateInvalidFlags[globalIdx], timeInvalid: timeInvalidFlags[globalIdx] });
         }
 
-        // Render any defined acts that have no scenes (as empty placeholders)
+        // Add empty-act placeholders for defined acts with no scenes
         for (const actNum of sortedActs) {
             if (!actsWithScenes.has(Number(actNum))) {
                 const beatLabel = this.sceneManager.getActLabel(actNum);
                 const cleanBeat = beatLabel?.replace(/^Act\s*\d+\s*—\s*/i, '');
                 const actLabel = cleanBeat ? `Act ${actNum} — ${cleanBeat}` : `Act ${actNum}`;
+                tlItems.push({ kind: 'empty-act', actLabel, actNum });
+            }
+        }
+
+        const renderTLItem = (item: TLItem) => {
+            if (item.kind === 'divider') {
                 const divider = track.createDiv('timeline-act-divider');
-                divider.createSpan({ cls: 'timeline-act-label', text: actLabel });
+                divider.createSpan({ cls: 'timeline-act-label', text: item.actLabel });
+                if (item.actNum !== undefined) {
+                    const addInAct = divider.createEl('button', {
+                        cls: 'timeline-act-add-btn clickable-icon',
+                        attr: { 'aria-label': `Add scene to ${item.actLabel}` }
+                    });
+                    obsidian.setIcon(addInAct, 'plus');
+                    const actForClosure = item.actNum;
+                    addInAct.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.openQuickAdd(actForClosure);
+                    });
+                }
+            } else if (item.kind === 'scene') {
+                this.renderTimelineEntry(track, item.scene, item.globalIdx, scenes, dragIndex, dropIndex, refreshDropIndicators, handleDrop, (di) => { dragIndex = di; }, (di) => { dropIndex = di; (track as any)._slDropIndex = di; }, item.dateInvalid, item.timeInvalid);
+            } else {
+                // empty-act placeholder
+                const divider = track.createDiv('timeline-act-divider');
+                divider.createSpan({ cls: 'timeline-act-label', text: item.actLabel });
                 const addInAct = divider.createEl('button', {
                     cls: 'timeline-act-add-btn clickable-icon',
-                    attr: { 'aria-label': `Add scene to ${actLabel}` }
+                    attr: { 'aria-label': `Add scene to ${item.actLabel}` }
                 });
                 obsidian.setIcon(addInAct, 'plus');
+                const actForClosure = item.actNum;
                 addInAct.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    this.openQuickAdd(actNum);
+                    this.openQuickAdd(actForClosure);
                 });
                 const emptyEntry = track.createDiv('timeline-entry timeline-entry-empty');
                 const emptyCard = emptyEntry.createDiv('timeline-entry-card');
                 const card = emptyCard.createDiv('timeline-card timeline-card-empty');
-                card.createDiv({ cls: 'timeline-card-title', text: `No scenes in ${actLabel}` });
+                card.createDiv({ cls: 'timeline-card-title', text: `No scenes in ${item.actLabel}` });
                 card.createEl('p', { cls: 'timeline-card-hint', text: 'Click + to add a scene' });
-                card.addEventListener('click', () => this.openQuickAdd(actNum));
+                card.addEventListener('click', () => this.openQuickAdd(actForClosure));
             }
+        };
+
+        // Progressive rendering: render first batch immediately, schedule rest
+        const INITIAL_BATCH = 20;
+        const CHUNK_SIZE = 10;
+        const total = tlItems.length;
+
+        if (total <= INITIAL_BATCH) {
+            // Small project — render everything synchronously
+            for (const item of tlItems) renderTLItem(item);
+        } else {
+            // Large project — chunked rendering
+            for (let i = 0; i < INITIAL_BATCH; i++) renderTLItem(tlItems[i]);
+
+            let cursor = INITIAL_BATCH;
+            const scheduleChunk = () => {
+                if (cursor >= total || !track.isConnected) return;
+                requestAnimationFrame(() => {
+                    if (!track.isConnected) return;
+                    const end = Math.min(cursor + CHUNK_SIZE, total);
+                    for (let i = cursor; i < end; i++) renderTLItem(tlItems[i]);
+                    cursor = end;
+                    if (cursor < total) scheduleChunk();
+                });
+            };
+            scheduleChunk();
         }
     }
 
@@ -1608,10 +1654,16 @@ export class TimelineView extends ItemView {
      * Public refresh called by the plugin on file changes
      */
     refresh(): void {
-        if (this.rootContainer) {
+        if (!this.rootContainer) return;
+        const version = this.sceneManager.cacheVersion;
+        if (version === this._lastCacheVersion) return;
+        if (this._pendingRefresh) return;
+        this._pendingRefresh = requestAnimationFrame(() => {
+            this._pendingRefresh = null;
+            if (!this.rootContainer) return;
+            this._lastCacheVersion = this.sceneManager.cacheVersion;
             const prevSelectedPath = this.selectedScene?.filePath ?? null;
             this.renderView(this.rootContainer);
-            // Restore scene selection & inspector after full re-render
             if (prevSelectedPath) {
                 const updated = this.sceneManager.getScene(prevSelectedPath);
                 if (updated) {
@@ -1621,6 +1673,6 @@ export class TimelineView extends ItemView {
                     }
                 }
             }
-        }
+        });
     }
 }

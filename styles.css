@@ -1215,6 +1215,7 @@ body.theme-dark {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.15s, background 0.15s;
     user-select: none;
+    contain: content;
 }
 
 .scene-card:hover {
@@ -2154,6 +2155,7 @@ body.theme-dark {
     cursor: pointer;
     transition: transform 0.1s, box-shadow 0.15s;
     max-width: 500px;
+    contain: content;
 }
 
 .timeline-card:hover {

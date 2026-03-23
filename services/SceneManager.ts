@@ -22,6 +22,51 @@ export class SceneManager implements ISceneStore {
     public undoManager: UndoManager;
     /** Read-only query service for filtering, sorting, aggregation */
     public readonly queryService: SceneQueryService;
+    /** Monotonically increasing version — bumped on every scene mutation */
+    private _cacheVersion = 0;
+    get cacheVersion(): number { return this._cacheVersion; }
+    /** Secondary index: tag → set of filePaths */
+    private _tagIndex: Map<string, Set<string>> = new Map();
+    /** Secondary index: plotline/tag list for fast reverse lookup */
+    getScenesByTag(tag: string): Scene[] {
+        const paths = this._tagIndex.get(tag);
+        if (!paths) return [];
+        const result: Scene[] = [];
+        for (const p of paths) {
+            const s = this.scenes.get(p);
+            if (s) result.push(s);
+        }
+        return result;
+    }
+    /** Bump version and rebuild tag index for a single scene */
+    private bumpVersion(filePath?: string): void {
+        this._cacheVersion++;
+        if (filePath) {
+            // Remove old tag entries for this path
+            for (const [, paths] of this._tagIndex) paths.delete(filePath);
+            // Re-add from current scene
+            const scene = this.scenes.get(filePath);
+            if (scene?.tags) {
+                for (const t of scene.tags) {
+                    let set = this._tagIndex.get(t);
+                    if (!set) { set = new Set(); this._tagIndex.set(t, set); }
+                    set.add(filePath);
+                }
+            }
+        } else {
+            // Full rebuild (used after initialize/clear)
+            this._tagIndex.clear();
+            for (const [fp, scene] of this.scenes) {
+                if (scene.tags) {
+                    for (const t of scene.tags) {
+                        let set = this._tagIndex.get(t);
+                        if (!set) { set = new Set(); this._tagIndex.set(t, set); }
+                        set.add(fp);
+                    }
+                }
+            }
+        }
+    }
 
     constructor(app: App, plugin: SceneCardsPlugin) {
         this.app = app;
@@ -540,6 +585,7 @@ export class SceneManager implements ISceneStore {
         const notesFolder = this.getNotesFolder();
         await this.scanFolderAdapter(notesFolder);
         this.initialized = true;
+        this.bumpVersion();
     }
 
     /**
@@ -551,6 +597,7 @@ export class SceneManager implements ISceneStore {
         const scene = MetadataParser.parseContent(content, filePath);
         if (scene) {
             this.scenes.set(filePath, scene);
+            this.bumpVersion(filePath);
             return true;
         }
         return false;
@@ -663,6 +710,7 @@ export class SceneManager implements ISceneStore {
         const scene = await MetadataParser.parseFile(this.app, file);
         if (scene) {
             this.scenes.set(file.path, scene);
+            this.bumpVersion(file.path);
         }
 
         return file;
@@ -691,6 +739,7 @@ export class SceneManager implements ISceneStore {
         const scene = await MetadataParser.parseFile(this.app, file);
         if (scene) {
             this.scenes.set(filePath, scene);
+            this.bumpVersion(filePath);
         }
 
         // If the act changed, relocate the file to the correct Act folder and
@@ -746,6 +795,7 @@ export class SceneManager implements ISceneStore {
             const updated = await MetadataParser.parseFile(this.app, movedFile);
             if (updated) this.scenes.set(newPath, updated);
         }
+        this.bumpVersion(newPath);
 
         return newPath;
     }
@@ -793,6 +843,7 @@ export class SceneManager implements ISceneStore {
                 const updated = await MetadataParser.parseFile(this.app, movedFile);
                 if (updated) this.scenes.set(newPath, updated);
             }
+            this.bumpVersion(newPath);
             return newPath;
         }
 
@@ -817,6 +868,7 @@ export class SceneManager implements ISceneStore {
 
         // Remove from active index
         this.scenes.delete(filePath);
+        this.bumpVersion(filePath);
 
         // Move the file
         await this.app.fileManager.renameFile(file, newPath);
@@ -865,6 +917,7 @@ export class SceneManager implements ISceneStore {
                 await MetadataParser.updateFrontmatter(this.app, movedFile, { sequence: newSeq });
                 scene.sequence = newSeq;
                 this.scenes.set(newPath, scene);
+                this.bumpVersion(newPath);
             }
         }
 
@@ -910,7 +963,7 @@ export class SceneManager implements ISceneStore {
 
         await this.app.vault.trash(file, true);
         this.scenes.delete(filePath);
-
+        this.bumpVersion(filePath);
 
     }
 
@@ -971,6 +1024,7 @@ export class SceneManager implements ISceneStore {
         } else {
             this.scenes.delete(file.path);
         }
+        this.bumpVersion(file.path);
     }
 
     /**
@@ -978,6 +1032,7 @@ export class SceneManager implements ISceneStore {
      */
     handleFileDelete(filePath: string): void {
         this.scenes.delete(filePath);
+        this.bumpVersion(filePath);
     }
 
     /**
@@ -991,6 +1046,7 @@ export class SceneManager implements ISceneStore {
                 this.scenes.set(file.path, scene);
             }
         }
+        this.bumpVersion(file.path);
     }
 
     /**
@@ -1504,6 +1560,7 @@ export class SceneManager implements ISceneStore {
         await MetadataParser.updateFrontmatter(this.app, file, updatesA);
         const parsedA = await MetadataParser.parseFile(this.app, file);
         if (parsedA) this.scenes.set(file.path, parsedA);
+        this.bumpVersion(file.path);
 
         // Shift sequence numbers for all scenes after the original
         const origSeq = scene.sequence ?? 0;
@@ -1606,6 +1663,7 @@ export class SceneManager implements ISceneStore {
         await MetadataParser.updateFrontmatter(this.app, primaryFile, updates);
         const parsed = await MetadataParser.parseFile(this.app, primaryFile);
         if (parsed) this.scenes.set(primaryFile.path, parsed);
+        this.bumpVersion(primaryFile.path);
 
         // Delete the other scenes
         for (const s of rest) {
