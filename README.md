@@ -1,18 +1,18 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.4** · By Jan Sandström
+**Version 1.8.5** · By Jan Sandström
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 
 StoryLine transforms your Obsidian vault into a complete book planning and writing tool. Organize scenes, build characters, manage locations, track plotlines, and monitor your progress — all inside Obsidian.
 
-### New in 1.8.4
+### New in 1.8.5
 
-- **Scene Colors** — Right-click any scene in Board, Timeline, or Navigator to assign a custom background tint color, independent of the color-coding edge stripe.
+- **Show in StoryLine** — Right-click any character, location, or codex entry file and choose "Show in StoryLine" to jump straight to its detail panel. Also available via the command palette.
 
-- **Codex Linking** — Link Codex entries (Items, Factions, custom categories) directly to scenes. Enable categories for the Inspector via Codex → Manage Categories → Inspector checkbox. Entries appear as tag-pill inputs with autocomplete. Right-click detected links to assign them to a Codex category. Plot Grid sync now includes Codex categories as column sources.
+- **Formatting toolbar toggle** — The Manuscript view now respects the toolbar setting, letting you hide the formatting bar if you prefer a cleaner editor.
 
-- **Bug fixes** — Act reassignment now moves scene files to the correct subfolder. Board resequencing numbers within each act. Timeline drag-and-drop, auto-scroll, and scroll-to-new-scene fixes.
+- **Corkboard fix** — Scene cards in Corkboard view now display properly after being filled out.
 
 ---
 

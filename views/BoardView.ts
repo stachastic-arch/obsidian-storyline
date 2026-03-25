@@ -574,8 +574,8 @@ export class BoardView extends ItemView {
                 cardEl.addClass('selected');
             }
 
-            // Restore persisted height from layout data
-            if (pos.h && pos.h > 0) {
+            // Restore persisted height from layout data (only for note cards)
+            if (pos.h && pos.h > 0 && this.isCorkboardNoteScene(scene)) {
                 cardEl.style.height = `${pos.h}px`;
             }
 

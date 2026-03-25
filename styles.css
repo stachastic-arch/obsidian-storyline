@@ -814,6 +814,7 @@ body.theme-dark {
 
 .story-line-corkboard-card {
     box-shadow: var(--sl-shadow-sm);
+    contain: none;
 }
 
 .story-line-corkboard-note-card .scene-card-meta,

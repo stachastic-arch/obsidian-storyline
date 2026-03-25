@@ -1351,6 +1351,22 @@ export class LocationView extends ItemView {
 
     // ── Refresh ────────────────────────────────────────
 
+    /**
+     * Navigate directly to a location/world detail view by file path.
+     */
+    async navigateToItem(filePath: string): Promise<void> {
+        await this.locationManager.loadAll(this.sceneManager.getLocationFolder());
+        const item = this.locationManager.getItem(filePath);
+        if (!item) {
+            new Notice('Location not found in the active project.');
+            return;
+        }
+        this.selectedItem = filePath;
+        if (this.rootContainer) {
+            this.renderView(this.rootContainer);
+        }
+    }
+
     async refresh(): Promise<void> {
         if (
             this.selectedItem &&

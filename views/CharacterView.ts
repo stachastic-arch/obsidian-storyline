@@ -2421,6 +2421,24 @@ export class CharacterView extends ItemView {
     }
 
     /**
+     * Navigate directly to a character's detail view by file path.
+     * Called from the command palette / file-menu when the user wants to
+     * jump from the character's freeform note back to the details panel.
+     */
+    async navigateToCharacter(filePath: string): Promise<void> {
+        await this.characterManager.loadCharacters(this.sceneManager.getCharacterFolder());
+        const char = this.characterManager.getCharacter(filePath);
+        if (!char) {
+            new Notice('Character not found in the active project.');
+            return;
+        }
+        this.selectedCharacter = filePath;
+        if (this.rootContainer) {
+            this.renderView(this.rootContainer);
+        }
+    }
+
+    /**
      * Public refresh called by the plugin on file changes.
      * If we are in detail-editing mode and the refresh was triggered by our own
      * save (within the grace window), skip the re-render to avoid stealing focus.

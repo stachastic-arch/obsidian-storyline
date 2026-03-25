@@ -207,9 +207,11 @@ export class ManuscriptView extends ItemView {
         }
 
         // Formatting toolbar (hidden until an editor is focused)
-        this.fmtToolbar = container.createDiv('sl-fmt-toolbar');
-        this.fmtToolbar.style.display = 'none';
-        this.buildFormattingToolbar(this.fmtToolbar);
+        if (this.plugin.settings.showFormattingToolbar) {
+            this.fmtToolbar = container.createDiv('sl-fmt-toolbar');
+            this.fmtToolbar.style.display = 'none';
+            this.buildFormattingToolbar(this.fmtToolbar);
+        }
 
         // Manuscript scroll area
         this.scrollArea = container.createDiv('sl-manuscript-scroll');

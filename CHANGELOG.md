@@ -2,6 +2,20 @@
 
 ---
 
+## Version 1.8.5
+
+### New Features
+
+- **Show in StoryLine** — Right-click any character, location, or codex entry file (in the file explorer, tab header, or editor) and choose **Show in StoryLine** to jump directly to its detail panel. Also available in the command palette (`Ctrl+P` → "Show in StoryLine"). The command auto-detects whether the file is a character, location, or codex entry and opens the correct view.
+
+- **Formatting Toolbar Toggle** — The formatting toolbar in the Manuscript view now respects the **Formatting toolbar** toggle in Settings. Previously the Manuscript view always showed the toolbar regardless of the setting.
+
+### Bug Fixes
+
+- **Corkboard scene card display** — Scene cards in Corkboard view now expand to fit their content (title, conflict, characters, etc.) after being filled out. Previously, cards could appear clipped because CSS containment prevented them from growing, and persisted sticky-note heights were incorrectly applied to regular scene cards.
+
+---
+
 ## Version 1.8.4
 
 ### New Features

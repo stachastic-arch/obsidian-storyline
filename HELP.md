@@ -1,6 +1,6 @@
 # StoryLine — Obsidian Plugin for Writers
 
-**Version 1.8.4** · By Jan Sandström
+**Version 1.8.5** · By Jan Sandström
 
 StoryLine transforms your Obsidian vault into a full-featured book planning and writing tool. Organize scenes, build rich character profiles, manage worlds and locations, track plotlines, and monitor your progress — all without leaving Obsidian. Fully theme-aware with dark and light mode support.
 
@@ -237,6 +237,7 @@ A dedicated character management system with rich profiles. Characters are acces
 - **Image picker** — choose to import an image from your computer (saved into `<Project>/Images/`), pick an existing vault image, or remove the current image.
 - All fields show grey **placeholder text** that disappears when you type.
 - **Auto-save** — changes are saved automatically after a short delay (no manual save needed).
+- **Show in StoryLine** — when editing a character’s markdown file in a regular Obsidian tab, right-click and choose **Show in StoryLine** (or use the command palette) to jump back to the character’s detail panel. This also works for location and codex entry files.
 - **Side panel** shows:
   - Scene count, word count, and POV scene count.
   - Intensity curve graph for scenes featuring this character.
@@ -1396,6 +1397,7 @@ Open **Settings → StoryLine** to configure:
 | Tag Color Overrides | Per-tag color overrides shown as compact chips | — |
 | Show Word Counts | Display word counts on cards | On |
 | Compact Card View | Smaller cards with less detail | Off |
+| Formatting Toolbar | Show/hide the formatting toolbar in scene editors and Manuscript view | On |
 | Plot Hole Detection | Enable the Validator engine | On |
 | Scene Templates | Custom scene templates for quick scene creation | — |
 | Additional Source Folders | Extra vault folders to scan for entities (experimental) | None |

@@ -476,6 +476,46 @@ export default class SceneCardsPlugin extends Plugin {
             })
         );
 
+        // "Show in StoryLine" — command palette + file-menu entry
+        // Detects whether the active file is a character, location, or codex entry
+        // and navigates to the appropriate detail panel.
+        this.addCommand({
+            id: 'show-entity-details',
+            name: 'Show in StoryLine',
+            checkCallback: (checking) => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return false;
+                if (!this.resolveEntityType(file.path)) return false;
+                if (!checking) this.showEntityDetails(file.path);
+                return true;
+            },
+        });
+
+        this.registerEvent(
+            this.app.workspace.on('file-menu', (menu, file) => {
+                if (!(file instanceof TFile)) return;
+                if (!this.resolveEntityType(file.path)) return;
+                menu.addItem((item) => {
+                    item.setTitle('Show in StoryLine')
+                        .setIcon('book-open')
+                        .onClick(() => this.showEntityDetails(file.path));
+                });
+            })
+        );
+
+        this.registerEvent(
+            this.app.workspace.on('editor-menu', (menu, _editor, info) => {
+                const file = info.file;
+                if (!file) return;
+                if (!this.resolveEntityType(file.path)) return;
+                menu.addItem((item) => {
+                    item.setTitle('Show in StoryLine')
+                        .setIcon('book-open')
+                        .onClick(() => this.showEntityDetails(file.path));
+                });
+            })
+        );
+
         // Inject formatting toolbar into scene editors when Editing Toolbar is absent
         this.registerEvent(
             this.app.workspace.on('active-leaf-change', (leaf) => {
@@ -1092,6 +1132,54 @@ export default class SceneCardsPlugin extends Plugin {
 
         if (leaf) {
             workspace.revealLeaf(leaf);
+        }
+    }
+
+    /**
+     * Determine what kind of StoryLine entity a file belongs to.
+     * Returns 'character' | 'location' | 'codex' | null.
+     */
+    private resolveEntityType(filePath: string): 'character' | 'location' | 'codex' | null {
+        const p = normalizePath(filePath);
+        const charFolder = normalizePath(this.sceneManager.getCharacterFolder());
+        if (p.startsWith(charFolder + '/') || p === charFolder) return 'character';
+        const locFolder = normalizePath(this.sceneManager.getLocationFolder());
+        if (p.startsWith(locFolder + '/') || p === locFolder) return 'location';
+        const codexFolder = normalizePath(this.sceneManager.getCodexFolder());
+        if (p.startsWith(codexFolder + '/') || p === codexFolder) return 'codex';
+        return null;
+    }
+
+    /**
+     * Open the appropriate StoryLine view and navigate to the entity's detail panel.
+     */
+    private async showEntityDetails(filePath: string): Promise<void> {
+        const kind = this.resolveEntityType(filePath);
+        switch (kind) {
+            case 'character': {
+                await this.activateView(CHARACTER_VIEW_TYPE);
+                const leaves = this.app.workspace.getLeavesOfType(CHARACTER_VIEW_TYPE);
+                if (leaves.length > 0) {
+                    await (leaves[0].view as CharacterView).navigateToCharacter(filePath);
+                }
+                break;
+            }
+            case 'location': {
+                await this.activateView(LOCATION_VIEW_TYPE);
+                const leaves = this.app.workspace.getLeavesOfType(LOCATION_VIEW_TYPE);
+                if (leaves.length > 0) {
+                    await (leaves[0].view as LocationView).navigateToItem(filePath);
+                }
+                break;
+            }
+            case 'codex': {
+                await this.activateView(CODEX_VIEW_TYPE);
+                const leaves = this.app.workspace.getLeavesOfType(CODEX_VIEW_TYPE);
+                if (leaves.length > 0) {
+                    await (leaves[0].view as CodexView).navigateToEntry(filePath);
+                }
+                break;
+            }
         }
     }
 

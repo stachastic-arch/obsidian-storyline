@@ -99,6 +99,28 @@ export class CodexView extends ItemView {
         if (this.rootContainer) this.renderView(this.rootContainer);
     }
 
+    /**
+     * Navigate directly to a codex entry's detail view by file path.
+     */
+    async navigateToEntry(filePath: string): Promise<void> {
+        const codexFolder = this.sceneManager.getCodexFolder();
+        this.codexManager.initCategories(
+            this.plugin.settings.codexEnabledCategories,
+            this.resolveCustomDefs(),
+        );
+        await this.codexManager.loadAll(codexFolder);
+        const entry = this.codexManager.getEntry(filePath);
+        if (!entry) {
+            new Notice('Codex entry not found in the active project.');
+            return;
+        }
+        this.activeCategory = entry.type;
+        this.selectedEntry = filePath;
+        if (this.rootContainer) {
+            this.renderView(this.rootContainer);
+        }
+    }
+
     /** Called by refreshOpenViews */
     async refresh(): Promise<void> {
         // Grace period — skip re-render if we just saved ourselves
