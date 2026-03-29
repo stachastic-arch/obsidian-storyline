@@ -80,10 +80,22 @@ export class ExportService {
     // ─── Helpers ───────────────────────────────────────────────
 
     private getSortedScenes(): Scene[] {
-        return this.sceneManager.getFilteredScenes(
+        const scenes = this.sceneManager.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
         );
+        scenes.sort((a, b) => {
+            if (a.act != null && b.act != null) {
+                const actCmp = Number(a.act) - Number(b.act);
+                if (actCmp !== 0) return actCmp;
+            }
+            if (a.chapter != null && b.chapter != null) {
+                const chCmp = Number(a.chapter) - Number(b.chapter);
+                if (chCmp !== 0) return chCmp;
+            }
+            return (a.sequence ?? 9999) - (b.sequence ?? 9999);
+        });
+        return scenes;
     }
 
     private timestamp(): string {

@@ -1,6 +1,12 @@
 # StoryLine — Changelog
 
+[![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.8.6
+
+### Bug Fix
+
+- **Export order** — Export was only sorting by sequence, which caused scenes from different acts to interleave. It now sorts by act → chapter → sequence, matching the same ordering logic that ManuscriptView already uses.
 
 ## Version 1.8.5
 
