@@ -80,19 +80,29 @@ export class ExportService {
     // ─── Helpers ───────────────────────────────────────────────
 
     private getSortedScenes(): Scene[] {
-        const scenes = this.sceneManager.getFilteredScenes(
+        // Spread into a new array so we don't mutate the memoized cache
+        const scenes = [...this.sceneManager.getFilteredScenes(
             undefined,
             { field: 'sequence', direction: 'asc' }
-        );
+        )];
         scenes.sort((a, b) => {
-            if (a.act != null && b.act != null) {
-                const actCmp = Number(a.act) - Number(b.act);
-                if (actCmp !== 0) return actCmp;
-            }
-            if (a.chapter != null && b.chapter != null) {
-                const chCmp = Number(a.chapter) - Number(b.chapter);
-                if (chCmp !== 0) return chCmp;
-            }
+            // Primary: act (scenes without act sort after those with one)
+            const aAct = a.act != null ? Number(a.act) : NaN;
+            const bAct = b.act != null ? Number(b.act) : NaN;
+            const aHasAct = !isNaN(aAct);
+            const bHasAct = !isNaN(bAct);
+            if (aHasAct !== bHasAct) return aHasAct ? -1 : 1;
+            if (aHasAct && bHasAct && aAct !== bAct) return aAct - bAct;
+
+            // Secondary: chapter
+            const aCh = a.chapter != null ? Number(a.chapter) : NaN;
+            const bCh = b.chapter != null ? Number(b.chapter) : NaN;
+            const aHasCh = !isNaN(aCh);
+            const bHasCh = !isNaN(bCh);
+            if (aHasCh !== bHasCh) return aHasCh ? -1 : 1;
+            if (aHasCh && bHasCh && aCh !== bCh) return aCh - bCh;
+
+            // Tertiary: sequence
             return (a.sequence ?? 9999) - (b.sequence ?? 9999);
         });
         return scenes;
