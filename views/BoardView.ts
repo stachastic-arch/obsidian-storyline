@@ -523,6 +523,7 @@ export class BoardView extends ItemView {
         this.attachCorkboardImageDrop(viewport);
 
         scenes.forEach((scene, index) => {
+          try {
             const existing = this.corkboardPositions.get(scene.filePath);
             const col = index % 4;
             const row = Math.floor(index / 4);
@@ -582,6 +583,9 @@ export class BoardView extends ItemView {
             this.attachCorkboardNoteEditor(cardEl, scene);
 
             this.attachCorkboardDrag(node, scene.filePath);
+          } catch (err) {
+            console.error(`[StoryLine] Failed to render corkboard scene "${scene.filePath}":`, err);
+          }
         });
     }
 

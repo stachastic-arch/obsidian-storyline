@@ -2,6 +2,20 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.8.8
+
+### Bug Fixes
+
+- **Plot Grid scroll reset** — Changing a scene name, finishing a drag, or editing any attribute in the Plot Grid no longer resets the view to the top. Scroll position is now preserved across re-renders.
+
+- **Corkboard rendering resilience** — If a single scene's data causes an error during corkboard rendering, the remaining scenes now still display instead of the entire board silently failing. Errors are logged to the console for diagnosis.
+
+### New Feature
+
+- **Timeline drag-scroll settings** — Two new settings under **Settings → Timeline Drag-Scroll** let you control the auto-scroll behavior when dragging scenes near the viewport edge: **Scroll speed** (1–30 px/frame, default 8) and **Scroll zone** (20–200 px from edge, default 60).
+
+---
+
 ## Version 1.8.7
 
 ### Bug Fix

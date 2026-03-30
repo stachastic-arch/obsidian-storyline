@@ -540,6 +540,10 @@ export class PlotgridView extends ItemView {
     private renderGrid() {
         if (!this.canvasEl || !this.scrollAreaEl) return;
 
+        // Preserve scroll position across re-renders so the view doesn't jump
+        const prevScrollTop = this.scrollAreaEl.scrollTop;
+        const prevScrollLeft = this.scrollAreaEl.scrollLeft;
+
         this.ensureDefaults();
         this.canvasEl.empty();
 
@@ -1341,9 +1345,15 @@ export class PlotgridView extends ItemView {
 
         // reapply selection visuals after render
         this.applySelectionVisuals();
-    }
 
-    /** Full refresh called by the plugin when projects/files change */
+        // Restore scroll position after DOM rebuild
+        requestAnimationFrame(() => {
+            if (this.scrollAreaEl) {
+                this.scrollAreaEl.scrollTop = prevScrollTop;
+                this.scrollAreaEl.scrollLeft = prevScrollLeft;
+            }
+        });
+    }
     async refresh(): Promise<void> {
         try {
             // If a save is pending, skip reloading from disk (would overwrite in-memory changes)

@@ -320,8 +320,8 @@ export class TimelineView extends ItemView {
         let lastDragClientY = 0;
 
         // Auto-scroll when dragging near viewport edges
-        const AUTO_SCROLL_ZONE = 60; // px from edge
-        const AUTO_SCROLL_SPEED = 8; // px per frame
+        const AUTO_SCROLL_ZONE = this.plugin.settings.timelineDragScrollZone ?? 60; // px from edge
+        const AUTO_SCROLL_SPEED = this.plugin.settings.timelineDragScrollSpeed ?? 8; // px per frame
         const startAutoScroll = (clientY: number) => {
             lastDragClientY = clientY;
             if (autoScrollRAF) return; // already running

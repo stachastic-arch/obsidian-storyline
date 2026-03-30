@@ -630,6 +630,11 @@ export interface SceneCardsSettings {
     focusDarkenAmount: number;
     /** Focus mode: blur radius in px for everything outside the text area (0–20) */
     focusBlurAmount: number;
+
+    /** Timeline drag-scroll: pixels per animation frame when auto-scrolling (1–30) */
+    timelineDragScrollSpeed: number;
+    /** Timeline drag-scroll: pixel zone from viewport edge that triggers scrolling (20–200) */
+    timelineDragScrollZone: number;
 }
 
 /**
@@ -712,6 +717,9 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
 
     focusDarkenAmount: 40,
     focusBlurAmount: 1,
+
+    timelineDragScrollSpeed: 8,
+    timelineDragScrollZone: 60,
 };
 
 /**
@@ -1143,6 +1151,38 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             this.plugin.refreshOpenViews();
             this.display();
         });
+
+        // ── Timeline Drag-Scroll Settings (collapsible) ──
+        const tlDetails = containerEl.createEl('details', { cls: 'story-line-timeline-scroll-section' });
+        tlDetails.createEl('summary', { text: 'Timeline Drag-Scroll' });
+        const tlBody = tlDetails.createDiv();
+        tlBody.style.padding = '8px 0';
+
+        new Setting(tlBody)
+            .setName('Scroll speed')
+            .setDesc('Pixels scrolled per animation frame while dragging near the edge (1–30).')
+            .addSlider(slider => slider
+                .setLimits(1, 30, 1)
+                .setValue(this.plugin.settings.timelineDragScrollSpeed)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.timelineDragScrollSpeed = value;
+                    await this.plugin.saveSettings();
+                })
+            );
+
+        new Setting(tlBody)
+            .setName('Scroll zone')
+            .setDesc('Pixel distance from the viewport edge where drag-scrolling activates (20–200).')
+            .addSlider(slider => slider
+                .setLimits(20, 200, 10)
+                .setValue(this.plugin.settings.timelineDragScrollZone)
+                .setDynamicTooltip()
+                .onChange(async (value) => {
+                    this.plugin.settings.timelineDragScrollZone = value;
+                    await this.plugin.saveSettings();
+                })
+            );
 
         // ═══════════════════════════════════════════
         //  Colors
