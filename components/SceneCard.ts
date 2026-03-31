@@ -383,8 +383,9 @@ export class SceneCardComponent {
 
     private formatSequence(scene: Scene): string {
         const act = scene.act !== undefined ? String(scene.act).padStart(2, '0') : '??';
+        const chapter = scene.chapter !== undefined ? String(scene.chapter).padStart(2, '0') : null;
         const seq = scene.sequence !== undefined ? String(scene.sequence).padStart(2, '0') : '??';
-        return `${act}-${seq}`;
+        return chapter ? `${act}-${chapter}-${seq}` : `${act}-${seq}`;
     }
 
     /**

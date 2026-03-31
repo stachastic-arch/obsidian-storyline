@@ -2,6 +2,16 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.8.9
+
+### Bug Fixes
+
+- **Corkboard empty on first open (iPad)** — Opening the Corkboard for the first time on iPad no longer shows an empty board. Scene cards now appear immediately without needing to switch to another view and back. The root cause was a race condition where the scene index was not re-initialized after the active project was set during startup.
+
+- **Scene card order badge now includes chapter** — The sequence badge on scene cards now displays the full Act-Chapter-Scene ordering (e.g. `01-02-03`) when a chapter number is assigned. Previously only Act-Scene was shown, omitting the chapter. Scenes without a chapter still display as before (e.g. `01-03`).
+
+---
+
 ## Version 1.8.8
 
 ### Bug Fixes
