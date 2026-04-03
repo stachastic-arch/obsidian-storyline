@@ -30,7 +30,7 @@ export interface CodexEntry {
     /** User-defined custom fields */
     custom?: Record<string, string>;
     /** Universal field template values (keyed by template id) */
-    universalFields?: Record<string, string>;
+    universalFields?: Record<string, string | string[]>;
 
     // ── Series-ready fields ────────────────────────
     /** Which books (project titles) this entry appears in — for future series sharing */

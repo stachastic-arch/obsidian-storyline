@@ -23,6 +23,7 @@ export class AddFieldModal extends Modal {
     private section = '';
     private placeholder = '';
     private options: string[] = [];
+    private folderSource = '';
 
     /**
      * @param app            Obsidian App
@@ -53,6 +54,7 @@ export class AddFieldModal extends Modal {
             this.section = existing.section;
             this.placeholder = existing.placeholder;
             this.options = [...existing.options];
+            this.folderSource = existing.folderSource ?? '';
         } else {
             this.section = defaultSection;
         }
@@ -99,17 +101,23 @@ export class AddFieldModal extends Modal {
 
         // ── Type ──
         let optionsContainer: HTMLElement | null = null;
+        let folderSourceContainer: HTMLElement | null = null;
         new Setting(contentEl)
             .setName('Input type')
             .addDropdown(dd => {
                 dd.addOption('text', 'Text (single line)');
                 dd.addOption('textarea', 'Text block (multi-line)');
                 dd.addOption('dropdown', 'Dropdown menu');
+                dd.addOption('multi-select', 'Multi-select (tags)');
                 dd.setValue(this.type);
                 dd.onChange(v => {
                     this.type = v as UniversalFieldType;
+                    const showOpts = this.type === 'dropdown' || this.type === 'multi-select';
                     if (optionsContainer) {
-                        optionsContainer.style.display = this.type === 'dropdown' ? '' : 'none';
+                        optionsContainer.style.display = showOpts ? '' : 'none';
+                    }
+                    if (folderSourceContainer) {
+                        folderSourceContainer.style.display = this.type === 'multi-select' ? '' : 'none';
                     }
                 });
             });
@@ -126,7 +134,7 @@ export class AddFieldModal extends Modal {
 
         // ── Dropdown options ──
         optionsContainer = contentEl.createDiv('storyline-field-options-container');
-        if (this.type !== 'dropdown') optionsContainer.style.display = 'none';
+        if (this.type !== 'dropdown' && this.type !== 'multi-select') optionsContainer.style.display = 'none';
 
         const optionsLabel = optionsContainer.createEl('div', {
             cls: 'setting-item-name',
@@ -174,6 +182,18 @@ export class AddFieldModal extends Modal {
             if (inputs.length) (inputs[inputs.length - 1] as HTMLInputElement).focus();
         });
 
+        // ── Folder source (multi-select only) ──
+        folderSourceContainer = contentEl.createDiv('storyline-field-folder-source-container');
+        if (this.type !== 'multi-select') folderSourceContainer.style.display = 'none';
+        new Setting(folderSourceContainer)
+            .setName('Folder source (optional)')
+            .setDesc('Vault folder path whose note names become selectable options (e.g. Traits/)')
+            .addText(text => {
+                text.setPlaceholder('e.g. World/Traits')
+                    .setValue(this.folderSource)
+                    .onChange(v => { this.folderSource = v.trim(); });
+            });
+
         // ── Action buttons ──
         const footer = contentEl.createDiv('storyline-add-field-footer');
 
@@ -217,7 +237,8 @@ export class AddFieldModal extends Modal {
                 section: this.section || CHARACTER_CATEGORIES[0].title,
                 category: this.existing?.category,
                 type: this.type,
-                options: this.type === 'dropdown' ? cleanOptions : [],
+                options: (this.type === 'dropdown' || this.type === 'multi-select') ? cleanOptions : [],
+                folderSource: this.type === 'multi-select' && this.folderSource ? this.folderSource : undefined,
                 placeholder: this.placeholder,
                 order: this.existing?.order ?? Date.now(),
             };

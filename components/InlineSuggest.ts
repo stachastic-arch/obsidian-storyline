@@ -22,6 +22,8 @@ export interface InlineSuggestOptions {
     newLabel?: (query: string) => string;
     /** Maximum visible suggestions (default: 8) */
     maxVisible?: number;
+    /** Optional mapping from value to display label (e.g., "Hallway" → "Bank > Hallway") */
+    getDisplayLabel?: (value: string) => string;
     /** Minimum characters before showing suggestions (default: 0) */
     minChars?: number;
 }
@@ -62,6 +64,7 @@ export class InlineSuggest {
     private newLabel: (query: string) => string;
     private maxVisible: number;
     private minChars: number;
+    private getDisplayLabel?: (value: string) => string;
 
     constructor(opts: InlineSuggestOptions) {
         this.inputEl = opts.inputEl;
@@ -72,6 +75,7 @@ export class InlineSuggest {
         this.newLabel = opts.newLabel ?? ((q) => `Add "${q}"`);
         this.maxVisible = opts.maxVisible ?? 8;
         this.minChars = opts.minChars ?? 0;
+        this.getDisplayLabel = opts.getDisplayLabel;
 
         if (opts.placeholder) this.inputEl.placeholder = opts.placeholder;
 
@@ -164,7 +168,11 @@ export class InlineSuggest {
         } else {
             scored = [];
             for (const name of all) {
-                const s = fuzzyScore(query, name);
+                // Match against both the value and the display label
+                let s = fuzzyScore(query, name);
+                if (s < 0 && this.getDisplayLabel) {
+                    s = fuzzyScore(query, this.getDisplayLabel(name));
+                }
                 if (s >= 0) scored.push({ name, score: s });
             }
             scored.sort((a, b) => a.score - b.score);
@@ -189,8 +197,9 @@ export class InlineSuggest {
 
         for (let i = 0; i < visible.length; i++) {
             const item = this.dropdown.createDiv('sl-suggest-item');
-            // Highlight matched characters
-            this.renderHighlighted(item, visible[i].name, query);
+            // Highlight matched characters (use display label if available)
+            const displayText = this.getDisplayLabel ? this.getDisplayLabel(visible[i].name) : visible[i].name;
+            this.renderHighlighted(item, displayText, query);
             item.addEventListener('mousedown', (e) => {
                 e.preventDefault(); // prevent blur
             });
@@ -246,13 +255,23 @@ export class InlineSuggest {
         this.dropdown = document.createElement('div');
         this.dropdown.className = 'sl-suggest-dropdown';
 
-        // Position below the input
+        // Position below the input, clamped to viewport
         const rect = this.inputEl.getBoundingClientRect();
+        const dropdownMaxH = 240;
+        const spaceBelow = window.innerHeight - rect.bottom - 4;
+        const spaceAbove = rect.top - 4;
+        const showAbove = spaceBelow < 120 && spaceAbove > spaceBelow;
         this.dropdown.style.position = 'fixed';
         this.dropdown.style.left = `${rect.left}px`;
-        this.dropdown.style.top = `${rect.bottom + 2}px`;
         this.dropdown.style.width = `${Math.max(rect.width, 200)}px`;
         this.dropdown.style.zIndex = '10000';
+        if (showAbove) {
+            this.dropdown.style.bottom = `${window.innerHeight - rect.top + 2}px`;
+            this.dropdown.style.maxHeight = `${Math.min(spaceAbove, dropdownMaxH)}px`;
+        } else {
+            this.dropdown.style.top = `${rect.bottom + 2}px`;
+            this.dropdown.style.maxHeight = `${Math.min(spaceBelow, dropdownMaxH)}px`;
+        }
 
         document.body.appendChild(this.dropdown);
     }
@@ -428,10 +447,12 @@ export interface AutocompleteInputOptions {
     placeholder?: string;
     /** Allow empty / "None" (default: true) */
     allowEmpty?: boolean;
+    /** Optional mapping from value to display label (e.g., "Hallway" → "Bank > Hallway") */
+    getDisplayLabel?: (value: string) => string;
 }
 
 export function renderAutocompleteInput(opts: AutocompleteInputOptions): { refresh: (value: string) => void } {
-    const { container, getSuggestions, onChange, placeholder } = opts;
+    const { container, getSuggestions, onChange, placeholder, getDisplayLabel } = opts;
     let currentValue = opts.value;
     const allowEmpty = opts.allowEmpty ?? true;
     let activeSuggest: InlineSuggest | null = null;
@@ -495,6 +516,7 @@ export function renderAutocompleteInput(opts: AutocompleteInputOptions): { refre
             },
             placeholder: placeholder ?? 'Type to search…',
             allowNew: true,
+            getDisplayLabel,
         });
 
         if (autoFocus) {

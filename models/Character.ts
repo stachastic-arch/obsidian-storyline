@@ -166,7 +166,7 @@ export interface Character {
     /** User-defined custom fields */
     custom?: Record<string, string>;
     /** Universal field values keyed by template ID (from field-templates.json) */
-    universalFields?: Record<string, string>;
+    universalFields?: Record<string, string | string[]>;
 
     // ── Meta ───────────────────────────────────────────
     /** Created date */

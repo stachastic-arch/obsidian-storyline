@@ -8,7 +8,7 @@ import { App, normalizePath } from 'obsidian';
 // ═══════════════════════════════════════════════════════
 
 /** Type of input control for a universal field */
-export type UniversalFieldType = 'text' | 'textarea' | 'dropdown';
+export type UniversalFieldType = 'text' | 'textarea' | 'dropdown' | 'multi-select';
 
 /** A single universal field template definition */
 export interface UniversalFieldTemplate {
@@ -22,8 +22,10 @@ export interface UniversalFieldTemplate {
     category?: string;
     /** Input type */
     type: UniversalFieldType;
-    /** Dropdown options (only used when type === 'dropdown') */
+    /** Dropdown options (used when type === 'dropdown' or 'multi-select') */
     options: string[];
+    /** Optional vault folder path whose note names are used as selectable options */
+    folderSource?: string;
     /** Placeholder / hint text */
     placeholder: string;
     /** Sort order within the section (higher = further down, default 0) */
@@ -133,6 +135,7 @@ export class FieldTemplateService {
                     category: f.category,
                     type: f.type ?? 'text',
                     options: Array.isArray(f.options) ? f.options : [],
+                    folderSource: f.folderSource,
                     placeholder: f.placeholder ?? '',
                     order: typeof f.order === 'number' ? f.order : 0,
                 }));

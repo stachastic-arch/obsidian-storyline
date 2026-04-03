@@ -2,6 +2,29 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.0
+
+### Bug Fixes
+
+- **Location hierarchy in dropdowns** — Location autocomplete fields (Inspector, Quick Add) now display locations with their parent as "Parent > Child" while still storing the plain name. Makes it easy to distinguish identically-named locations in different regions.
+
+- **Dropdown positioning** — Autocomplete dropdowns no longer overflow below the viewport. When there isn't enough space underneath, the dropdown now appears above the input field instead.
+
+- **Resequencing across acts** — The Resequence button now applies global continuous numbering sorted by act → sequence, and keeps the chapter field in sync. Dragging cards between acts also updates both sequence and chapter correctly.
+
+- **Plot Grid sort order** — The sort dropdown in the Plot Grid filter bar now actually controls the row display order. Previously the selected sort was ignored during rendering.
+
+- **Views not re-rendering after rapid changes** — A second file change arriving while a refresh was already queued could be silently dropped. Board, Timeline, and Plotlines views now use `cancelAnimationFrame` coalescing so every change is rendered.
+
+### New Features
+
+- **Switch Project command** — A new command palette entry "Open/Switch StoryLine Project" (`Ctrl+P` → "Switch Project") lets you quickly jump between projects.
+
+- **Plotlines refresh button** — The Plotlines toolbar now includes a manual refresh button (↻) that forces a full re-render, useful after bulk edits.
+
+- **Multi-select field template type** — Universal field templates now support a "Multi-select (tags)" input type. Selected values display as removable pills. Options can be defined manually or sourced from a vault folder (note names become selectable items). Values are stored as a YAML list, making them queryable from Obsidian Bases.
+
+---
 ## Version 1.8.9
 
 ### Bug Fixes

@@ -197,7 +197,7 @@ Six export formats: Markdown, JSON, CSV, HTML, PDF, and DOCX. Export either an o
 - **Sticky Note Themes** — Six built-in sticky note color themes (Classic, Pastel, Earth, Jewel, Neon, Mono) with per-note overrides and HSL sliders.
 - **Plotline Subway Map** — Transit-style SVG visualization with gradient connectors, act dividers, scene labels, and drag-to-pan.
 - **Image Galleries** — Add up to 10 images per character or location with captions, carousel browsing, and a floating lightbox viewer.
-- **Custom Field Templates** — Define your own reusable fields for character and location profiles.
+- **Custom Field Templates** — Define your own reusable fields for character and location profiles. Supports text, textarea, dropdown, and **multi-select (tags)** input types. Multi-select fields can pull options from a vault folder.
 - **Autocomplete Inputs** — Character, location, and tag fields use smart autocomplete with tag-pill styling.
 - **Chapter Descriptions** — Add descriptions to acts and chapters via the Board view's right-click menu.
 - **Undo / Redo** — `Ctrl+Z` / `Ctrl+Shift+Z` with a 50-action stack.

@@ -1655,9 +1655,11 @@ export class TimelineView extends ItemView {
      */
     refresh(): void {
         if (!this.rootContainer) return;
-        const version = this.sceneManager.cacheVersion;
-        if (version === this._lastCacheVersion) return;
-        if (this._pendingRefresh) return;
+        // Coalesce rapid calls into a single rAF, but never skip —
+        // data may have changed again since the last queued render.
+        if (this._pendingRefresh) {
+            cancelAnimationFrame(this._pendingRefresh);
+        }
         this._pendingRefresh = requestAnimationFrame(() => {
             this._pendingRefresh = null;
             if (!this.rootContainer) return;

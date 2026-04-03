@@ -334,17 +334,20 @@ export class BoardView extends ItemView {
                     undefined,
                     { field: 'sequence', direction: 'asc' }
                 );
-                // Group by act and resequence within each act starting from 1
-                const byAct = new Map<number | string | undefined, Scene[]>();
-                for (const s of scenes) {
-                    const key = s.act;
-                    if (!byAct.has(key)) byAct.set(key, []);
-                    byAct.get(key)!.push(s);
-                }
-                for (const group of byAct.values()) {
-                    for (let i = 0; i < group.length; i++) {
-                        await this.sceneManager.updateScene(group[i].filePath, { sequence: i + 1 });
-                    }
+                // Sort by act → current sequence for stable ordering, then assign
+                // globally continuous sequence numbers (1..N across all acts).
+                // Also update chapter to match sequence for consistency.
+                const sorted = [...scenes].sort((a, b) => {
+                    const actA = typeof a.act === 'number' ? a.act : (a.act ? parseInt(String(a.act), 10) || 0 : 0);
+                    const actB = typeof b.act === 'number' ? b.act : (b.act ? parseInt(String(b.act), 10) || 0 : 0);
+                    if (actA !== actB) return actA - actB;
+                    return (a.sequence ?? 0) - (b.sequence ?? 0);
+                });
+                for (let i = 0; i < sorted.length; i++) {
+                    await this.sceneManager.updateScene(sorted[i].filePath, {
+                        sequence: i + 1,
+                        chapter: i + 1,
+                    });
                 }
                 await this.sceneManager.initialize();
                 this.refreshBoard();
@@ -1705,19 +1708,21 @@ export class BoardView extends ItemView {
             ? siblings.length
             : insertBefore ? targetIdx : targetIdx + 1;
 
-        // Assign sequences 1..N in the new order
+        // Assign sequences 1..N in the new order, and keep chapter in sync
         let seq = 1;
         for (let i = 0; i < siblings.length; i++) {
             if (i === insertIdx) {
                 updates.sequence = seq;
+                updates.chapter = seq;
                 seq++;
             }
-            await this.sceneManager.updateScene(siblings[i].filePath, { sequence: seq });
+            await this.sceneManager.updateScene(siblings[i].filePath, { sequence: seq, chapter: seq });
             seq++;
         }
         // Dragged scene goes at end if insertIdx === siblings.length
         if (updates.sequence === undefined) {
             updates.sequence = seq;
+            updates.chapter = seq;
         }
 
         await this.sceneManager.updateScene(draggedPath, updates);
@@ -1754,12 +1759,13 @@ export class BoardView extends ItemView {
             }
         }
 
-        // Update sequence to be at end of column
+        // Update sequence to be at end of column, and sync chapter
         const maxSeq = columnScenes.reduce(
             (max, s) => Math.max(max, s.sequence ?? 0),
             0
         );
         updates.sequence = maxSeq + 1;
+        updates.chapter = maxSeq + 1;
 
         await this.sceneManager.updateScene(filePath, updates);
         this.plugin.viewSnapshotService.scheduleAutoSave();
@@ -2888,9 +2894,7 @@ export class BoardView extends ItemView {
      */
     refresh(): void {
         if (!this.rootContainer) return;
-        const version = this.sceneManager.cacheVersion;
-        if (version === this._lastCacheVersion) return;
-        if (this._pendingRefresh) return;
+        if (this._pendingRefresh) { cancelAnimationFrame(this._pendingRefresh); }
         this._pendingRefresh = requestAnimationFrame(() => {
             this._pendingRefresh = null;
             if (!this.rootContainer) return;

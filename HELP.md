@@ -1296,7 +1296,25 @@ Define your own reusable fields for character and location profiles. If the buil
 4. The new field appears in every character or location detail editor under the **Custom Fields** section.
 5. Fill in values per character/location as needed — empty fields are hidden from exports.
 
-Custom field data is stored in the character or location's frontmatter under the `custom` key as key-value pairs.
+### Field Types
+
+| Type | Description |
+|------|-------------|
+| **Text** | Single-line text input. |
+| **Textarea** | Multi-line text block with auto-grow. |
+| **Dropdown** | Single-select dropdown with predefined options. |
+| **Multi-select (tags)** | Pick multiple values displayed as removable pills. |
+
+### Multi-select Fields
+
+The multi-select type is ideal for traits, themes, categories, or any field where multiple items apply:
+
+- **Manual options** — Define a list of options in the field template (same as dropdown).
+- **Folder source** — Optionally enter a vault folder path (e.g., `World/Traits`). All `.md` note names in that folder become selectable options, merged with any manual options.
+- **Free entry** — Type a custom value and press Enter to add it even if it's not in the predefined list.
+- **Storage** — Values are saved as a YAML list in frontmatter (`universalFields`), making them queryable from Obsidian Bases and Dataview.
+
+Custom field data is stored in the character or location's frontmatter under the `universalFields` key.
 
 ---
 

@@ -733,7 +733,7 @@ export class CodexView extends ItemView {
         draft: CodexEntry,
     ): void {
         if (!draft.universalFields) draft.universalFields = {};
-        const value = draft.universalFields[tpl.id] ?? '';
+        const value = (draft.universalFields[tpl.id] ?? '') as string;
 
         const row = parent.createDiv('codex-field-row codex-universal-field-row');
 
@@ -764,7 +764,89 @@ export class CodexView extends ItemView {
         });
 
         // Input control based on template type
-        if (tpl.type === 'dropdown') {
+        if (tpl.type === 'multi-select') {
+            const raw = draft.universalFields[tpl.id];
+            const selected: string[] = Array.isArray(raw) ? [...raw] : (typeof raw === 'string' && raw ? [raw] : []);
+
+            const allOptions = [...tpl.options];
+            if (tpl.folderSource) {
+                const folder = this.app.vault.getAbstractFileByPath(tpl.folderSource);
+                if (folder && 'children' in folder) {
+                    for (const child of (folder as obsidian.TFolder).children) {
+                        if (child instanceof obsidian.TFile && child.extension === 'md') {
+                            if (!allOptions.includes(child.basename)) allOptions.push(child.basename);
+                        }
+                    }
+                }
+            }
+            allOptions.sort((a, b) => a.localeCompare(b));
+
+            const msContainer = row.createDiv('universal-multi-select');
+            const pillsEl = msContainer.createDiv('universal-multi-pills');
+            const inputRow = msContainer.createDiv('universal-multi-input-row');
+            const msInput = inputRow.createEl('input', {
+                cls: 'universal-multi-input',
+                type: 'text',
+                attr: { placeholder: tpl.placeholder || 'Type to add\u2026' },
+            });
+            const msDropdown = inputRow.createDiv('universal-multi-dropdown');
+            msDropdown.style.display = 'none';
+
+            const renderPills = () => {
+                pillsEl.empty();
+                for (const item of selected) {
+                    const pill = pillsEl.createSpan({ cls: 'universal-multi-pill' });
+                    pill.createSpan({ text: item });
+                    const x = pill.createSpan({ cls: 'universal-multi-pill-x', text: '\u00d7' });
+                    x.addEventListener('click', () => {
+                        const idx = selected.indexOf(item);
+                        if (idx >= 0) selected.splice(idx, 1);
+                        draft.universalFields![tpl.id] = [...selected];
+                        this.scheduleSave(draft);
+                        renderPills();
+                    });
+                }
+            };
+            renderPills();
+
+            const updateMsDropdown = (filter: string) => {
+                msDropdown.empty();
+                const lf = filter.toLowerCase();
+                const available = allOptions.filter(o => !selected.includes(o) && o.toLowerCase().includes(lf));
+                if (available.length === 0) { msDropdown.style.display = 'none'; return; }
+                msDropdown.style.display = '';
+                for (const opt of available) {
+                    const item = msDropdown.createDiv({ cls: 'universal-multi-dropdown-item', text: opt });
+                    item.addEventListener('mousedown', (e) => {
+                        e.preventDefault();
+                        selected.push(opt);
+                        draft.universalFields![tpl.id] = [...selected];
+                        this.scheduleSave(draft);
+                        renderPills();
+                        msInput.value = '';
+                        updateMsDropdown('');
+                    });
+                }
+            };
+
+            msInput.addEventListener('focus', () => updateMsDropdown(msInput.value));
+            msInput.addEventListener('input', () => updateMsDropdown(msInput.value));
+            msInput.addEventListener('blur', () => { setTimeout(() => { msDropdown.style.display = 'none'; }, 200); });
+            msInput.addEventListener('keydown', (e: KeyboardEvent) => {
+                if (e.key === 'Enter' && msInput.value.trim()) {
+                    e.preventDefault();
+                    const val = msInput.value.trim();
+                    if (!selected.includes(val)) {
+                        selected.push(val);
+                        draft.universalFields![tpl.id] = [...selected];
+                        this.scheduleSave(draft);
+                        renderPills();
+                    }
+                    msInput.value = '';
+                    updateMsDropdown('');
+                }
+            });
+        } else if (tpl.type === 'dropdown') {
             const select = row.createEl('select', { cls: 'codex-field-input dropdown' });
             select.createEl('option', { text: tpl.placeholder || 'Select…', value: '' });
             for (const opt of tpl.options) {

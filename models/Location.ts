@@ -33,7 +33,7 @@ interface LocationBase {
     /** User-defined custom fields */
     custom?: Record<string, string>;
     /** Universal field values (keyed by template id) */
-    universalFields?: Record<string, string>;
+    universalFields?: Record<string, string | string[]>;
 }
 
 // ── World ──────────────────────────────────────────

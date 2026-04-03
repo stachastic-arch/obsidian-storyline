@@ -1,4 +1,4 @@
-import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon } from 'obsidian';
+import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon, FuzzySuggestModal } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
 import {
@@ -18,7 +18,7 @@ import {
 } from './constants';
 import { PlotgridView } from './views/PlotgridView';
 import type { PlotGridData } from './models/PlotGridData';
-import type { SeriesMetadata } from './models/StoryLineProject';
+import type { SeriesMetadata, StoryLineProject } from './models/StoryLineProject';
 import { BoardView } from './views/BoardView';
 import { TimelineView } from './views/TimelineView';
 import { StorylineView } from './views/StorylineView';
@@ -296,6 +296,24 @@ export default class SceneCardsPlugin extends Plugin {
             id: 'create-new-project',
             name: 'Create New StoryLine Project',
             callback: () => this.openNewProjectModal(),
+        });
+
+        this.addCommand({
+            id: 'switch-project',
+            name: 'Open/Switch StoryLine Project',
+            callback: () => {
+                const projects = this.sceneManager.getProjects();
+                if (projects.length <= 1) {
+                    new Notice(projects.length === 0 ? 'No projects found.' : 'Only one project exists.');
+                    return;
+                }
+                const modal = new ProjectSwitcherModal(this.app, projects, async (project) => {
+                    await this.sceneManager.setActiveProject(project);
+                    this.refreshOpenViews();
+                    new Notice(`Switched to "${project.title}"`);
+                });
+                modal.open();
+            },
         });
 
         this.addCommand({
@@ -2067,6 +2085,33 @@ export default class SceneCardsPlugin extends Plugin {
     openSeriesManagementModal(): void {
         const modal = new SeriesManagementModal(this.app, this);
         modal.open();
+    }
+}
+
+/**
+ * Fuzzy-search modal for quick project switching from the command palette.
+ */
+class ProjectSwitcherModal extends FuzzySuggestModal<StoryLineProject> {
+    private projects: StoryLineProject[];
+    private onChoose: (project: StoryLineProject) => void;
+
+    constructor(app: any, projects: StoryLineProject[], onChoose: (project: StoryLineProject) => void) {
+        super(app);
+        this.projects = projects;
+        this.onChoose = onChoose;
+        this.setPlaceholder('Switch to project…');
+    }
+
+    getItems(): StoryLineProject[] {
+        return this.projects;
+    }
+
+    getItemText(project: StoryLineProject): string {
+        return project.title + (project.seriesId ? ` [${project.seriesId}]` : '');
+    }
+
+    onChooseItem(project: StoryLineProject): void {
+        this.onChoose(project);
     }
 }
 

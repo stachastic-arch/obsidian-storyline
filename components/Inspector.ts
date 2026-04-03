@@ -371,6 +371,7 @@ export class InspectorComponent {
                 scene.location = val;
             },
             placeholder: 'Search locations…',
+            getDisplayLabel: this.getLocationDisplayLabel(),
         });
 
         // ── Dynamic Codex sections (categories with showInSidebar) ──
@@ -1093,6 +1094,16 @@ export class InspectorComponent {
         return Array.from(names.values()).sort((a, b) =>
             a.toLowerCase().localeCompare(b.toLowerCase())
         );
+    }
+
+    /**
+     * Build a display-label function for locations (e.g., "Parent > Child").
+     */
+    private getLocationDisplayLabel(): (value: string) => string {
+        const lm = this.plugin.locationManager;
+        if (!lm) return (v) => v;
+        const displayMap = lm.getDisplayNameMap();
+        return (value: string) => displayMap.get(value) || value;
     }
 }
 

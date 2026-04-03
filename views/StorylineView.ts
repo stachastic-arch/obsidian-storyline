@@ -156,6 +156,19 @@ export class StorylineView extends ItemView {
             });
         }
 
+        // Refresh button
+        const refreshBtn = controls.createEl('button', {
+            cls: 'clickable-icon',
+        });
+        const refreshIcon = refreshBtn.createSpan();
+        obsidian.setIcon(refreshIcon, 'refresh-cw');
+        attachTooltip(refreshBtn, 'Refresh plotlines');
+        refreshBtn.addEventListener('click', () => {
+            this._lastCacheVersion = -1;
+            this._lastRenderKey = '';
+            this.refresh();
+        });
+
         // View mode toggle (list vs subway)
         const viewToggle = controls.createDiv('storyline-view-toggle');
         const listBtn = viewToggle.createEl('button', {
@@ -1137,10 +1150,11 @@ export class StorylineView extends ItemView {
      */
     refresh(): void {
         if (!this.rootContainer) return;
-        // Skip if scene data hasn't changed (external refresh with no mutations)
-        const version = this.sceneManager.cacheVersion;
-        if (version === this._lastCacheVersion) return;
-        if (this._pendingRefresh) return;
+        // Coalesce rapid calls into a single rAF, but do NOT skip if
+        // a render is already queued — the data may have changed again.
+        if (this._pendingRefresh) {
+            cancelAnimationFrame(this._pendingRefresh);
+        }
         this._pendingRefresh = requestAnimationFrame(() => {
             this._pendingRefresh = null;
             if (this.rootContainer) {

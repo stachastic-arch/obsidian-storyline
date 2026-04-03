@@ -1001,11 +1001,11 @@ export class SceneManager implements ISceneStore {
     }
 
     /**
-     * Resequence scenes after drag-and-drop
+     * Resequence scenes after drag-and-drop (also syncs chapter field)
      */
     async resequenceScenes(orderedPaths: string[]): Promise<void> {
         for (let i = 0; i < orderedPaths.length; i++) {
-            await this.updateScene(orderedPaths[i], { sequence: i + 1 });
+            await this.updateScene(orderedPaths[i], { sequence: i + 1, chapter: i + 1 });
         }
     }
 

@@ -49,6 +49,7 @@ export class PlotgridView extends ItemView {
     private inspectorEl: HTMLElement | null = null;
     private filtersComponent: FiltersComponent | null = null;
     private currentFilter: SceneFilter = {};
+    private currentSort: SortConfig = { field: 'sequence', direction: 'asc' };
 
     constructor(leaf: WorkspaceLeaf, plugin?: SceneCardsPlugin) {
         super(leaf);
@@ -163,8 +164,9 @@ export class PlotgridView extends ItemView {
             this.filtersComponent = new FiltersComponent(
                 filterContainer,
                 filterSceneMgr,
-                (filter, _sort) => {
+                (filter, sort) => {
                     this.currentFilter = filter;
+                    if (sort) this.currentSort = sort;
                     this.renderGrid();
                 },
                 this.plugin
@@ -550,6 +552,7 @@ export class PlotgridView extends ItemView {
         let colTemplate = [ROW_HEADER_WIDTH + 'px', ...this.data.columns.map((c) => c.width + 'px')].join(' ');
 
         // ── Determine which rows are visible (filter support) ──
+        // Also build a sort-order index if the user changed the sort dropdown
         const sceneManager = this.plugin?.sceneManager as SceneManager | undefined;
         const activeProject = sceneManager?.activeProject;
         const hasFilter = this.currentFilter && Object.keys(this.currentFilter).some(
@@ -561,8 +564,32 @@ export class PlotgridView extends ItemView {
                 sceneManager.getFilteredScenes(this.currentFilter, undefined).map(s => s.filePath)
             );
         }
+
+        // Build a row display order based on current sort field
+        const rowIndices = this.data.rows.map((_, i) => i);
+        if (sceneManager && this.currentSort) {
+            const field = this.currentSort.field;
+            const dir = this.currentSort.direction === 'desc' ? -1 : 1;
+            rowIndices.sort((ai, bi) => {
+                const rowA = this.data.rows[ai];
+                const rowB = this.data.rows[bi];
+                const sceneA = rowA.sourceId ? sceneManager.getScene(rowA.sourceId) : null;
+                const sceneB = rowB.sourceId ? sceneManager.getScene(rowB.sourceId) : null;
+                if (!sceneA && !sceneB) return 0;
+                if (!sceneA) return 1;
+                if (!sceneB) return -1;
+                const valA = (sceneA as any)[field];
+                const valB = (sceneB as any)[field];
+                if (valA == null && valB == null) return 0;
+                if (valA == null) return 1;
+                if (valB == null) return -1;
+                if (typeof valA === 'number' && typeof valB === 'number') return (valA - valB) * dir;
+                return String(valA).localeCompare(String(valB)) * dir;
+            });
+        }
+
         const visibleRows = new Set<number>();
-        for (let ri = 0; ri < this.data.rows.length; ri++) {
+        for (const ri of rowIndices) {
             const row = this.data.rows[ri];
             if (!filteredPaths) { visibleRows.add(ri); continue; }
             // Manual rows always visible
@@ -575,7 +602,7 @@ export class PlotgridView extends ItemView {
         {
             let prevAct: string | number | undefined;
             let prevChapter: string | number | undefined;
-            for (let ri = 0; ri < this.data.rows.length; ri++) {
+            for (const ri of rowIndices) {
                 if (!visibleRows.has(ri)) continue;
                 const row = this.data.rows[ri];
                 if (row.sourceType !== 'auto' || !row.sourceId || !sceneManager) continue;
@@ -603,7 +630,7 @@ export class PlotgridView extends ItemView {
 
         // Build row template including divider rows (visible only)
         const rowHeightParts: string[] = [];
-        for (let ri = 0; ri < this.data.rows.length; ri++) {
+        for (const ri of rowIndices) {
             if (!visibleRows.has(ri)) continue;
             const divs = dividersBefore.get(ri);
             if (divs) for (const d of divs) rowHeightParts.push(d.type === 'act' ? '32px' : '26px');
@@ -771,7 +798,7 @@ export class PlotgridView extends ItemView {
             });
         }
 
-        for (let ri = 0; ri < this.data.rows.length; ri++) {
+        for (const ri of rowIndices) {
             if (!visibleRows.has(ri)) continue; // skip filtered-out rows
             // ── Act/chapter dividers ──
             const divs = dividersBefore.get(ri);

@@ -172,6 +172,22 @@ export class LocationManager {
         );
     }
 
+    /**
+     * Build a display-name map: plain location name → "Parent > Child" label.
+     * Only locations that have a parent get the hierarchical prefix.
+     */
+    getDisplayNameMap(): Map<string, string> {
+        const map = new Map<string, string>();
+        for (const loc of this.getAllLocations()) {
+            if (loc.parent) {
+                map.set(loc.name, `${loc.parent} > ${loc.name}`);
+            } else {
+                map.set(loc.name, loc.name);
+            }
+        }
+        return map;
+    }
+
     // ── Create ─────────────────────────────────────────
 
     async createWorld(folderPath: string, name: string): Promise<StoryWorld> {
