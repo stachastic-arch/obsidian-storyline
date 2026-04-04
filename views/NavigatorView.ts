@@ -1,7 +1,7 @@
 import { ItemView, WorkspaceLeaf, Menu, TFile, setIcon } from 'obsidian';
 import type SceneCardsPlugin from '../main';
 import { SceneManager } from '../services/SceneManager';
-import { Scene, SceneStatus, STATUS_CONFIG } from '../models/Scene';
+import { Scene, SceneStatus, STATUS_CONFIG, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import { NAVIGATOR_VIEW_TYPE, SCENE_INSPECTOR_VIEW_TYPE, MANUSCRIPT_VIEW_TYPE } from '../constants';
 import { ManuscriptView } from './ManuscriptView';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
@@ -11,10 +11,11 @@ import { SceneCardComponent } from '../components/SceneCard';
 /**
  * Sort modes available in the navigator.
  */
-type NavSortMode = 'sequence' | 'status' | 'recent' | 'words' | 'title';
+type NavSortMode = 'reading' | 'chronological' | 'status' | 'recent' | 'words' | 'title';
 
 const SORT_LABELS: Record<NavSortMode, string> = {
-    sequence: 'Book order',
+    reading: 'Reading order',
+    chronological: 'Chronological order',
     status: 'Status',
     recent: 'Recently edited',
     words: 'Word count',
@@ -22,7 +23,8 @@ const SORT_LABELS: Record<NavSortMode, string> = {
 };
 
 const SORT_ICONS: Record<NavSortMode, string> = {
-    sequence: 'list-ordered',
+    reading: 'book-open',
+    chronological: 'list-ordered',
     status: 'circle-dot',
     recent: 'clock',
     words: 'hash',
@@ -40,7 +42,7 @@ export class NavigatorView extends ItemView {
     private sceneManager: SceneManager;
 
     // State
-    private sortMode: NavSortMode = 'sequence';
+    private sortMode: NavSortMode = 'reading';
     private filterText = '';
     private plotlineFilter: string | null = null;
     private pinnedScenes: Set<string> = new Set();
@@ -281,8 +283,8 @@ export class NavigatorView extends ItemView {
             return;
         }
 
-        // Group by act if sorting by sequence
-        if (this.sortMode === 'sequence') {
+        // Group by act if sorting by reading or chronological order
+        if (this.sortMode === 'reading' || this.sortMode === 'chronological') {
             this.renderGroupedByAct(scenes);
         } else {
             for (const scene of scenes) {
@@ -343,7 +345,7 @@ export class NavigatorView extends ItemView {
 
         // Status dot
         const dot = row.createSpan('sl-nav-status-dot');
-        const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+        const statusCfg = resolveStatusCfg(scene.status || 'idea');
         dot.style.background = statusCfg.color;
         dot.setAttribute('aria-label', statusCfg.label);
 
@@ -433,10 +435,10 @@ export class NavigatorView extends ItemView {
             });
 
             // Status submenu
-            const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+            const statuses = getStatusOrder();
             for (const status of statuses) {
                 menu.addItem((item) => {
-                    const cfg = STATUS_CONFIG[status];
+                    const cfg = resolveStatusCfg(status);
                     item.setTitle(cfg.label);
                     item.setIcon(cfg.icon);
                     if (scene.status === status) item.setChecked(true);
@@ -458,10 +460,12 @@ export class NavigatorView extends ItemView {
 
         const sortFn = (a: Scene, b: Scene): number => {
             switch (this.sortMode) {
-                case 'sequence':
+                case 'reading':
+                    return (a.chapter ?? a.sequence ?? 9999) - (b.chapter ?? b.sequence ?? 9999);
+                case 'chronological':
                     return (a.sequence ?? 9999) - (b.sequence ?? 9999);
                 case 'status': {
-                    const order: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+                    const order = getStatusOrder();
                     return order.indexOf(a.status || 'idea') - order.indexOf(b.status || 'idea');
                 }
                 case 'recent': {

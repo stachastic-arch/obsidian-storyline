@@ -2,6 +2,25 @@
 
 [![Donate with PayPal](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate?hosted_button_id=A2N2LE7EUBL3A)
 ---
+## Version 1.9.1
+
+### Bug Fixes
+
+- **Tab title on project switch** — Switching projects now immediately updates the tab title. Previously the tab still showed the old project name until you changed views.
+
+- **Resequencing preserves existing order** — Dragging a card within the Board view no longer resets all sequence numbers in the column to 1..N. Existing sequence ranges are preserved and only the moved card is updated. The Resequence toolbar button and column-level drops also no longer overwrite the `chapter` field when grouping by status or other non-chapter fields.
+
+- **Plotgrid "Rename Row" now works** — The right-click "Rename Row" menu item in Plot Grid view now opens an inline text input instead of a browser prompt dialog, which was blocked by the drag-to-reorder system. Double-click editing also disables dragging during the edit so mouse text selection works properly. For rows linked to scenes, single-click opens the scene (with a short delay) and double-click enters edit mode without also opening the file.
+
+### New Features
+
+- **Custom statuses** — Define your own scene statuses (e.g. "Sent to Team", "Waiting", "Edited", "Pitched", "Published") in Settings → Scene Cards → Custom Statuses. Each custom status gets a label and color. Custom statuses appear in all status dropdowns, Board columns, filter chips, progress dots, and exports alongside the six built-in statuses. Existing projects are unaffected — the built-in statuses remain permanent and custom statuses are purely additive.
+
+- **Reading order vs chronological order** — Sort terminology is now consistent across all views. "Reading order" sorts by the `chapter` YAML field (the order scenes appear in the book). "Chronological order" sorts by `sequence` / `chronologicalOrder` (the order events happen in story time). The Navigator now offers both "Reading order" and "Chronological order" sort options (replacing the old "Book order"). The Timeline view's "Reading Order" toggle now correctly sorts by chapter. The Plotlines (Storyline) view sort is renamed to "Reading order (chapter #)".
+
+- **Beat Sheet Templates discoverability** — The "Add acts or chapters" button is now available in both Corkboard and Kanban modes (previously Kanban only), with an updated tooltip mentioning Beat Sheet Templates. When adding chapters, a new "Create an empty scene per chapter" toggle optionally creates placeholder scenes so new chapters are immediately visible in all views — not just Kanban. After adding chapters, a notice directs you to Board → Kanban → Group by Chapter. HELP.md updated with step-by-step instructions and a scene ordering terminology guide.
+
+---
 ## Version 1.9.0
 
 ### Bug Fixes

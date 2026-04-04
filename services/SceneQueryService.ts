@@ -1,4 +1,4 @@
-import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER } from '../models/Scene';
+import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER, getStatusOrder } from '../models/Scene';
 
 /**
  * Read-only interface for accessing the scene store.
@@ -298,8 +298,10 @@ export class SceneQueryService {
                 case 'title':
                     cmp = (a.title || '').localeCompare(b.title || '');
                     break;
-                case 'status':
-                    cmp = STATUS_ORDER.indexOf(a.status || 'idea') - STATUS_ORDER.indexOf(b.status || 'idea');
+                case 'status': {
+                    const statusOrder = getStatusOrder();
+                    cmp = statusOrder.indexOf(a.status || 'idea') - statusOrder.indexOf(b.status || 'idea');
+                }
                     break;
                 case 'act':
                     cmp = Number(a.act ?? 0) - Number(b.act ?? 0);

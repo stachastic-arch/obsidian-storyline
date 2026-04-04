@@ -1,5 +1,5 @@
 import { Modal, Setting, Notice } from 'obsidian';
-import { Scene, STATUS_ORDER, STATUS_CONFIG, SceneStatus } from '../models/Scene';
+import { Scene, STATUS_ORDER, STATUS_CONFIG, SceneStatus, getStatusOrder } from '../models/Scene';
 import type SceneCardsPlugin from '../main';
 
 // ────────────────────────────────────────────────────────
@@ -268,10 +268,11 @@ export class MergeSceneModal extends Modal {
         // Status
         const statuses = [...new Set(scenes.map(s => s.status).filter(Boolean))];
         if (statuses.length > 1) {
+            const statusOrder = getStatusOrder();
             const lowest = statuses.reduce((lo, s) => {
-                const iC = STATUS_ORDER.indexOf(s as any) ?? 99;
-                const iL = STATUS_ORDER.indexOf(lo as any) ?? 99;
-                return iC < iL ? s : lo;
+                const iC = statusOrder.indexOf(s as any);
+                const iL = statusOrder.indexOf(lo as any);
+                return (iC === -1 ? 99 : iC) < (iL === -1 ? 99 : iL) ? s : lo;
             });
             conflicts.push(`Status differs (${statuses.join(', ')}) → using lowest: "${lowest}"`);
         }

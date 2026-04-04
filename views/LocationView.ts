@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { Scene, STATUS_CONFIG } from '../models/Scene';
+import { Scene, STATUS_CONFIG, resolveStatusCfg } from '../models/Scene';
 import {
     StoryWorld, StoryLocation, WorldOrLocation,
     WORLD_CATEGORIES, LOCATION_CATEGORIES, LOCATION_TYPES,
@@ -1088,7 +1088,7 @@ export class LocationView extends ItemView {
                 item.createSpan({ cls: 'scene-id', text: `[${act}-${seq}]` });
                 item.createSpan({ cls: 'scene-title', text: ` ${scene.title}` });
 
-                const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+                const statusCfg = resolveStatusCfg(scene.status || 'idea');
                 const statusBadge = item.createSpan({
                     cls: 'scene-status-badge',
                     attr: { title: statusCfg.label },

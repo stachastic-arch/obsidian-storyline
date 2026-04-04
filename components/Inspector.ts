@@ -1,4 +1,4 @@
-import { Scene, STATUS_CONFIG, SceneStatus, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode, TIMELINE_MODES } from '../models/Scene';
+import { Scene, STATUS_CONFIG, SceneStatus, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode, TIMELINE_MODES, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
 import { Modal, App, FuzzySuggestModal } from 'obsidian';
 import * as obsidian from 'obsidian';
 import { openConfirmModal } from './ConfirmModal';
@@ -255,7 +255,7 @@ export class InspectorComponent {
         
         const statusDropdown = statusSection.createDiv('inspector-status-dropdown');
         const currentStatus = scene.status || 'idea';
-        const currentCfg = STATUS_CONFIG[currentStatus];
+        const currentCfg = resolveStatusCfg(currentStatus);
         
         const statusButton = statusDropdown.createEl('button', {
             cls: 'inspector-status-button',
@@ -269,9 +269,9 @@ export class InspectorComponent {
         const statusMenu = statusDropdown.createDiv('inspector-status-menu');
         statusMenu.style.display = 'none';
 
-        const statusValues: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+        const statusValues = getStatusOrder();
         statusValues.forEach(s => {
-            const cfg = STATUS_CONFIG[s];
+            const cfg = resolveStatusCfg(s);
             const item = statusMenu.createDiv({
                 cls: `inspector-status-item ${s === currentStatus ? 'active' : ''}`
             });

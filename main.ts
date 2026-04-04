@@ -1,6 +1,7 @@
 import { Plugin, TFile, WorkspaceLeaf, Notice, Modal, Setting, parseYaml, normalizePath, setIcon, FuzzySuggestModal } from 'obsidian';
 import { SceneCardsSettings, SceneCardsSettingTab, DEFAULT_SETTINGS } from './settings';
 import { SceneManager } from './services/SceneManager';
+import { registerCustomStatuses } from './models/Scene';
 import {
     BOARD_VIEW_TYPE,
     TIMELINE_VIEW_TYPE,
@@ -78,6 +79,7 @@ export default class SceneCardsPlugin extends Plugin {
 
     async onload(): Promise<void> {
         await this.loadSettings();
+        registerCustomStatuses(this.settings.customStatuses || []);
         this.applyImageSizingVariables();
 
         this.sceneManager = new SceneManager(this.app, this);
@@ -683,6 +685,7 @@ export default class SceneCardsPlugin extends Plugin {
 
     async saveSettings(): Promise<void> {
         this.applyImageSizingVariables();
+        registerCustomStatuses(this.settings.customStatuses || []);
         const toSave: Record<string, any> = { ...this.settings };
         if (this._systemMigrationDone) {
             // Strip per-project data from the global data.json payload
@@ -1465,6 +1468,8 @@ export default class SceneCardsPlugin extends Plugin {
                 if (view && 'refresh' in view && typeof (view as Record<string, unknown>).refresh === 'function') {
                     (view as unknown as { refresh(): void }).refresh();
                 }
+                // Update the tab title so it reflects the new project name immediately
+                (leaf as any).updateHeader?.();
             }
         }
     }

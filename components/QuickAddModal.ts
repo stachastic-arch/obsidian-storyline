@@ -1,5 +1,5 @@
 import { App, Modal, Setting, DropdownComponent, TextComponent, Notice } from 'obsidian';
-import { Scene, SceneStatus, SceneTemplate, BUILTIN_SCENE_TEMPLATES } from '../models/Scene';
+import { Scene, SceneStatus, SceneTemplate, BUILTIN_SCENE_TEMPLATES, getStatusOrder, getStatusConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { LocationManager } from '../services/LocationManager';
 import type SceneCardsPlugin from '../main';
@@ -205,8 +205,9 @@ export class QuickAddModal extends Modal {
         new Setting(contentEl)
             .setName('Status')
             .addDropdown(dropdown => {
-                const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
-                statuses.forEach(s => dropdown.addOption(s, s.charAt(0).toUpperCase() + s.slice(1)));
+                const statuses = getStatusOrder();
+                const cfg = getStatusConfig();
+                statuses.forEach(s => dropdown.addOption(s, cfg[s]?.label ?? (s.charAt(0).toUpperCase() + s.slice(1))));
                 dropdown.setValue(this.result.status || 'idea');
                 dropdown.onChange(value => this.result.status = value as SceneStatus);
             });

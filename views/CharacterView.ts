@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFile, Notice, Modal, Setting, requestUrl } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { Scene, STATUS_CONFIG } from '../models/Scene';
+import { Scene, STATUS_CONFIG, resolveStatusCfg } from '../models/Scene';
 import { Character, CharacterRelation, CharacterRelationCategory, CHARACTER_CATEGORIES, CHARACTER_ROLES, CharacterFieldDef, RELATION_CATEGORIES, RELATION_TYPES_BY_CATEGORY, extractCharacterProps, extractCharacterLocationTags, extractAllCharacterTags, normalizeCharacterRelations, TagType, computeReciprocalUpdates } from '../models/Character';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
@@ -1968,7 +1968,7 @@ export class CharacterView extends ItemView {
                     item.createSpan({ cls: 'character-pov-badge', text: 'POV' });
                 }
 
-                const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+                const statusCfg = resolveStatusCfg(scene.status || 'idea');
                 const statusBadge = item.createSpan({
                     cls: 'scene-status-badge',
                     attr: { title: statusCfg.label }

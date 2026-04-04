@@ -189,7 +189,7 @@ Track your story's plotlines (tags) across the narrative. Two view modes are ava
 #### Common Features
 - **Rename** or **delete** plotlines across all scenes at once.
 - Visualize plotline density and coverage.
-- Scenes default to **book order** (reading order). Toggle to sequence order from the toolbar.
+- Scenes default to **reading order** (chapter). Toggle to chronological order from the toolbar.
 
 ### Manuscript View
 
@@ -647,13 +647,24 @@ Apply proven story structure templates to quickly scaffold your acts:
 
 ### How to Use
 
-1. Open the **Structure** modal from the Board or Timeline toolbar.
-2. Select a **Beat Sheet Template** from the dropdown.
-3. Click **Apply** — StoryLine creates the acts and assigns beat labels automatically.
-4. **Act labels** appear on column headers (Board View) and timeline dividers (Timeline View).
-5. **Edit labels inline** by clicking the label text on any act divider.
+1. Open the **Structure** modal from the Board or Timeline toolbar (the columns icon).
+2. Select a **Beat Sheet Template** and click **Apply** — StoryLine creates the acts and assigns beat labels automatically.
+3. **Act labels** appear on column headers (Board View) and timeline dividers (Timeline View).
+4. **Edit labels inline** by clicking the label text on any act divider.
+5. To **add chapters**, use the "Add chapters" section in the same modal. Enter a range (e.g. "1-10") and click Add.
+6. **Seeing chapters**: After adding chapters, switch to Board View → **Kanban** mode → set "Group by" to **Chapter**. Chapters will appear as columns. Alternatively, enable the "Create an empty scene per chapter" toggle before adding — this creates a placeholder scene per chapter so they appear in all views immediately.
 
 Beat names are stored as `actLabels` on the project and persist across sessions.
+
+### Scene Ordering Terminology
+
+| Term | YAML field | Meaning |
+|------|-----------|---------|
+| **Reading order** | `chapter` | The order scenes appear in the book as the reader reads them. Chapter 1 comes before Chapter 2, etc. |
+| **Chronological order** | `sequence` (or `chronologicalOrder` if set) | The order events happen in story time. For non-linear narratives (flashbacks, parallel timelines), this may differ from reading order. |
+| **Scene #** | `sequence` | A unique number identifying each scene, used for file naming and default sorting. |
+
+In the Navigator, Timeline, and Plotlines views you can toggle between **Reading order** and **Chronological order** to see your scenes arranged either way.
 
 ---
 

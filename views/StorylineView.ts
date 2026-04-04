@@ -11,7 +11,7 @@ import { enableDragToPan } from '../components/DragToPan';
 import { resolveTagColor, getPlotlineHSL } from '../settings';
 import { attachTooltip } from '../components/Tooltip';
 
-type SortMode = 'alpha' | 'scenes-desc' | 'scenes-asc' | 'book-order';
+type SortMode = 'alpha' | 'scenes-desc' | 'scenes-asc' | 'reading-order';
 type PlotlineViewMode = 'list' | 'subway';
 
 /**
@@ -24,7 +24,7 @@ export class StorylineView extends ItemView {
     private sceneManager: SceneManager;
     private rootContainer: HTMLElement | null = null;
     private _pendingRefresh: number | null = null;
-    private sortMode: SortMode = 'book-order';
+    private sortMode: SortMode = 'reading-order';
     private plotlineViewMode: PlotlineViewMode = 'subway';
     /** Set of plotline tag names that are hidden in the subway view */
     private hiddenPlotlines: Set<string> = new Set();
@@ -102,8 +102,8 @@ export class StorylineView extends ItemView {
                     .onClick(() => { this.sortMode = 'scenes-asc'; this.refresh(); });
             });
             menu.addItem((item: any) => {
-                item.setTitle(`${this.sortMode === 'book-order' ? '✓ ' : ''}Book order (scene #)`)
-                    .onClick(() => { this.sortMode = 'book-order'; this.refresh(); });
+                item.setTitle(`${this.sortMode === 'reading-order' ? '✓ ' : ''}Reading order (chapter #)`)
+                    .onClick(() => { this.sortMode = 'reading-order'; this.refresh(); });
             });
             menu.showAtPosition({ x: e.clientX, y: e.clientY });
         });
@@ -213,13 +213,13 @@ export class StorylineView extends ItemView {
             plotlineKeys.sort((a, b) => (plotlines.get(b)?.length || 0) - (plotlines.get(a)?.length || 0));
         } else if (this.sortMode === 'scenes-asc') {
             plotlineKeys.sort((a, b) => (plotlines.get(a)?.length || 0) - (plotlines.get(b)?.length || 0));
-        } else if (this.sortMode === 'book-order') {
+        } else if (this.sortMode === 'reading-order') {
             plotlineKeys.sort((a, b) => {
                 const aScenes = plotlines.get(a) || [];
                 const bScenes = plotlines.get(b) || [];
-                const aSeq = aScenes.length > 0 ? Math.min(...aScenes.map(s => s.sequence ?? Infinity)) : Infinity;
-                const bSeq = bScenes.length > 0 ? Math.min(...bScenes.map(s => s.sequence ?? Infinity)) : Infinity;
-                return aSeq - bSeq;
+                const aChap = aScenes.length > 0 ? Math.min(...aScenes.map(s => Number(s.chapter ?? s.sequence ?? Infinity))) : Infinity;
+                const bChap = bScenes.length > 0 ? Math.min(...bScenes.map(s => Number(s.chapter ?? s.sequence ?? Infinity))) : Infinity;
+                return aChap - bChap;
             });
         }
 

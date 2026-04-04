@@ -1,7 +1,20 @@
 /**
- * Scene status progression
+ * Scene status progression.
+ * Built-in statuses are the canonical six plus any user-defined custom ones.
+ * The type is widened to `string` so custom statuses pass type checks.
  */
-export type SceneStatus = 'idea' | 'outlined' | 'draft' | 'written' | 'revised' | 'final';
+export type BuiltinSceneStatus = 'idea' | 'outlined' | 'draft' | 'written' | 'revised' | 'final';
+export type SceneStatus = BuiltinSceneStatus | (string & {});
+
+/**
+ * Custom status definition (user-created)
+ */
+export interface CustomStatusDef {
+    id: string;
+    label: string;
+    color: string;
+    icon: string;
+}
 
 /**
  * Color coding mode for scene cards
@@ -477,9 +490,10 @@ Additional thoughts, references, or reminders
 `;
 
 /**
- * Status display labels and colors
+ * Status display labels and colors — built-in statuses.
+ * Use getStatusConfig() and getStatusOrder() at runtime to include custom statuses.
  */
-export const STATUS_CONFIG: Record<SceneStatus, { label: string; color: string; icon: string }> = {
+export const BUILTIN_STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
     idea: { label: 'Idea', color: 'var(--sl-status-idea, #9E9E9E)', icon: 'lightbulb' },
     outlined: { label: 'Outlined', color: 'var(--sl-status-outlined, #2196F3)', icon: 'list' },
     draft: { label: 'Draft', color: 'var(--sl-status-draft, #FF9800)', icon: 'pencil' },
@@ -488,7 +502,47 @@ export const STATUS_CONFIG: Record<SceneStatus, { label: string; color: string; 
     final: { label: 'Final', color: 'var(--sl-status-final, #F44336)', icon: 'check-circle' },
 };
 
+/** @deprecated Use getStatusConfig() for dynamic access. Kept for backward compatibility. */
+export const STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = BUILTIN_STATUS_CONFIG;
+
 /**
- * Status order for sorting
+ * Built-in status order for sorting
  */
-export const STATUS_ORDER: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+export const BUILTIN_STATUS_ORDER: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+
+/** @deprecated Use getStatusOrder() for dynamic access. Kept for backward compatibility. */
+export const STATUS_ORDER: SceneStatus[] = BUILTIN_STATUS_ORDER;
+
+/**
+ * Default fallback config for unknown/custom statuses without explicit config.
+ */
+const DEFAULT_STATUS_CFG = { label: '?', color: '#888', icon: 'circle' };
+
+// ── Runtime custom-status registry ──
+// Populated by the plugin on startup / when settings change.
+let _customStatuses: CustomStatusDef[] = [];
+
+/** Register custom statuses (called from plugin settings load). */
+export function registerCustomStatuses(defs: CustomStatusDef[]): void {
+    _customStatuses = defs;
+}
+
+/** Get the full status config (built-in + custom). */
+export function getStatusConfig(): Record<string, { label: string; color: string; icon: string }> {
+    const merged: Record<string, { label: string; color: string; icon: string }> = { ...BUILTIN_STATUS_CONFIG };
+    for (const cs of _customStatuses) {
+        merged[cs.id] = { label: cs.label, color: cs.color, icon: cs.icon };
+    }
+    return merged;
+}
+
+/** Get the full status order (built-in + custom). */
+export function getStatusOrder(): SceneStatus[] {
+    return [...BUILTIN_STATUS_ORDER, ..._customStatuses.map(cs => cs.id)];
+}
+
+/** Safely resolve a status config entry, returning a fallback for unknown statuses. */
+export function resolveStatusCfg(status: string): { label: string; color: string; icon: string } {
+    const cfg = getStatusConfig();
+    return cfg[status] ?? { label: status.charAt(0).toUpperCase() + status.slice(1), color: DEFAULT_STATUS_CFG.color, icon: DEFAULT_STATUS_CFG.icon };
+}

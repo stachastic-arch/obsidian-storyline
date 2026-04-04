@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, TFile, Modal, Setting, Notice, Menu } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { Scene, SceneFilter, SortConfig, STATUS_CONFIG, SceneStatus, BUILTIN_BEAT_SHEETS, BeatSheetTemplate, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TIMELINE_MODES, TimelineMode } from '../models/Scene';
+import { Scene, SceneFilter, SortConfig, STATUS_CONFIG, SceneStatus, BUILTIN_BEAT_SHEETS, BeatSheetTemplate, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TIMELINE_MODES, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import { openConfirmModal } from '../components/ConfirmModal';
 import { SceneManager } from '../services/SceneManager';
 import { SceneCardComponent } from '../components/SceneCard';
@@ -242,7 +242,7 @@ export class TimelineView extends ItemView {
         if (existing) existing.remove();
 
         const timelineEl = container.createDiv('story-line-timeline');
-        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'sequence';
+        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
         const scenes = this.sceneManager.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }
@@ -375,7 +375,7 @@ export class TimelineView extends ItemView {
             scenes.splice(insertAt, 0, moved);
 
             // Update the field matching the current ordering mode
-            const field = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'sequence';
+            const field = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
             for (let i = 0; i < scenes.length; i++) {
                 await this.sceneManager.updateScene(scenes[i].filePath, { [field]: i + 1 } as Partial<Scene>);
             }
@@ -523,7 +523,7 @@ export class TimelineView extends ItemView {
 
         const timelineEl = container.createDiv('story-line-timeline swimlane-timeline');
         enableDragToPan(timelineEl);
-        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'sequence';
+        const sortField = this.timelineOrder === 'chronological' ? 'chronologicalOrder' : 'chapter';
         const scenes = this.sceneManager.getFilteredScenes(
             undefined,
             { field: sortField, direction: 'asc' }
@@ -719,7 +719,7 @@ export class TimelineView extends ItemView {
 
         // Status + word count footer
         const footer = card.createDiv('timeline-card-footer');
-        const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+        const statusCfg = resolveStatusCfg(scene.status || 'idea');
         const statusBadge = footer.createSpan({ cls: 'timeline-card-status', text: statusCfg.label });
         statusBadge.style.color = statusCfg.color;
 
@@ -912,7 +912,7 @@ export class TimelineView extends ItemView {
 
         // Status + word count footer
         const footer = card.createDiv('timeline-card-footer');
-        const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+        const statusCfg = resolveStatusCfg(scene.status || 'idea');
         const statusBadge = footer.createSpan({
             cls: 'timeline-card-status',
             text: statusCfg.label,
@@ -1136,10 +1136,10 @@ export class TimelineView extends ItemView {
         menu.addSeparator();
 
         // Status submenu
-        const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+        const statuses = getStatusOrder();
         statuses.forEach(status => {
             menu.addItem(item => {
-                item.setTitle(`Status: ${status}`)
+                item.setTitle(`Status: ${resolveStatusCfg(status).label}`)
                     .setChecked(scene.status === status)
                     .onClick(async () => {
                         await this.sceneManager.updateScene(scene.filePath, { status });
@@ -1484,6 +1484,7 @@ export class TimelineView extends ItemView {
         renderChaptersList();
 
         const addChapterRow = contentEl.createDiv('structure-add-row');
+        let createScenesForChapters = false;
         new Setting(addChapterRow)
             .setName('Add chapters')
             .setDesc('Enter chapter numbers (e.g. "1-10" or "1,2,3")')
@@ -1512,10 +1513,37 @@ export class TimelineView extends ItemView {
                         return;
                     }
                     await this.sceneManager.addChapters(nums);
+
+                    // Optionally create one empty scene per chapter
+                    if (createScenesForChapters) {
+                        const chapterLabels = this.sceneManager.getChapterLabels();
+                        for (const ch of nums) {
+                            const label = chapterLabels[ch];
+                            const title = label ? `Chapter ${ch} — ${label}` : `Chapter ${ch}`;
+                            await this.sceneManager.createScene({
+                                title,
+                                chapter: ch,
+                                sequence: ch,
+                                status: 'idea' as any,
+                            });
+                        }
+                    }
+
                     input.value = '';
                     renderChaptersList();
-                    new Notice(`Added ${nums.length} chapter(s)`);
+                    const msg = createScenesForChapters
+                        ? `Added ${nums.length} chapter(s) with empty scenes — visible in all views.`
+                        : `Added ${nums.length} chapter(s). Switch to Board view → Kanban → Group by Chapter to see them.`;
+                    new Notice(msg);
                 });
+            });
+
+        new Setting(addChapterRow)
+            .setName('Create an empty scene per chapter')
+            .setDesc('Makes new chapters immediately visible in all views.')
+            .addToggle(toggle => {
+                toggle.setValue(false);
+                toggle.onChange(v => { createScenesForChapters = v; });
             });
 
         // Close button

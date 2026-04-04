@@ -1,5 +1,5 @@
 import { App, Notice, TFile } from 'obsidian';
-import { Scene, STATUS_CONFIG, SceneStatus } from '../models/Scene';
+import { Scene, STATUS_CONFIG, SceneStatus, resolveStatusCfg } from '../models/Scene';
 import { StoryLineProject } from '../models/StoryLineProject';
 import { SceneManager } from './SceneManager';
 import { CharacterManager } from './CharacterManager';
@@ -185,7 +185,7 @@ export class ExportService {
         lines.push(`**Scenes:** ${scenes.length}  `);
         lines.push(`**Total words:** ${totalWords.toLocaleString()}  `);
         const statusLine = Object.entries(statusCounts)
-            .map(([s, c]) => `${STATUS_CONFIG[s as SceneStatus]?.label || s}: ${c}`)
+            .map(([s, c]) => `${resolveStatusCfg(s).label}: ${c}`)
             .join(' | ');
         lines.push(`**Status:** ${statusLine}`);
         lines.push('');
@@ -200,7 +200,7 @@ export class ExportService {
             const act = scene.act ?? '';
             const ch = scene.chapter ?? '';
             const chrono = scene.chronologicalOrder ?? '';
-            const status = STATUS_CONFIG[scene.status as SceneStatus]?.label || scene.status || '';
+            const status = resolveStatusCfg(scene.status || 'idea').label;
             const pov = scene.pov || '';
             const location = (scene.location || '').replace(/\|/g, '/');
             const words = scene.wordcount ?? '';
@@ -549,7 +549,7 @@ ${body}
             parts.push(`<td>${this.escHtml(scene.title || 'Untitled')}</td>`);
             parts.push(`<td>${scene.act ?? ''}</td>`);
             parts.push(`<td>${scene.chapter ?? ''}</td>`);
-            parts.push(`<td>${this.escHtml(STATUS_CONFIG[scene.status as SceneStatus]?.label || scene.status || '')}</td>`);
+            parts.push(`<td>${this.escHtml(resolveStatusCfg(scene.status || 'idea').label)}</td>`);
             parts.push(`<td>${this.escHtml(scene.pov || '')}</td>`);
             parts.push(`<td>${this.escHtml(scene.location || '')}</td>`);
             parts.push(`<td>${scene.wordcount ?? ''}</td>`);
@@ -590,7 +590,7 @@ ${body}
                     scene.title || 'Untitled',
                     String(scene.act ?? ''),
                     String(scene.chapter ?? ''),
-                    STATUS_CONFIG[scene.status as SceneStatus]?.label || scene.status || '',
+                    resolveStatusCfg(scene.status || 'idea').label,
                     scene.pov || '',
                     scene.location || '',
                     (scene.characters || []).join('; '),

@@ -1,5 +1,5 @@
 import { ItemView, WorkspaceLeaf, TFile } from 'obsidian';
-import { STATUS_CONFIG, SceneStatus, Scene } from '../models/Scene';
+import { STATUS_CONFIG, SceneStatus, Scene, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { Validator, PlotWarning, WarningSeverity } from '../services/Validator';
 import { renderViewSwitcher } from '../components/ViewSwitcher';
@@ -338,11 +338,11 @@ export class StatsView extends ItemView {
         statusSec.createEl('h5', { cls: 'stats-subsection-title', text: 'Status Breakdown' });
         const statusList = statusSec.createEl('ul', { cls: 'stats-list' });
 
-        const allStatuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+        const allStatuses = getStatusOrder();
         for (const status of allStatuses) {
             const count = stats.statusCounts[status] || 0;
             const pct = stats.totalScenes > 0 ? Math.round((count / stats.totalScenes) * 100) : 0;
-            const cfg = STATUS_CONFIG[status];
+            const cfg = resolveStatusCfg(status);
             const li = statusList.createEl('li');
             const lic = li.createSpan({ cls: 'stats-status-entry' });
             const ico = lic.createSpan({ cls: 'stats-status-icon' });

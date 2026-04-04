@@ -1,5 +1,5 @@
 import { App, TFile, TFolder, Notice, normalizePath, parseYaml, stringifyYaml } from 'obsidian';
-import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER, FilterPreset, BeatSheetTemplate } from '../models/Scene';
+import { Scene, SceneFilter, SortConfig, SortField, STATUS_ORDER, FilterPreset, BeatSheetTemplate, getStatusOrder } from '../models/Scene';
 import { StoryLineProject, deriveProjectFolders, deriveProjectFoldersFromFilePath } from '../models/StoryLineProject';
 import { MetadataParser } from './MetadataParser';
 import { UndoManager } from './UndoManager';
@@ -1625,11 +1625,12 @@ export class SceneManager implements ISceneStore {
 
         // Keep lower (earlier) status
         const lowestStatus = scenes.reduce((lowest, s) => {
-            const idxCurrent = STATUS_ORDER.indexOf(s.status as any);
-            const idxLowest = STATUS_ORDER.indexOf(lowest as any);
+            const statusOrder = getStatusOrder();
+            const idxCurrent = statusOrder.indexOf(s.status as any);
+            const idxLowest = statusOrder.indexOf(lowest as any);
             // -1 means not found; treat as highest so it doesn't win
-            const safeCurrent = idxCurrent >= 0 ? idxCurrent : STATUS_ORDER.length;
-            const safeLowest = idxLowest >= 0 ? idxLowest : STATUS_ORDER.length;
+            const safeCurrent = idxCurrent >= 0 ? idxCurrent : statusOrder.length;
+            const safeLowest = idxLowest >= 0 ? idxLowest : statusOrder.length;
             return safeCurrent < safeLowest ? s.status : lowest;
         }, primary.status || 'idea');
 

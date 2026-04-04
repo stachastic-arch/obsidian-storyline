@@ -1,5 +1,5 @@
 import { App, TFile, TFolder, parseYaml, stringifyYaml } from 'obsidian';
-import { Scene, SceneStatus, TimelineMode, TIMELINE_MODES } from '../models/Scene';
+import { Scene, SceneStatus, TimelineMode, TIMELINE_MODES, getStatusOrder } from '../models/Scene';
 
 /**
  * Parses frontmatter from markdown content and extracts Scene data
@@ -232,14 +232,18 @@ export class MetadataParser {
     }
 
     /**
-     * Validate and parse scene status
+     * Validate and parse scene status.
+     * Accepts any status that appears in the current status order (built-in + custom).
+     * Unknown strings are preserved as-is to prevent data loss.
      */
     private static parseStatus(status: string | undefined): SceneStatus | undefined {
-        const valid: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
-        if (status && valid.includes(status as SceneStatus)) {
-            return status as SceneStatus;
-        }
-        return undefined;
+        if (!status) return undefined;
+        const lower = String(status).toLowerCase().trim();
+        if (!lower) return undefined;
+        // Accept anything — the status order list is the source of truth for known
+        // statuses, but we preserve unknown strings so user data is never silently
+        // dropped (e.g. hand-edited YAML with a status not yet defined in settings).
+        return lower as SceneStatus;
     }
 
     /**

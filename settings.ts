@@ -1,6 +1,6 @@
 import { App, PluginSettingTab, Setting, Modal, TextAreaComponent, AbstractInputSuggest, TFolder, normalizePath } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { ColorCodingMode, SceneStatus, ViewType, SceneTemplate, BUILTIN_SCENE_TEMPLATES } from './models/Scene';
+import { ColorCodingMode, SceneStatus, ViewType, SceneTemplate, BUILTIN_SCENE_TEMPLATES, CustomStatusDef, getStatusOrder, getStatusConfig, resolveStatusCfg, registerCustomStatuses } from './models/Scene';
 import type SceneCardsPlugin from './main';
 import { HELP_VIEW_TYPE } from './constants';
 import { SLDocxSettings, SL_DEFAULT_DOCX_SETTINGS } from './services/DocxConverter';
@@ -527,6 +527,8 @@ export interface SceneCardsSettings {
     defaultStatus: SceneStatus;
     autoGenerateSequence: boolean;
     defaultTargetWordCount: number;
+    /** User-defined custom statuses appended after the built-in six */
+    customStatuses: CustomStatusDef[];
 
     // Display
     defaultView: ViewType;
@@ -647,6 +649,7 @@ export const DEFAULT_SETTINGS: SceneCardsSettings = {
     defaultStatus: 'idea',
     autoGenerateSequence: true,
     defaultTargetWordCount: 800,
+    customStatuses: [],
 
     defaultView: 'board',
     defaultBoardMode: 'corkboard',
@@ -797,8 +800,9 @@ export class SceneCardsSettingTab extends PluginSettingTab {
             .setName('Default status')
             .setDesc('Status for newly created scenes')
             .addDropdown(dropdown => {
-                const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
-                statuses.forEach(s => dropdown.addOption(s, s.charAt(0).toUpperCase() + s.slice(1)));
+                const statuses = getStatusOrder();
+                const cfg = getStatusConfig();
+                statuses.forEach(s => dropdown.addOption(s, cfg[s]?.label ?? (s.charAt(0).toUpperCase() + s.slice(1))));
                 dropdown.setValue(this.plugin.settings.defaultStatus);
                 dropdown.onChange(async (value) => {
                     this.plugin.settings.defaultStatus = value as SceneStatus;
@@ -826,6 +830,93 @@ export class SceneCardsSettingTab extends PluginSettingTab {
                     this.plugin.settings.defaultTargetWordCount = Number(value) || 800;
                     await this.plugin.saveSettings();
                 }));
+
+        // ── Custom Statuses ──
+        containerEl.createEl('h3', { text: 'Custom Statuses' });
+        const customStatusDesc = containerEl.createEl('p', {
+            cls: 'setting-item-description',
+            text: 'Add custom scene statuses after the built-in six (Idea → Final). Useful for editorial workflows like "Sent to Team", "Waiting", "Published", etc.'
+        });
+
+        const customStatusList = containerEl.createDiv('sl-custom-status-list');
+        const renderCustomStatusList = () => {
+            customStatusList.empty();
+            const defs = this.plugin.settings.customStatuses || [];
+            if (defs.length === 0) {
+                customStatusList.createEl('p', { cls: 'setting-item-description', text: 'No custom statuses defined.' });
+            }
+            for (let i = 0; i < defs.length; i++) {
+                const def = defs[i];
+                const row = customStatusList.createDiv('sl-custom-status-row');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.gap = '8px';
+                row.style.marginBottom = '4px';
+
+                const colorSwatch = row.createEl('input', { type: 'color' });
+                colorSwatch.value = def.color;
+                colorSwatch.style.width = '32px';
+                colorSwatch.style.height = '28px';
+                colorSwatch.style.border = 'none';
+                colorSwatch.style.cursor = 'pointer';
+                colorSwatch.addEventListener('change', async () => {
+                    def.color = colorSwatch.value;
+                    registerCustomStatuses(this.plugin.settings.customStatuses);
+                    await this.plugin.saveSettings();
+                });
+
+                const labelInput = row.createEl('input', { type: 'text', value: def.label });
+                labelInput.placeholder = 'Label';
+                labelInput.style.flex = '1';
+                labelInput.addEventListener('change', async () => {
+                    def.label = labelInput.value.trim() || def.id;
+                    registerCustomStatuses(this.plugin.settings.customStatuses);
+                    await this.plugin.saveSettings();
+                });
+
+                const removeBtn = row.createEl('button', { text: '×', cls: 'clickable-icon' });
+                removeBtn.addEventListener('click', async () => {
+                    defs.splice(i, 1);
+                    registerCustomStatuses(this.plugin.settings.customStatuses);
+                    await this.plugin.saveSettings();
+                    renderCustomStatusList();
+                });
+            }
+        };
+        renderCustomStatusList();
+
+        new Setting(containerEl)
+            .setName('Add custom status')
+            .setDesc('Enter a name for the new status (e.g. "Sent to Team")')
+            .addText(text => {
+                text.setPlaceholder('Status name…');
+                (text.inputEl as any)._ref = text;
+            })
+            .addButton(btn => {
+                btn.setButtonText('Add').setCta().onClick(async () => {
+                    const input = btn.buttonEl.parentElement?.parentElement?.querySelector('input[type="text"]') as HTMLInputElement;
+                    const name = input?.value?.trim();
+                    if (!name) return;
+                    const id = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                    if (!id) return;
+                    const existing = getStatusOrder();
+                    if (existing.includes(id)) {
+                        new (obsidian as any).Notice(`Status "${id}" already exists.`);
+                        return;
+                    }
+                    if (!this.plugin.settings.customStatuses) this.plugin.settings.customStatuses = [];
+                    this.plugin.settings.customStatuses.push({
+                        id,
+                        label: name,
+                        color: '#607D8B',
+                        icon: 'circle',
+                    });
+                    registerCustomStatuses(this.plugin.settings.customStatuses);
+                    await this.plugin.saveSettings();
+                    input.value = '';
+                    renderCustomStatusList();
+                });
+            });
 
         // ═══════════════════════════════════════════
         //  Display Options
@@ -2489,8 +2580,9 @@ class TemplateEditorModal extends Modal {
             .setName('Default status')
             .addDropdown(dd => {
                 dd.addOption('', '(none)');
-                const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
-                statuses.forEach(s => dd.addOption(s, s.charAt(0).toUpperCase() + s.slice(1)));
+                const statuses = getStatusOrder();
+                const cfg = getStatusConfig();
+                statuses.forEach(s => dd.addOption(s, cfg[s]?.label ?? (s.charAt(0).toUpperCase() + s.slice(1))));
                 dd.setValue(this.template.defaultFields.status || '');
                 dd.onChange(v => {
                     if (v) this.template.defaultFields.status = v as SceneStatus;

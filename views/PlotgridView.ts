@@ -3,7 +3,7 @@ import * as obsidian from 'obsidian';
 import { CellData, ColumnMeta, RowMeta, PlotGridData } from '../models/PlotGridData';
 import { LocationManager } from '../services/LocationManager';
 import { openConfirmModal } from '../components/ConfirmModal';
-import { Scene, SceneStatus, STATUS_CONFIG } from '../models/Scene';
+import { Scene, SceneStatus, STATUS_CONFIG, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import type { SceneFilter, SortConfig } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import { CharacterManager } from '../services/CharacterManager';
@@ -836,7 +836,7 @@ export class PlotgridView extends ItemView {
             if (row.sourceType === 'auto' && row.sourceId && sceneManager) {
                 const rowScene = sceneManager.getScene(row.sourceId);
                 if (rowScene) {
-                    const statusCfg = STATUS_CONFIG[rowScene.status || 'idea'];
+                    const statusCfg = resolveStatusCfg(rowScene.status || 'idea');
                     rowEl.style.borderLeft = `4px solid ${statusCfg.color}`;
                 }
             }
@@ -844,6 +844,7 @@ export class PlotgridView extends ItemView {
             // allow naming like cells: double-click to edit label
             rowEl.addEventListener('dblclick', (ev) => {
                 ev.stopPropagation();
+                rowEl.draggable = false;
                 const inp = document.createElement('input');
                 inp.type = 'text';
                 inp.value = row.label;
@@ -852,20 +853,30 @@ export class PlotgridView extends ItemView {
                 rowEl.empty();
                 rowEl.appendChild(inp);
                 inp.focus();
+                inp.select();
                 const commit = () => { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); };
                 inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { commit(); } else if (ke.key === 'Escape') { this.renderGrid(); } });
                 inp.addEventListener('blur', () => commit());
             });
 
             // click opens scene file for synced rows; Ctrl/Cmd+click selects
+            // Use a small delay so double-click (edit label) doesn't also open the file
+            let clickTimer: ReturnType<typeof setTimeout> | null = null;
             rowEl.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 if (row.sourceType === 'auto' && row.sourceId && !(ev.ctrlKey || ev.metaKey)) {
-                    const file = this.app.vault.getAbstractFileByPath(row.sourceId) as TFile | null;
-                    if (file) this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
+                    if (clickTimer) clearTimeout(clickTimer);
+                    clickTimer = setTimeout(() => {
+                        clickTimer = null;
+                        const file = this.app.vault.getAbstractFileByPath(row.sourceId!) as TFile | null;
+                        if (file) this.app.workspace.getLeaf('tab').openFile(file, { state: { mode: 'source', source: false } });
+                    }, 250);
                     return;
                 }
                 this.selectRowHeader(ri);
+            });
+            rowEl.addEventListener('dblclick', () => {
+                if (clickTimer) { clearTimeout(clickTimer); clickTimer = null; }
             });
             if (row.sourceType === 'auto' && row.sourceId) {
                 rowEl.title = `${row.label} (click to open)`;
@@ -905,8 +916,19 @@ export class PlotgridView extends ItemView {
                 evt.preventDefault();
                 const menu = new Menu();
                 menu.addItem((item) => item.setTitle('Rename Row').onClick(() => {
-                    const name = window.prompt('Rename row', row.label);
-                    if (name !== null) { row.label = name; this.scheduleSave(); this.renderGrid(); }
+                    rowEl.draggable = false;
+                    const inp = document.createElement('input');
+                    inp.type = 'text';
+                    inp.value = row.label;
+                    inp.style.width = '100%';
+                    inp.style.boxSizing = 'border-box';
+                    rowEl.empty();
+                    rowEl.appendChild(inp);
+                    inp.focus();
+                    inp.select();
+                    const commit = () => { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); };
+                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { commit(); } else if (ke.key === 'Escape') { this.renderGrid(); } });
+                    inp.addEventListener('blur', () => commit());
                 }));
                 menu.addItem((item) => item.setTitle((this.data.stickyHeaders ? 'Disable' : 'Enable') + ' Sticky Headers').onClick(() => { this.data.stickyHeaders = !this.data.stickyHeaders; this.scheduleSave(); this.renderToolbar(); this.renderGrid(); }));
                 menu.addItem((item) => item.setTitle('Set Row Colour…').onClick(() => {
@@ -1064,7 +1086,7 @@ export class PlotgridView extends ItemView {
 
                         // Status icon + title row
                         const titleRow = miniCard.createDiv('pg-mini-title-row');
-                        const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+                        const statusCfg = resolveStatusCfg(scene.status || 'idea');
                         const statusIcon = titleRow.createSpan({ cls: 'pg-mini-status-icon' });
                         obsidian.setIcon(statusIcon, statusCfg.icon);
                         statusIcon.title = statusCfg.label;
@@ -1263,9 +1285,9 @@ export class PlotgridView extends ItemView {
                         }));
                         menu.addSeparator();
                         // Status submenu
-                        const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+                        const statuses = getStatusOrder();
                         statuses.forEach(s => {
-                            menu.addItem((it) => it.setTitle(`Status: ${s.charAt(0).toUpperCase() + s.slice(1)}`)
+                            menu.addItem((it) => it.setTitle(`Status: ${resolveStatusCfg(s).label}`)
                                 .setChecked(linkedScene.status === s)
                                 .onClick(async () => {
                                     await scMgr?.updateScene(linkedScene.filePath, { status: s });

@@ -1,4 +1,4 @@
-import { Scene, STATUS_CONFIG, SceneStatus, ColorCodingMode, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode } from '../models/Scene';
+import { Scene, STATUS_CONFIG, SceneStatus, ColorCodingMode, TIMELINE_MODE_LABELS, TIMELINE_MODE_ICONS, TimelineMode, getStatusOrder, resolveStatusCfg } from '../models/Scene';
 import * as obsidian from 'obsidian';
 import { MarkdownRenderer, Component, Modal, App } from 'obsidian';
 import type SceneCardsPlugin from '../main';
@@ -61,7 +61,7 @@ export class SceneCardComponent {
                 text: this.formatSequence(scene)
             });
         }
-        const statusCfg = STATUS_CONFIG[scene.status || 'idea'];
+        const statusCfg = resolveStatusCfg(scene.status || 'idea');
         const statusIconEl = header.createSpan({
             cls: 'scene-card-status-icon',
             attr: { title: statusCfg.label }
@@ -219,11 +219,13 @@ export class SceneCardComponent {
      * Render status progress dots (●/○)
      */
     private renderProgressDots(container: HTMLElement, status: SceneStatus) {
-        const order = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+        const order = getStatusOrder();
         const idx = order.indexOf(status);
-        for (let i = 0; i < 3; i++) {
-            const r = i * 2;
-            const filled = idx >= r;
+        // Show 3 dots for 6 or fewer statuses, otherwise scale number of dots
+        const dotCount = Math.max(3, Math.ceil(order.length / 2));
+        for (let i = 0; i < dotCount; i++) {
+            const threshold = i * Math.max(1, Math.floor(order.length / dotCount));
+            const filled = idx >= threshold;
             container.createSpan({
                 cls: `scene-card-dot ${filled ? 'filled' : 'empty'}`,
                 text: filled ? '●' : '○'
@@ -267,7 +269,7 @@ export class SceneCardComponent {
     private getCardColor(scene: Scene, mode: ColorCodingMode): string {
         switch (mode) {
             case 'status':
-                return STATUS_CONFIG[scene.status || 'idea'].color;
+                return resolveStatusCfg(scene.status || 'idea').color;
             case 'pov':
                 return this.stringToColor(scene.pov || 'none');
             case 'emotion':
@@ -277,7 +279,7 @@ export class SceneCardComponent {
             case 'tag':
                 return this.tagToColor(scene.tags);
             default:
-                return STATUS_CONFIG[scene.status || 'idea'].color;
+                return resolveStatusCfg(scene.status || 'idea').color;
         }
     }
 

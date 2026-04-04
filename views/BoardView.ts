@@ -1,6 +1,6 @@
 import { ItemView, WorkspaceLeaf, Menu, Notice, TFile, Modal, Setting, MarkdownRenderer } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { Scene, SceneFilter, SortConfig, BoardGroupBy, SceneStatus, BUILTIN_BEAT_SHEETS } from '../models/Scene';
+import { Scene, SceneFilter, SortConfig, BoardGroupBy, SceneStatus, BUILTIN_BEAT_SHEETS, getStatusOrder, getStatusConfig, resolveStatusCfg } from '../models/Scene';
 import { openConfirmModal } from '../components/ConfirmModal';
 import { SceneManager } from '../services/SceneManager';
 import { SceneCardComponent } from '../components/SceneCard';
@@ -304,8 +304,8 @@ export class BoardView extends ItemView {
         // Icon button group
         const iconGroup = controls.createDiv('story-line-icon-group');
 
-        // Add acts/chapters button (kanban only)
-        if (this.boardMode !== 'corkboard') {
+        // Add acts/chapters button (available in both kanban and corkboard)
+        {
             const structBtn = iconGroup.createEl('button', {
                 cls: 'clickable-icon',
             });
@@ -314,7 +314,7 @@ export class BoardView extends ItemView {
             } else {
                 console.error('obsidian.setIcon is not defined when setting structBtn');
             }
-            attachTooltip(structBtn, 'Add acts or chapters');
+            attachTooltip(structBtn, 'Beat Sheet Templates / Add acts or chapters');
             structBtn.addEventListener('click', () => this.openStructureModal());
         }
 
@@ -344,10 +344,11 @@ export class BoardView extends ItemView {
                     return (a.sequence ?? 0) - (b.sequence ?? 0);
                 });
                 for (let i = 0; i < sorted.length; i++) {
-                    await this.sceneManager.updateScene(sorted[i].filePath, {
-                        sequence: i + 1,
-                        chapter: i + 1,
-                    });
+                    const upd: Record<string, any> = { sequence: i + 1 };
+                    if (this.groupBy === 'chapter') {
+                        upd.chapter = i + 1;
+                    }
+                    await this.sceneManager.updateScene(sorted[i].filePath, upd);
                 }
                 await this.sceneManager.initialize();
                 this.refreshBoard();
@@ -1689,9 +1690,13 @@ export class BoardView extends ItemView {
                 if (match) updates.chapter = Number(match[1]);
                 break;
             }
-            case 'status':
-                updates.status = columnTitle as SceneStatus;
+            case 'status': {
+                // Map column display label back to status id
+                const cfg = getStatusConfig();
+                const statusId = Object.entries(cfg).find(([, v]) => v.label === columnTitle)?.[0] || columnTitle.toLowerCase();
+                updates.status = statusId as SceneStatus;
                 break;
+            }
             case 'pov':
                 updates.pov = columnTitle !== 'No POV' ? columnTitle : undefined;
                 break;
@@ -1708,21 +1713,45 @@ export class BoardView extends ItemView {
             ? siblings.length
             : insertBefore ? targetIdx : targetIdx + 1;
 
-        // Assign sequences 1..N in the new order, and keep chapter in sync
-        let seq = 1;
+        // Build the new ordered list including the dragged scene
+        const newOrder: string[] = [];
         for (let i = 0; i < siblings.length; i++) {
-            if (i === insertIdx) {
-                updates.sequence = seq;
-                updates.chapter = seq;
-                seq++;
-            }
-            await this.sceneManager.updateScene(siblings[i].filePath, { sequence: seq, chapter: seq });
-            seq++;
+            if (i === insertIdx) newOrder.push(draggedPath);
+            newOrder.push(siblings[i].filePath);
         }
-        // Dragged scene goes at end if insertIdx === siblings.length
-        if (updates.sequence === undefined) {
-            updates.sequence = seq;
-            updates.chapter = seq;
+        if (newOrder.indexOf(draggedPath) === -1) newOrder.push(draggedPath);
+
+        // Collect the existing sequence values from all column scenes (including dragged)
+        // and re-distribute them so relative global order is preserved but internal
+        // order matches the new arrangement.
+        const allColumnScenes = [...columnScenes];
+        const draggedScene = allColumnScenes.find(s => s.filePath === draggedPath)
+            ?? this.sceneManager.getAllScenes().find(s => s.filePath === draggedPath);
+        if (draggedScene && !allColumnScenes.some(s => s.filePath === draggedPath)) {
+            allColumnScenes.push(draggedScene);
+        }
+        const existingSeqs = allColumnScenes
+            .map(s => s.sequence ?? 0)
+            .sort((a, b) => a - b);
+        // If we need one more slot (dragged came from another column), generate one
+        while (existingSeqs.length < newOrder.length) {
+            const maxSeq = existingSeqs.length > 0 ? existingSeqs[existingSeqs.length - 1] : 0;
+            existingSeqs.push(maxSeq + 1);
+        }
+
+        // Assign sequences preserving the existing range but in the new order
+        for (let i = 0; i < newOrder.length; i++) {
+            const sceneUpdates: Partial<Scene> = { sequence: existingSeqs[i] };
+            // Only update chapter when grouping by chapter to avoid overwriting user chapter values
+            if (this.groupBy === 'chapter') {
+                sceneUpdates.chapter = existingSeqs[i];
+            }
+            if (newOrder[i] === draggedPath) {
+                updates.sequence = existingSeqs[i];
+                if (this.groupBy === 'chapter') updates.chapter = existingSeqs[i];
+            } else {
+                await this.sceneManager.updateScene(newOrder[i], sceneUpdates);
+            }
         }
 
         await this.sceneManager.updateScene(draggedPath, updates);
@@ -1750,7 +1779,9 @@ export class BoardView extends ItemView {
                 break;
             }
             case 'status': {
-                updates.status = columnTitle as SceneStatus;
+                const cfg = getStatusConfig();
+                const statusId = Object.entries(cfg).find(([, v]) => v.label === columnTitle)?.[0] || columnTitle.toLowerCase();
+                updates.status = statusId as SceneStatus;
                 break;
             }
             case 'pov': {
@@ -1759,13 +1790,16 @@ export class BoardView extends ItemView {
             }
         }
 
-        // Update sequence to be at end of column, and sync chapter
+        // Update sequence to be at end of column
         const maxSeq = columnScenes.reduce(
             (max, s) => Math.max(max, s.sequence ?? 0),
             0
         );
         updates.sequence = maxSeq + 1;
-        updates.chapter = maxSeq + 1;
+        // Only sync chapter when grouping by chapter
+        if (this.groupBy === 'chapter') {
+            updates.chapter = maxSeq + 1;
+        }
 
         await this.sceneManager.updateScene(filePath, updates);
         this.plugin.viewSnapshotService.scheduleAutoSave();
@@ -1846,10 +1880,10 @@ export class BoardView extends ItemView {
         obsidian.setIcon(statusIcon, 'check-circle');
         statusBtn.addEventListener('click', (e) => {
             const menu = new Menu();
-            const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+            const statuses = getStatusOrder();
             statuses.forEach(status => {
                 menu.addItem(item => {
-                    item.setTitle(status.charAt(0).toUpperCase() + status.slice(1))
+                    item.setTitle(resolveStatusCfg(status).label)
                         .onClick(async () => {
                             for (const fp of this.selectedScenes) {
                                 await this.sceneManager.updateScene(fp, { status });
@@ -2124,10 +2158,10 @@ export class BoardView extends ItemView {
         menu.addSeparator();
 
         // Status submenu
-        const statuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+        const statuses = getStatusOrder();
         statuses.forEach(status => {
             menu.addItem(item => {
-                item.setTitle(`Status: ${status}`)
+                item.setTitle(`Status: ${resolveStatusCfg(status).label}`)
                     .setChecked(scene.status === status)
                     .onClick(async () => {
                         await this.sceneManager.updateScene(scene.filePath, { status });
@@ -2737,6 +2771,7 @@ export class BoardView extends ItemView {
         renderChaptersList();
 
         const addChapterRow = contentEl.createDiv('structure-add-row');
+        let createScenesForChapters = false;
         new Setting(addChapterRow)
             .setName('Add chapters')
             .setDesc('Enter chapter numbers (e.g. "1-10" or "1,2,3")')
@@ -2766,10 +2801,37 @@ export class BoardView extends ItemView {
                         return;
                     }
                     await this.sceneManager.addChapters(nums);
+
+                    // Optionally create one empty scene per chapter
+                    if (createScenesForChapters) {
+                        const chLabels = this.sceneManager.getChapterLabels();
+                        for (const ch of nums) {
+                            const label = chLabels[ch];
+                            const title = label ? `Chapter ${ch} — ${label}` : `Chapter ${ch}`;
+                            await this.sceneManager.createScene({
+                                title,
+                                chapter: ch,
+                                sequence: ch,
+                                status: 'idea' as any,
+                            });
+                        }
+                    }
+
                     input.value = '';
                     renderChaptersList();
-                    new Notice(`Added ${nums.length} chapter(s)`);
+                    const msg = createScenesForChapters
+                        ? `Added ${nums.length} chapter(s) with empty scenes — visible in all views.`
+                        : `Added ${nums.length} chapter(s). Group by Chapter in Kanban to see them.`;
+                    new Notice(msg);
                 });
+            });
+
+        new Setting(addChapterRow)
+            .setName('Create an empty scene per chapter')
+            .setDesc('Makes new chapters immediately visible in all views.')
+            .addToggle(toggle => {
+                toggle.setValue(false);
+                toggle.onChange(v => { createScenesForChapters = v; });
             });
 
         // Close button
@@ -2797,10 +2859,12 @@ export class BoardView extends ItemView {
                 const match = presetColumn.match(/Chapter (.+)/);
                 if (match) defaults.chapter = Number(match[1]) || match[1];
             } else if (this.groupBy === 'status') {
-                const statusMap: Record<string, string> = {
-                    'Idea': 'idea', 'Outlined': 'outlined', 'Draft': 'draft',
-                    'Written': 'written', 'Revised': 'revised', 'Final': 'final',
-                };
+                // Build a label→id mapping from the dynamic status config
+                const cfg = getStatusConfig();
+                const statusMap: Record<string, string> = {};
+                for (const [id, def] of Object.entries(cfg)) {
+                    statusMap[def.label] = id;
+                }
                 const statusVal = statusMap[presetColumn] || presetColumn.toLowerCase();
                 defaults.status = statusVal as any;
             } else if (this.groupBy === 'pov') {

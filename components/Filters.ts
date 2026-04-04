@@ -1,6 +1,6 @@
 import { Setting, Notice } from 'obsidian';
 import * as obsidian from 'obsidian';
-import { SceneFilter, SceneStatus, SortConfig, SortField, SortDirection, FilterPreset } from '../models/Scene';
+import { SceneFilter, SceneStatus, SortConfig, SortField, SortDirection, FilterPreset, getStatusOrder } from '../models/Scene';
 import { SceneManager } from '../services/SceneManager';
 import type SceneCardsPlugin from '../main';
 
@@ -125,7 +125,7 @@ export class FiltersComponent {
         if (statusValues.length > 0) {
             const statusSetting = new Setting(panel).setName('Status');
             const statusContainer = panel.createDiv('story-line-filter-chips');
-            const allStatuses: SceneStatus[] = ['idea', 'outlined', 'draft', 'written', 'revised', 'final'];
+            const allStatuses = getStatusOrder();
             allStatuses.forEach(status => {
                 const chip = statusContainer.createEl('button', {
                     cls: 'story-line-chip',
