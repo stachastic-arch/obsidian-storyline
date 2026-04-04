@@ -8,9 +8,9 @@
 
 - **Tab title on project switch** — Switching projects now immediately updates the tab title. Previously the tab still showed the old project name until you changed views.
 
-- **Resequencing preserves existing order** — Dragging a card within the Board view no longer resets all sequence numbers in the column to 1..N. Existing sequence ranges are preserved and only the moved card is updated. The Resequence toolbar button and column-level drops also no longer overwrite the `chapter` field when grouping by status or other non-chapter fields.
+- **Resequencing preserves existing order** — Dragging a card in the Board view no longer resets all sequence numbers in the column. Only the dragged card gets a new sequence number (inserted between neighbors using midpoint gaps, or shifting only when necessary). Cards that aren't moved keep their original sequence, so dragging a scene to another act and back preserves the numbering of all other scenes. The Resequence toolbar button and column-level drops also no longer overwrite the `chapter` field when grouping by status or other non-chapter fields.
 
-- **Plotgrid "Rename Row" now works** — The right-click "Rename Row" menu item in Plot Grid view now opens an inline text input instead of a browser prompt dialog, which was blocked by the drag-to-reorder system. Double-click editing also disables dragging during the edit so mouse text selection works properly. For rows linked to scenes, single-click opens the scene (with a short delay) and double-click enters edit mode without also opening the file.
+- **Plotgrid Rename Row & Column now works** — The right-click "Rename Row" and "Rename Column" menu items in Plot Grid view now open a small modal dialog instead of a browser prompt, which was blocked by the context menu and drag-to-reorder systems. Double-click editing on row headers also disables dragging during the edit so mouse text selection works properly. For rows linked to scenes, single-click opens the scene (with a short delay) and double-click enters edit mode without also opening the file.
 
 ### New Features
 

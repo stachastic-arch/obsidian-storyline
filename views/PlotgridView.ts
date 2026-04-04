@@ -764,8 +764,18 @@ export class PlotgridView extends ItemView {
                 evt.preventDefault();
                 const menu = new Menu();
                 menu.addItem((item) => item.setTitle('Rename Column').onClick(() => {
-                    const name = window.prompt('Rename column', col.label);
-                    if (name !== null) { col.label = name; this.scheduleSave(); this.renderGrid(); }
+                    const modal = new Modal(this.app);
+                    modal.titleEl.setText('Rename Column');
+                    const inp = modal.contentEl.createEl('input', { type: 'text', cls: 'plot-grid-rename-input' });
+                    inp.style.width = '100%';
+                    inp.value = col.label;
+                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { col.label = inp.value || col.label; this.scheduleSave(); this.renderGrid(); modal.close(); } });
+                    const btn = modal.contentEl.createEl('button', { text: 'OK', cls: 'mod-cta' });
+                    btn.style.marginTop = '8px';
+                    btn.addEventListener('click', () => { col.label = inp.value || col.label; this.scheduleSave(); this.renderGrid(); modal.close(); });
+                    modal.open();
+                    inp.focus();
+                    inp.select();
                 }));
                 menu.addItem((item) => item.setTitle((this.data.stickyHeaders ? 'Disable' : 'Enable') + ' Sticky Headers').onClick(() => { this.data.stickyHeaders = !this.data.stickyHeaders; this.scheduleSave(); this.renderToolbar(); this.renderGrid(); }));
                 menu.addItem((item) => item.setTitle('Set Column Colour…').onClick(() => {
@@ -916,19 +926,18 @@ export class PlotgridView extends ItemView {
                 evt.preventDefault();
                 const menu = new Menu();
                 menu.addItem((item) => item.setTitle('Rename Row').onClick(() => {
-                    rowEl.draggable = false;
-                    const inp = document.createElement('input');
-                    inp.type = 'text';
-                    inp.value = row.label;
+                    const modal = new Modal(this.app);
+                    modal.titleEl.setText('Rename Row');
+                    const inp = modal.contentEl.createEl('input', { type: 'text', cls: 'plot-grid-rename-input' });
                     inp.style.width = '100%';
-                    inp.style.boxSizing = 'border-box';
-                    rowEl.empty();
-                    rowEl.appendChild(inp);
+                    inp.value = row.label;
+                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); modal.close(); } });
+                    const btn = modal.contentEl.createEl('button', { text: 'OK', cls: 'mod-cta' });
+                    btn.style.marginTop = '8px';
+                    btn.addEventListener('click', () => { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); modal.close(); });
+                    modal.open();
                     inp.focus();
                     inp.select();
-                    const commit = () => { row.label = inp.value || row.label; this.scheduleSave(); this.renderGrid(); };
-                    inp.addEventListener('keydown', (ke) => { if (ke.key === 'Enter') { commit(); } else if (ke.key === 'Escape') { this.renderGrid(); } });
-                    inp.addEventListener('blur', () => commit());
                 }));
                 menu.addItem((item) => item.setTitle((this.data.stickyHeaders ? 'Disable' : 'Enable') + ' Sticky Headers').onClick(() => { this.data.stickyHeaders = !this.data.stickyHeaders; this.scheduleSave(); this.renderToolbar(); this.renderGrid(); }));
                 menu.addItem((item) => item.setTitle('Set Row Colour…').onClick(() => {

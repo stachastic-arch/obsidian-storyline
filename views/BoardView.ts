@@ -1691,7 +1691,6 @@ export class BoardView extends ItemView {
                 break;
             }
             case 'status': {
-                // Map column display label back to status id
                 const cfg = getStatusConfig();
                 const statusId = Object.entries(cfg).find(([, v]) => v.label === columnTitle)?.[0] || columnTitle.toLowerCase();
                 updates.status = statusId as SceneStatus;
@@ -1702,8 +1701,7 @@ export class BoardView extends ItemView {
                 break;
         }
 
-        // Build the desired order: take column scenes without the dragged one,
-        // then splice the dragged scene in at the target position.
+        // Build sorted list of siblings (column scenes excluding the dragged card)
         const siblings = columnScenes
             .filter(s => s.filePath !== draggedPath)
             .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
@@ -1713,45 +1711,32 @@ export class BoardView extends ItemView {
             ? siblings.length
             : insertBefore ? targetIdx : targetIdx + 1;
 
-        // Build the new ordered list including the dragged scene
-        const newOrder: string[] = [];
-        for (let i = 0; i < siblings.length; i++) {
-            if (i === insertIdx) newOrder.push(draggedPath);
-            newOrder.push(siblings[i].filePath);
-        }
-        if (newOrder.indexOf(draggedPath) === -1) newOrder.push(draggedPath);
+        // Compute a new sequence for the dragged card by inserting between neighbors.
+        // This avoids changing any other card's sequence number.
+        let newSeq: number;
+        const prevSeq = insertIdx > 0 ? (siblings[insertIdx - 1].sequence ?? 0) : 0;
+        const nextSeq = insertIdx < siblings.length ? (siblings[insertIdx].sequence ?? 0) : null;
 
-        // Collect the existing sequence values from all column scenes (including dragged)
-        // and re-distribute them so relative global order is preserved but internal
-        // order matches the new arrangement.
-        const allColumnScenes = [...columnScenes];
-        const draggedScene = allColumnScenes.find(s => s.filePath === draggedPath)
-            ?? this.sceneManager.getAllScenes().find(s => s.filePath === draggedPath);
-        if (draggedScene && !allColumnScenes.some(s => s.filePath === draggedPath)) {
-            allColumnScenes.push(draggedScene);
-        }
-        const existingSeqs = allColumnScenes
-            .map(s => s.sequence ?? 0)
-            .sort((a, b) => a - b);
-        // If we need one more slot (dragged came from another column), generate one
-        while (existingSeqs.length < newOrder.length) {
-            const maxSeq = existingSeqs.length > 0 ? existingSeqs[existingSeqs.length - 1] : 0;
-            existingSeqs.push(maxSeq + 1);
+        if (nextSeq !== null && nextSeq > prevSeq + 1) {
+            // There's a gap — pick the midpoint (integer)
+            newSeq = Math.floor((prevSeq + nextSeq) / 2);
+            if (newSeq <= prevSeq) newSeq = prevSeq + 1; // safety: ensure it's actually between
+        } else if (nextSeq !== null && nextSeq === prevSeq + 1) {
+            // No integer gap — need to shift subsequent siblings up by 1 to make room
+            newSeq = nextSeq;
+            for (let i = siblings.length - 1; i >= insertIdx; i--) {
+                await this.sceneManager.updateScene(siblings[i].filePath, {
+                    sequence: (siblings[i].sequence ?? 0) + 1,
+                });
+            }
+        } else {
+            // Inserting at the end
+            newSeq = prevSeq + 1;
         }
 
-        // Assign sequences preserving the existing range but in the new order
-        for (let i = 0; i < newOrder.length; i++) {
-            const sceneUpdates: Partial<Scene> = { sequence: existingSeqs[i] };
-            // Only update chapter when grouping by chapter to avoid overwriting user chapter values
-            if (this.groupBy === 'chapter') {
-                sceneUpdates.chapter = existingSeqs[i];
-            }
-            if (newOrder[i] === draggedPath) {
-                updates.sequence = existingSeqs[i];
-                if (this.groupBy === 'chapter') updates.chapter = existingSeqs[i];
-            } else {
-                await this.sceneManager.updateScene(newOrder[i], sceneUpdates);
-            }
+        updates.sequence = newSeq;
+        if (this.groupBy === 'chapter') {
+            updates.chapter = newSeq;
         }
 
         await this.sceneManager.updateScene(draggedPath, updates);
